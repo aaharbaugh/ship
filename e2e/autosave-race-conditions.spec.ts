@@ -177,6 +177,8 @@ test.describe('Auto-Save Race Conditions - Throttle Behavior', () => {
   });
 
   test('throttle: saves periodically during long typing session', async ({ page, context }) => {
+    await expect(page).toHaveURL(/\/(docs|login|documents)\b/);
+
     // Track API calls
     const apiCalls: { timestamp: number; title: string }[] = [];
     await context.route('**/api/documents/**', async (route) => {
@@ -276,6 +278,7 @@ test.describe('Auto-Save Race Conditions - Slow Network', () => {
 
   test('slow response does not overwrite faster local changes', async ({ page, context }) => {
     await createNewDocument(page);
+    await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/);
 
     // Slow down PATCH responses significantly
     await context.route('**/api/documents/**', async (route) => {

@@ -1,0 +1,525 @@
+{
+  "generatedAt": "2026-03-10T16:18:44.624Z",
+  "flows": [
+    {
+      "flow": "unlabeled",
+      "requestCount": 3,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/csrf-token",
+          "statusCode": 200,
+          "totalQueries": 0,
+          "slowestQueryMs": 0
+        },
+        {
+          "method": "GET",
+          "url": "/api/csrf-token",
+          "statusCode": 200,
+          "totalQueries": 0,
+          "slowestQueryMs": 0
+        },
+        {
+          "method": "POST",
+          "url": "/api/auth/login",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 10.089
+        }
+      ],
+      "totalQueries": 10,
+      "slowestQuery": {
+        "text": "SELECT u.id, u.email, u.password_hash, u.name, u.is_super_admin, u.last_workspace_id FROM users u WHERE LOWER(u.email) = LOWER($1)",
+        "values": [
+          "dev@ship.local"
+        ],
+        "ms": 10.089,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT u.id, u.email, u.password_hash, u.name, u.is_super_admin, u.last_workspace_id FROM users u WHERE LOWER(u.email) = LOWER($1)",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "INSERT INTO sessions (id, user_id, workspace_id, expires_at, last_activity, user_agent, ip_address) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          "count": 2
+        },
+        {
+          "text": "UPDATE users SET last_workspace_id = $1, updated_at = NOW() WHERE id = $2",
+          "count": 2
+        },
+        {
+          "text": "INSERT INTO audit_logs (workspace_id, actor_user_id, impersonating_user_id, action, resource_type, resource_id, details, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "flow": "load-main-page",
+      "requestCount": 2,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/auth/me",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 12.318
+        },
+        {
+          "method": "GET",
+          "url": "/api/dashboard/my-week",
+          "statusCode": 200,
+          "totalQueries": 18,
+          "slowestQueryMs": 3.763
+        }
+      ],
+      "totalQueries": 28,
+      "slowestQuery": {
+        "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+        "values": [
+          "2026-03-10T16:18:44.474Z",
+          "0e85efb12f0a7ae88b5f643ad76cb411915f1a1004a28c6c12b59c041463e702"
+        ],
+        "ms": 12.318,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+          "count": 4
+        },
+        {
+          "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+          "count": 4
+        },
+        {
+          "text": "SELECT id, email, name, is_super_admin FROM users WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2 WHERE w.id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT id, title FROM documents WHERE workspace_id = $1 AND document_type = 'person' AND (properties->>'user_id') = $2 LIMIT 1",
+          "count": 2
+        },
+        {
+          "text": "SELECT sprint_start_date FROM workspaces WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT id, title, content, properties, created_at, updated_at FROM documents WHERE workspace_id = $1 AND document_type = 'weekly_plan' AND (properties->>'person_id') = $2 AND (properties->>'week_number')::int = $3 AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1",
+          "count": 2
+        },
+        {
+          "text": "SELECT id, title, content, properties, created_at, updated_at FROM documents WHERE workspace_id = $1 AND document_type = 'weekly_retro' AND (properties->>'person_id') = $2 AND (properties->>'week_number')::int = $3 AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1",
+          "count": 2
+        },
+        {
+          "text": "SELECT id, title, properties FROM documents WHERE workspace_id = $1 AND document_type = 'weekly_retro' AND (properties->>'person_id') = $2 AND (properties->>'week_number')::int = $3 AND archived_at IS NULL AND deleted_at IS NULL LIMIT 1",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "flow": "view-document",
+      "requestCount": 3,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/auth/me",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 2.266
+        },
+        {
+          "method": "GET",
+          "url": "/api/documents/6481e5e5-f358-437c-ae4c-8a93482ffadf",
+          "statusCode": 200,
+          "totalQueries": 8,
+          "slowestQueryMs": 2.255
+        },
+        {
+          "method": "GET",
+          "url": "/api/documents/6481e5e5-f358-437c-ae4c-8a93482ffadf/context",
+          "statusCode": 200,
+          "totalQueries": 14,
+          "slowestQueryMs": 3.345
+        }
+      ],
+      "totalQueries": 32,
+      "slowestQuery": {
+        "text": "SELECT da.relationship_type as type, d.id, d.title, d.document_type, d.properties->>'color' as color FROM document_associations da JOIN documents d ON d.id = da.related_id WHERE da.document_id = $1 AND da.relationship_type IN ('project', 'sprint', 'program') AND d.workspace_id = $2 AND d.archived_at IS NULL ORDER BY CASE da.relationship_type WHEN 'program' THEN 1 WHEN 'project' THEN 2 WHEN 'sprint' THEN 3 END",
+        "values": [
+          "6481e5e5-f358-437c-ae4c-8a93482ffadf",
+          "e1e0431d-f86f-4ac0-98ed-e1538f653a09"
+        ],
+        "ms": 3.345,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+          "count": 6
+        },
+        {
+          "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+          "count": 6
+        },
+        {
+          "text": "SELECT id, email, name, is_super_admin FROM users WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2 WHERE w.id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.*, (d.visibility = 'workspace' OR d.created_by = $2 OR (SELECT role FROM workspace_memberships WHERE workspace_id = $3 AND user_id = $2) = 'admin') as can_access FROM documents d WHERE d.id = $1 AND d.workspace_id = $3 AND d.deleted_at IS NULL",
+          "count": 2
+        },
+        {
+          "text": "SELECT da.related_id as id, da.relationship_type as type, d.title, (d.properties->>'color') as color FROM document_associations da LEFT JOIN documents d ON d.id = da.related_id WHERE da.document_id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT id FROM documents WHERE id = $1 AND workspace_id = $2 AND (visibility = 'workspace' OR created_by = $3 OR (SELECT role FROM workspace_memberships WHERE workspace_id = $2 AND user_id = $3) = 'admin')",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id, d.title, d.document_type, d.ticket_number, prog_da.related_id as program_id, prog.title as program_name, prog.properties->>'color' as program_color FROM documents d LEFT JOIN document_associations prog_da ON d.id = prog_da.document_id AND prog_da.relationship_type = 'program' LEFT JOIN documents prog ON prog_da.related_id = prog.id AND prog.document_type = 'program' WHERE d.id = $1",
+          "count": 2
+        },
+        {
+          "text": "WITH RECURSIVE ancestors AS ( -- Base case: direct parent of current document SELECT d.id, d.title, d.document_type, d.ticket_number, 1 as depth FROM documents d JOIN document_associations da ON da.related_id = d.id WHERE da.document_id = $1 AND da.relationship_type = 'parent' AND d.workspace_id = $2 AND d.archived_at IS NULL UNION ALL -- Recursive case: parent of each ancestor SELECT d.id, d.title, d.document_type, d.ticket_number, a.depth + 1 FROM documents d JOIN document_associations da ON da.related_id = d.id JOIN ancestors a ON da.document_id = a.id WHERE da.relationship_type = 'parent' AND d.workspace_id = $2 AND d.archived_at IS NULL ) SELECT * FROM ancestors ORDER BY depth DESC",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "flow": "list-issues",
+      "requestCount": 2,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/auth/me",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 2.067
+        },
+        {
+          "method": "GET",
+          "url": "/api/issues",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 2.369
+        }
+      ],
+      "totalQueries": 20,
+      "slowestQuery": {
+        "text": "SELECT da.document_id, da.related_id as id, da.relationship_type as type, d.title, d.properties->>'color' as color FROM document_associations da LEFT JOIN documents d ON da.related_id = d.id WHERE da.document_id = ANY($1) ORDER BY da.document_id, da.relationship_type, da.created_at",
+        "values": [
+          [
+            "2b42b72f-ccc6-4454-8b4d-9282f72dcf5a",
+            "3cc01598-bd19-48f2-95c1-e4df34beeb92",
+            "3ca4ff86-72c9-49bc-b5a8-326b49ab51de",
+            "0f34d2bd-331c-415e-91ec-5302ac97aae7",
+            "ca2e5fc0-ef44-4a56-8954-8f88310ac41c",
+            "c6706ee0-2039-4314-b83f-b84b6856cd5c",
+            "d0ef3566-dc8a-470f-893b-605ad9fb787b",
+            "4b5c0849-eb3d-4482-b57e-fddee31f080b",
+            "8cb88ecc-b6ad-4e00-bc5e-f74ba2ec9cb3",
+            "8f8cedd8-f56e-4d85-815c-6a270eb5d968",
+            "78c99132-134a-422a-8cf8-52ef4b4886a6",
+            "51b8b8cc-3413-4084-b8a8-e96a881b707d",
+            "11f003a5-cf61-4705-923a-269a41f62b64",
+            "b80985d6-feb2-4daf-b1a2-2723336cb179",
+            "32e61a27-2797-49bc-9fc2-eba8584f7003",
+            "d51646fa-fad8-49ac-83b1-2bc0ef088fea",
+            "28c457df-a000-4f18-87d5-b13ec3f77b01",
+            "4127c1f6-e773-4cb1-8392-1326baf896a0",
+            "18725c69-5cb9-4f0a-b3a3-4762202a72d8",
+            "0fdd1abb-942d-41e0-bde7-872ded0352b2",
+            "8ec11a83-8e03-4dcc-9162-d5cce9f0a72f",
+            "217a7a20-8929-4687-a092-9a8ca2b88927",
+            "ad80a619-fbf2-40c7-8829-95aa454d5575",
+            "dca7338c-94f0-489b-bbe6-979db0be2b2c",
+            "cf6fe4b9-3119-4813-9742-b66e7c0e4e65",
+            "474a0030-eb43-41df-acb3-523b7385d6ea",
+            "15b281cf-5c40-43db-9582-3320ded927bd",
+            "dfa80be7-af81-4119-9f4b-0e7dda67d6b6",
+            "bb6cb23e-e465-4e9b-a6ed-d55d465f9909",
+            "8b1c63aa-889f-4ac9-bf50-83b6d6ed41fa",
+            "d99b7f3a-c524-4472-bc76-3ec634c48ccb",
+            "2bf0b2e5-6a26-4c61-aba9-bcebfcb9ad35",
+            "9b0a27bc-f7f2-423f-adf5-751550df4b76",
+            "d6973f20-8b7d-47e3-9d93-c14826da5c40",
+            "b483e3cc-448f-494b-be41-3c4b9a415569",
+            "53aa898e-c371-4b28-ada9-2e8c64e22547",
+            "f07c1420-acde-4798-945f-b061c7d6e7f3",
+            "c79a7fed-cd71-4e6f-87b0-2d439fc90667",
+            "f95c4432-38b4-4f81-9610-be91970f395d",
+            "a507b91c-99e0-4ae4-a7b3-12e10e545bc3",
+            "7e65de91-cd1a-42a2-81e2-e31b5d01dd82",
+            "f8f9214e-9143-484f-aed9-9820c65b9680",
+            "a49ca7ec-fc1c-493b-bf5b-4969f66165f3",
+            "4a87c14b-f36b-4fc9-91bf-7f523ef241e5",
+            "89b88b58-72eb-43fc-a53f-645d4b9f19d3",
+            "b7a58d24-3a53-49fc-b338-ff0847fe7ec9",
+            "e0bb12e7-08b7-4efc-9de7-d21683290438",
+            "d00af4e0-288e-4233-8274-528ee551832f",
+            "1d09dab1-69af-4714-b836-f6c8806befcb",
+            "ce3d4c0a-86b1-41b3-a97e-d90880a27ca7",
+            "0d9e16c6-8850-4201-912c-716e79db1fed",
+            "f8c11983-5ab4-42e0-b834-1ef655eb1cf8",
+            "22e5fd88-6d68-4d1a-b8ac-f63e58964122",
+            "0efe8ab4-af51-4f98-a34e-cb2972206e9b",
+            "1eec951c-d969-4b60-9550-796e26d8f2c4",
+            "3411fa37-9602-4985-85fb-9738c25b1d16",
+            "7fc76122-bccf-4545-9f88-2787348222fa",
+            "57458b39-6986-4490-8f09-1edb19b176f4",
+            "0afc4da6-69a8-4e79-8d28-03f7906a84aa",
+            "034cad54-77f6-4a46-82f1-65c3ca603774",
+            "6bb284f4-0f24-4f65-acd1-268b85de0cf8",
+            "59255fd5-ad1c-456a-b9dd-7f0bbc6cc541",
+            "465dcd42-bf76-4b1d-b59e-a6fc4bebb056",
+            "94df3208-d416-4cdd-850e-6677cda9b026",
+            "7622c8a0-879c-4655-a9ff-b8b2750dd64a",
+            "2fa82e8f-14f3-4066-acf8-646545646382",
+            "1ad700d8-177a-4679-8ff0-95c39a5fe12c",
+            "f1a717f6-970f-4561-bef9-ffee8f83af45",
+            "ff8a0a75-4e7d-47dc-8f37-11a2a6d8de22",
+            "9d67bce4-6094-495b-a68c-d4fed0079ccc",
+            "c6575b6e-89d4-42a5-9198-b9ef631a68cc",
+            "489233d0-cb04-462d-a959-ff962dc87ab0",
+            "4ae787a0-ce7e-44cb-9899-884854bdfecb",
+            "212d16cd-7cfb-458e-8024-578a3d5f45b0",
+            "b08373e0-c0a8-4905-be83-50d7ec2e2e94",
+            "a9c37e1c-acdd-463d-8272-4c5b0d4e0c70",
+            "ccc25db2-8f12-4254-bbe0-f587f1180abd",
+            "c41bc87b-6cc7-4155-b812-72038998ab73",
+            "beffcaa5-bc15-4a8a-9f99-e1a956d88949",
+            "ac4f30d6-e91a-41af-a1b0-e521ab532b53",
+            "b7442e53-3670-41fc-af54-3f39b90d7bda",
+            "11e8012d-46f8-4702-8699-f69bbbb83c0e",
+            "06a262be-e01f-4935-87fa-1c9c514899cb",
+            "27b4c7c0-60ab-477f-94f6-43ddf94b5a50",
+            "99dcd2ba-172d-49db-b67d-bdd6eb018b1c",
+            "3d2d307c-ab7c-4ad0-b1d4-0c2ba50eae6b",
+            "a17327a3-9917-4fbc-a8f7-721e112b43e2",
+            "023d6244-bea0-4ddf-8888-659a64d20203",
+            "9a3b1240-bba4-45ce-8410-329eaa2982f0",
+            "88affa32-cc10-4f71-8d21-a6f2dc700cd2",
+            "19974fea-1c62-4723-af66-29c87ba49972",
+            "90f8843b-3746-4e45-b2f4-fdbe781a28fc",
+            "b894df23-fc1e-4b05-ab78-2ee89f716999",
+            "60486565-fd7c-4ad5-b4a2-ea9e09de526e",
+            "16ca3774-75c4-419a-926c-614aba9e3b86",
+            "c750e049-d52d-4219-981c-1e48ebb61876",
+            "9f751b43-8bf5-4861-999a-135daf57a9d6",
+            "d75d75fb-29e9-4365-8a0a-eb3fb7cc6671",
+            "33e812c6-c0ff-49c2-a355-ba874c5a648f",
+            "5f46273e-b36e-406a-a5a4-34c2d1d1ff21",
+            "ccc29aee-3167-4613-baae-412326447188",
+            "3ddb310d-dfe7-4c1c-8891-7cf09aaebe6d",
+            "218b13a0-b0e2-44d3-9617-713344921568",
+            "25b16259-7483-4795-9bf2-c66fe1e145cd"
+          ]
+        ],
+        "ms": 2.369,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+          "count": 4
+        },
+        {
+          "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+          "count": 4
+        },
+        {
+          "text": "SELECT id, email, name, is_super_admin FROM users WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2 WHERE w.id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT role FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id, d.title, d.properties, d.ticket_number, d.content, d.created_at, d.updated_at, d.created_by, d.started_at, d.completed_at, d.cancelled_at, d.reopened_at, d.converted_from_id, u.name as assignee_name, CASE WHEN person_doc.archived_at IS NOT NULL THEN true ELSE false END as assignee_archived FROM documents d LEFT JOIN users u ON (d.properties->>'assignee_id')::uuid = u.id LEFT JOIN documents person_doc ON person_doc.workspace_id = d.workspace_id AND person_doc.document_type = 'person' AND person_doc.properties->>'user_id' = d.properties->>'assignee_id' WHERE d.workspace_id = $1 AND d.document_type = 'issue' AND (d.visibility = 'workspace' OR d.created_by = $2 OR $3 = TRUE) AND d.archived_at IS NULL AND d.deleted_at IS NULL ORDER BY CASE d.properties->>'priority' WHEN 'urgent' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 WHEN 'low' THEN 4 ELSE 5 END, d.updated_at DESC",
+          "count": 2
+        },
+        {
+          "text": "SELECT da.document_id, da.related_id as id, da.relationship_type as type, d.title, d.properties->>'color' as color FROM document_associations da LEFT JOIN documents d ON da.related_id = d.id WHERE da.document_id = ANY($1) ORDER BY da.document_id, da.relationship_type, da.created_at",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "flow": "load-sprint-board",
+      "requestCount": 3,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/auth/me",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 1.392
+        },
+        {
+          "method": "GET",
+          "url": "/api/weeks/1b01042f-1b57-4fc6-b0d3-7c1b512320ae",
+          "statusCode": 200,
+          "totalQueries": 12,
+          "slowestQueryMs": 2.192
+        },
+        {
+          "method": "GET",
+          "url": "/api/weeks/1b01042f-1b57-4fc6-b0d3-7c1b512320ae/issues",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 1.956
+        }
+      ],
+      "totalQueries": 32,
+      "slowestQuery": {
+        "text": "UPDATE documents SET properties = $1, updated_at = now() WHERE id = $2",
+        "values": [
+          "{\"plan\":null,\"goals\":null,\"status\":\"active\",\"vision\":null,\"owner_id\":\"dfcb12c0-f89d-433e-ae3f-3ef254f9f361\",\"confidence\":70.94089133089088,\"project_id\":\"a8882cc2-2876-40e1-ac17-c8b56313f403\",\"assignee_ids\":[\"f1f8973b-c175-43ec-89bb-8cf7cf49ab39\",\"840f3714-b92b-45e2-9791-4777eb2542f1\"],\"sprint_number\":14,\"success_criteria\":null,\"planned_issue_ids\":[\"bb6cb23e-e465-4e9b-a6ed-d55d465f9909\",\"dfa80be7-af81-4119-9f4b-0e7dda67d6b6\",\"489233d0-cb04-462d-a959-ff962dc87ab0\",\"15b281cf-5c40-43db-9582-3320ded927bd\",\"c6575b6e-89d4-42a5-9198-b9ef631a68cc\",\"9d67bce4-6094-495b-a68c-d4fed0079ccc\",\"ff8a0a75-4e7d-47dc-8f37-11a2a6d8de22\",\"f1a717f6-970f-4561-bef9-ffee8f83af45\",\"3ddb310d-dfe7-4c1c-8891-7cf09aaebe6d\"],\"snapshot_taken_at\":\"2026-03-10T16:18:44.582Z\"}",
+          "1b01042f-1b57-4fc6-b0d3-7c1b512320ae"
+        ],
+        "ms": 2.192,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+          "count": 6
+        },
+        {
+          "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+          "count": 6
+        },
+        {
+          "text": "SELECT role FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
+          "count": 4
+        },
+        {
+          "text": "SELECT id, email, name, is_super_admin FROM users WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2 WHERE w.id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id, d.title, d.properties, prog_da.related_id as program_id, p.title as program_name, p.properties->>'prefix' as program_prefix, p.properties->>'accountable_id' as program_accountable_id, (SELECT op.properties->>'reports_to' FROM documents op WHERE d.properties->>'owner_id' IS NOT NULL AND op.id = (d.properties->>'owner_id')::uuid AND op.document_type = 'person' AND op.workspace_id = d.workspace_id) as owner_reports_to, w.sprint_start_date as workspace_sprint_start_date, u.id as owner_id, u.name as owner_name, u.email as owner_email, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue') as issue_count, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue' AND i.properties->>'state' = 'done') as completed_count, (SELECT COUNT(*) FROM documents i JOIN document_associations ida ON ida.document_id = i.id AND ida.related_id = d.id AND ida.relationship_type = 'sprint' WHERE i.document_type = 'issue' AND i.properties->>",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id FROM documents d JOIN document_associations da ON da.document_id = d.id WHERE da.related_id = $1 AND da.relationship_type = 'sprint' AND d.document_type = 'issue'",
+          "count": 2
+        },
+        {
+          "text": "UPDATE documents SET properties = $1, updated_at = now() WHERE id = $2",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id, p.properties->>'prefix' as prefix FROM documents d LEFT JOIN document_associations prog_da ON prog_da.document_id = d.id AND prog_da.relationship_type = 'program' LEFT JOIN documents p ON prog_da.related_id = p.id WHERE d.id = $1 AND d.workspace_id = $2 AND d.document_type = 'sprint' AND (d.visibility = 'workspace' OR d.created_by = $3 OR $4 = TRUE)",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "flow": "search-content",
+      "requestCount": 2,
+      "requests": [
+        {
+          "method": "GET",
+          "url": "/api/auth/me",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 1.475
+        },
+        {
+          "method": "GET",
+          "url": "/api/search/mentions?q=Audit",
+          "statusCode": 200,
+          "totalQueries": 10,
+          "slowestQueryMs": 2.155
+        }
+      ],
+      "totalQueries": 20,
+      "slowestQuery": {
+        "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+        "values": [
+          "2026-03-10T16:18:44.605Z",
+          "0e85efb12f0a7ae88b5f643ad76cb411915f1a1004a28c6c12b59c041463e702"
+        ],
+        "ms": 2.155,
+        "status": "ok"
+      },
+      "repeatedAcrossFlow": [
+        {
+          "text": "SELECT s.id, s.user_id, s.workspace_id, s.expires_at, s.last_activity, s.created_at, u.is_super_admin FROM sessions s JOIN users u ON s.user_id = u.id WHERE s.id = $1",
+          "count": 4
+        },
+        {
+          "text": "UPDATE sessions SET last_activity = $1 WHERE id = $2",
+          "count": 4
+        },
+        {
+          "text": "SELECT id, email, name, is_super_admin FROM users WHERE id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w JOIN workspace_memberships wm ON w.id = wm.workspace_id WHERE wm.user_id = $1 AND w.archived_at IS NULL ORDER BY w.name",
+          "count": 2
+        },
+        {
+          "text": "SELECT w.id, w.name, wm.role FROM workspaces w LEFT JOIN workspace_memberships wm ON w.id = wm.workspace_id AND wm.user_id = $2 WHERE w.id = $1",
+          "count": 2
+        },
+        {
+          "text": "SELECT role FROM workspace_memberships WHERE workspace_id = $1 AND user_id = $2",
+          "count": 2
+        },
+        {
+          "text": "SELECT d.id::text as id, d.title as name, 'person' as document_type FROM documents d WHERE d.workspace_id = $1 AND d.document_type = 'person' AND d.archived_at IS NULL AND d.deleted_at IS NULL AND d.title ILIKE $2 ORDER BY d.title ASC LIMIT 5",
+          "count": 2
+        },
+        {
+          "text": "SELECT id, title, document_type, visibility FROM documents WHERE workspace_id = $1 AND document_type IN ('wiki', 'issue', 'project', 'program') AND deleted_at IS NULL AND title ILIKE $2 AND (visibility = 'workspace' OR created_by = $3 OR $4 = TRUE) ORDER BY CASE document_type WHEN 'issue' THEN 1 WHEN 'wiki' THEN 2 WHEN 'project' THEN 3 WHEN 'program' THEN 4 ELSE 5 END, updated_at DESC LIMIT 10",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

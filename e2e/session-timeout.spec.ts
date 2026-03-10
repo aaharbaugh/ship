@@ -503,6 +503,8 @@ test.describe('401 Error Handling', () => {
   });
 
   test('API calls without valid session return 401', async ({ request }) => {
+    expect(request).toBeDefined();
+
     // Make an API call without logging in (no session cookie)
     const response = await request.get('/api/documents', {
       headers: { Accept: 'application/json' },
@@ -1097,6 +1099,8 @@ test.describe('Session Info API', () => {
   });
 
   test('GET /api/auth/session returns 401 when not authenticated', async ({ request }) => {
+    expect(request).toBeDefined();
+
     // Make an API call without logging in (no session cookie)
     const response = await request.get('/api/auth/session', {
       headers: { Accept: 'application/json' },

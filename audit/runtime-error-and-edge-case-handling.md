@@ -1,0 +1,128 @@
+# Category 6: Runtime Error and Edge Case Handling
+
+Measurement date: March 10, 2026
+
+## Executive Summary
+- Baseline happy-path runtime behavior is acceptable: focused document-load and reconnection flows completed with `0` observed browser console errors during normal navigation and document open.
+- Runtime resilience drops sharply in collaboration, image-upload, and offline scenarios, where the app emits repeated WebSocket and fetch errors while keeping the editor superficially usable.
+- Server-side unhandled promise rejections were `0` observed in the focused runtime run, but the API process does not register a global `unhandledRejection` handler, so that signal is currently weak.
+- Error handling is present but inconsistent: Ship has a shared React error boundary, yet many failure paths still resolve to `console.error`, `alert()`, silent retry, or stale UI rather than a coherent recovery state.
+
+## Measurement Method
+Tools and commands used:
+
+```bash
+rg -n "unhandledRejection|onunhandledrejection|ErrorBoundary|alert\\(|console\\.(error|warn)|offline|online|WebSocket|reconnect|retry|escapeHtml|dangerouslySetInnerHTML|safeParse|z\\.object|zod" web api e2e
+sed -n '1,220p' web/src/components/ui/ErrorBoundary.tsx
+sed -n '520,570p' web/src/pages/App.tsx
+sed -n '960,1010p' web/src/components/Editor.tsx
+sed -n '1,240p' e2e/error-handling.spec.ts
+sed -n '1,220p' e2e/content-caching.spec.ts
+sed -n '1,260p' e2e/images.spec.ts
+sed -n '1,260p' e2e/race-conditions.spec.ts
+sed -n '1,220p' api/src/index.ts
+sg docker -c "env PLAYWRIGHT_WORKERS=1 pnpm test:e2e e2e/error-handling.spec.ts e2e/content-caching.spec.ts e2e/images.spec.ts e2e/race-conditions.spec.ts --reporter=line"
+```
+
+Methodology:
+- Used source inspection first to identify runtime safety mechanisms: React error boundaries, async retry paths, offline handling, WebSocket reconnect logic, input validation, and any global unhandled-rejection hooks.
+- Used existing Playwright coverage to avoid inventing new audit-only product scripts. Focused on the tests that already exercise error handling, offline behavior, collaboration recovery, caching, image upload, and concurrent editing.
+- Treated `e2e/content-caching.spec.ts` and the happy-path portions of `e2e/error-handling.spec.ts` as the “normal usage” baseline for console-noise measurement.
+- Treated image upload, offline editing, and concurrent editing scenarios as edge-case measurements.
+- Reviewed API process startup to verify whether unhandled promise rejections are globally trapped.
+
+Notes:
+- The focused runtime subset exposed both browser console noise and request failures during image/offline scenarios. Those were counted as runtime handling findings even when the editor remained interactive.
+- The API process logs many route- and collaboration-level errors, but no global `process.on('unhandledRejection', ...)` hook was found in startup code.
+- React error boundaries were found in [ErrorBoundary.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/ui/ErrorBoundary.tsx), applied at [App.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/App.tsx#L542) and around the editor content in [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx#L980).
+
+## Baseline
+
+### Runtime Baseline
+| Metric | Your Baseline |
+|---|---|
+| Console errors during normal usage | `0` observed in focused happy-path flows (`content-caching` document load and `error-handling` non-offline flows) |
+| Unhandled promise rejections (server) | `0` observed |
+| Network disconnect recovery | `Partial` |
+| Missing error boundaries | Local boundaries missing for route/page-level async failure surfaces in `AdminWorkspaceDetail`, `WorkspaceSettings`, `Projects`, `TeamMode`, `ReviewsPage`, and most document-tab panels |
+| Silent failures identified | `5` |
+
+### Edge-Case Runtime Evidence
+| Scenario | Baseline behavior | Evidence |
+|---|---|---|
+| Document load and WebSocket connect | Pass | `content-caching.spec.ts` passed the WebSocket connect and “no WebSocket console errors” checks |
+| Network disconnect while editing | Partial | `error-handling.spec.ts` shows text entry survives disconnect/reconnect, but offline/image flows still produce repeated fetch and WebSocket console errors |
+| Temporary API failure | Pass | `error-handling.spec.ts` keeps the page responsive through injected `500` responses |
+| CSRF expiration | Partial | Editor remains usable in the test, but errors are not surfaced as a clear user-facing recovery state |
+| Image upload and offline editing | Fail / noisy partial recovery | `images.spec.ts` produced repeated file-chooser timeouts, WebSocket `429` handshake failures, fetch failures, and offline console errors |
+| Concurrent editing / rapid operations | Partial | Existing E2E suite passes many race-condition cases, but Category 5 surfaced hard failures and flake in simultaneous formatting, stale-data, backlinks, and image persistence paths |
+
+## Hotspots
+| Location | Why it is a hotspot |
+|---|---|
+| [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx) | Central collaboration path; contains offline status, IndexedDB cache handling, WebSocket lifecycle handling, `alert()` recovery paths, and upload error logging |
+| [useRealtimeEvents.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useRealtimeEvents.tsx) | Reconnects on WebSocket failure but currently resolves parse/socket errors to console output rather than structured UI feedback |
+| [useAutoSave.ts](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useAutoSave.ts) | Retries silently and only logs after exhaustion, making save-failure visibility weak |
+| [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts) | Concentrates the clearest runtime degradation: file chooser instability, offline upload behavior, and console-noisy collaboration failures |
+| [api/src/collaboration/index.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/collaboration/index.ts) | Collaboration backend handles many failure modes, but several paths log and continue, leaving frontend recovery behavior to implicit reconnect logic |
+
+## Findings
+
+### High
+- Collaboration and image-upload paths degrade noisily instead of failing cleanly.
+  Why it matters: these are core editing workflows, and repeated WebSocket `429` handshake failures plus fetch errors create a state where the editor appears alive while synchronization is compromised.
+  Evidence: the focused runtime run logged repeated `WebSocket ... Unexpected response code: 429`, `[RealtimeEvents] Error: Event`, `Error fetching backlinks: TypeError: Failed to fetch`, and offline fetch failures during [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts).
+
+- Runtime failures are often console-only or alert-based rather than modeled as durable UI states.
+  Why it matters: users can continue interacting without understanding whether data is safe, queued, rejected, or stale.
+  Evidence: [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx) uses `alert()` for revoked/conversion cases; [useAutoSave.ts](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useAutoSave.ts) retries silently; multiple pages only log fetch failures.
+
+- There is no global server-side unhandled-rejection trap.
+  Why it matters: if an async path escapes route-local `try/catch`, the audit currently has no reliable centralized signal for background promise failures.
+  Evidence: [api/src/index.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/index.ts) only wraps `main().catch(...)`; no `process.on('unhandledRejection', ...)` or equivalent startup hook was found.
+
+### Medium
+- Error boundaries exist, but they are broad and render-focused rather than targeted to high-risk surfaces.
+  Why it matters: the app has some protection against render crashes, but most async/editor/network failures bypass those boundaries entirely.
+  Evidence: the shared boundary is used at [App.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/App.tsx#L542) and inside [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx#L980), while route-level async handlers in `Projects`, `TeamMode`, `ReviewsPage`, `AdminWorkspaceDetail`, and `WorkspaceSettings` rely on logging or alerts instead of localized recovery UI.
+
+- Offline recovery is functional at the typing level but incomplete at the product level.
+  Why it matters: preserving keystrokes is necessary, but not sufficient if related features like backlinks, embeds, comments, uploads, and sync status emit noisy failures or require manual retry.
+  Evidence: [error-handling.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/error-handling.spec.ts) shows continued editing after disconnect, while [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts) explicitly defers automatic retry when back online and the focused run showed repeated offline fetch/WebSocket errors.
+
+- Edge-case reliability issues are already visible in the broader E2E baseline.
+  Why it matters: runtime handling weaknesses are not isolated to synthetic audit tests; they align with existing failing and flaky product flows.
+  Evidence: Category 5’s full E2E run failed on backlinks removal, simultaneous formatting, inline code/comment shortcuts, table deletion, and TOC rename updates, with additional flake in offline image upload, stale-data, and image persistence flows.
+
+### Low
+- Input validation and injection handling are stronger than the rest of the runtime story.
+  Why it matters: malformed input risk appears more controlled than network/recovery risk.
+  Evidence: route handlers across `api/src/routes/` use `zod` `safeParse`; search escaping and `escapeHtml` protections are present; no obvious `dangerouslySetInnerHTML` usage was found in the audit scan.
+
+- Standard document navigation is not currently polluted by routine browser console errors.
+  Why it matters: the base experience is cleaner than the stressed-edge experience, which helps prioritize remediation.
+  Evidence: the focused `content-caching` and non-offline `error-handling` flows completed without observed browser console error output.
+
+## Silent Failures Identified
+| Reproduction | Silent or weakly surfaced behavior |
+|---|---|
+| Disconnect browser network while editing a document with backlinks and reconnect | Editing continues, but backlink fetch failures and WebSocket reconnect failures spill to console with no strong user-facing recovery message |
+| Trigger autosave failure repeatedly | [useAutoSave.ts](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useAutoSave.ts) retries silently and only logs after exhaustion |
+| Cause realtime event parse/socket failure | [useRealtimeEvents.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useRealtimeEvents.tsx) logs errors and reconnects, but no structured UI state is shown |
+| Expire CSRF token during document editing | Editor remains interactive in test coverage, but the failure path is not surfaced as a clear action state for the user |
+| Fail document conversion / file upload side effects | Several paths in [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx) and file/upload components log errors or use `alert()` instead of durable inline error states |
+
+## Suggested Direction
+The next step is not “add more try/catch everywhere.” The higher-value move is to standardize runtime failure handling around a small set of explicit user-facing states for sync, upload, save, and collaboration health, then back that with centralized client/server error capture so edge-case failures stop disappearing into console logs and ad hoc alerts.
+
+## Audit Deliverable
+| Metric | Your Baseline |
+|---|---|
+| Console errors during normal usage | `0` |
+| Unhandled promise rejections (server) | `0` observed |
+| Network disconnect recovery | `Partial` |
+| Missing error boundaries | `AdminWorkspaceDetail`, `WorkspaceSettings`, `Projects`, `TeamMode`, `ReviewsPage`, most document-tab panels |
+| Silent failures identified | `5` with reproduction steps listed above |
+
+Improvement target:
+- Reduce console-only runtime failures in collaboration, upload, and offline flows by replacing them with explicit recovery states and observable centralized error capture.
