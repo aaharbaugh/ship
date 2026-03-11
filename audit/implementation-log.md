@@ -778,3 +778,54 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Route execution still needs a local rerun against the accessible test database outside this sandbox.
 - Follow-up needed:
   - Run `pnpm --filter @ship/api exec vitest run src/routes/team.test.ts` locally and refresh coverage.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Reduced inference work inside `accountability-grid-v3` by moving issue counting from the route layer into grouped SQL.
+- Files changed:
+  - `api/src/routes/team.ts`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 3: API Response Time
+  - Category 4: Database Query Efficiency
+  - Category 1: Type Safety
+- Baseline issue:
+  - The route still loaded one row per issue for inferred assignments, then counted primary projects in application code. That adds unnecessary row volume and JS work on the hottest remaining backend endpoint.
+- What changed:
+  - Replaced the per-issue inference query with a grouped query that returns one row per assignee, sprint, and project plus `issue_count`.
+  - Kept the existing explicit-assignment precedence, but reduced the amount of data the route has to iterate through for inference.
+  - Added typed row interfaces for the accountability-grid query results.
+- Why this improves the system:
+  - Shrinks the result set the route has to process when many issues exist in the sprint window.
+  - Moves counting work to Postgres, which is a better fit than counting every issue row in Node.
+  - Tightens route boundary typing while touching the hotspot.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes.
+- Follow-up needed:
+  - Re-run `pnpm --filter @ship/api exec vitest run src/routes/team.test.ts` locally.
+  - Re-run the focused accountability-grid benchmark on the stable seeded benchmark DB to see if this clears any meaningful latency.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Removed repeated CAIA initialization noise from test runs so backend verification output stays readable.
+- Files changed:
+  - `api/src/services/caia.ts`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - Every `createApp()` call during API tests triggered CAIA initialization logging, which produced repeated "CAIA not configured, skipping initialization" output and buried actual failures.
+- What changed:
+  - Suppressed the unconfigured CAIA log entirely in `NODE_ENV=test`.
+  - Limited the non-test unconfigured log to one-time output.
+- Why this improves the system:
+  - Keeps local and CI test output focused on real failures.
+  - Reduces friction when iterating on the backend test suite.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes after the logging change.
+- Follow-up needed:
+  - Re-run the targeted API test files locally to confirm the output is quieter as expected.

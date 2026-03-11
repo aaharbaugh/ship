@@ -7,6 +7,45 @@ import { TEMPLATE_HEADINGS, extractText, hasContent } from '../utils/document-co
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+type TeamAccountabilityPersonRow = {
+  id: string;
+  name: string;
+};
+
+type ExplicitAssignmentRow = {
+  person_id: string | null;
+  sprint_number: number | null;
+  project_id: string | null;
+  plan_approval_state: string | null;
+  review_approval_state: string | null;
+  project_name: string | null;
+  project_color: string | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_color: string | null;
+};
+
+type InferredProjectCountRow = {
+  assignee_id: string | null;
+  sprint_number: number | null;
+  project_id: string | null;
+  issue_count: number | string;
+  project_name: string | null;
+  project_color: string | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_color: string | null;
+};
+
+type AccountabilityDocumentRow = {
+  document_type: 'weekly_plan' | 'weekly_retro';
+  person_id: string | null;
+  project_id: string | null;
+  week_number: number | null;
+  id: string;
+  content: unknown;
+};
+
 // GET /api/team/grid - Get team grid data
 // Query params:
 //   fromSprint: number - start of range (default: current - 7)
@@ -1680,7 +1719,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     const [
       peopleResult,
       explicitAssignmentsResult,
-      issuesResult,
+      inferredProjectCountsResult,
       accountabilityDocsResult,
     ] = await Promise.all([
       pool.query(
@@ -1718,6 +1757,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
         `SELECT
            i.properties->>'assignee_id' as assignee_id,
            da_project.related_id as project_id,
+           COUNT(*)::int as issue_count,
            proj.title as project_name,
            proj.properties->>'color' as project_color,
            proj_prog_da.related_id as program_id,
@@ -1737,7 +1777,16 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
            AND i.deleted_at IS NULL
            AND s.deleted_at IS NULL
            AND s.archived_at IS NULL
-           AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3`,
+           AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3
+         GROUP BY
+           i.properties->>'assignee_id',
+           da_project.related_id,
+           proj.title,
+           proj.properties->>'color',
+           proj_prog_da.related_id,
+           prog.title,
+           prog.properties->>'color',
+           (s.properties->>'sprint_number')::int`,
         [workspaceId, fromSprint, toSprint]
       ),
       pool.query(
@@ -1769,7 +1818,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       reviewApprovalState: string | null;
     }>> = {};
 
-    for (const row of explicitAssignmentsResult.rows) {
+    for (const row of explicitAssignmentsResult.rows as ExplicitAssignmentRow[]) {
       const personId = row.person_id;
       const sprintNumber = row.sprint_number;
       if (!personId || !sprintNumber) continue;
@@ -1800,12 +1849,12 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       programColor: string | null;
     }>>> = {};
 
-    for (const issue of issuesResult.rows) {
+    for (const issue of inferredProjectCountsResult.rows as InferredProjectCountRow[]) {
       const personId = issue.assignee_id;
       const sprintNumber = issue.sprint_number;
       const projectId = issue.project_id;
 
-      if (!personId || !projectId) continue;
+      if (!personId || sprintNumber === null || !projectId) continue;
       if (assignments[personId]?.[sprintNumber]) continue; // Skip if explicit assignment exists
 
       if (!projectCounts[personId]) projectCounts[personId] = {};
@@ -1814,14 +1863,14 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
         projectCounts[personId][sprintNumber][projectId] = {
           count: 0,
           projectId,
-          projectName: issue.project_name,
+          projectName: issue.project_name || 'Untitled project',
           projectColor: issue.project_color,
           programId: issue.program_id,
           programName: issue.program_name,
           programColor: issue.program_color,
         };
       }
-      projectCounts[personId][sprintNumber][projectId].count++;
+      projectCounts[personId][sprintNumber][projectId].count += Number(issue.issue_count) || 0;
     }
 
     // Add inferred assignments
@@ -1893,7 +1942,8 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     // Build plan/retro maps: `${projectId}_${personId}_${weekNumber}` -> { id, content }
     const plans = new Map<string, { id: string; content: unknown }>();
     const retros = new Map<string, { id: string; content: unknown }>();
-    for (const row of accountabilityDocsResult.rows) {
+    for (const row of accountabilityDocsResult.rows as AccountabilityDocumentRow[]) {
+      if (!row.person_id || !row.project_id || !row.week_number) continue;
       const key = `${row.project_id}_${row.person_id}_${row.week_number}`;
       if (row.document_type === 'weekly_plan') {
         plans.set(key, { id: row.id, content: row.content });
@@ -1949,7 +1999,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     });
 
     // Assign each person to a program based on current week's allocation
-    for (const person of peopleResult.rows) {
+    for (const person of peopleResult.rows as TeamAccountabilityPersonRow[]) {
       const currentAllocation = assignments[person.id]?.[currentSprintNumber];
       const programId = currentAllocation?.programId || 'unassigned';
 
