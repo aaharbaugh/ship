@@ -18,6 +18,7 @@ node --input-type=module <autocannon runner>
 
 Raw artifact:
 - `audit/phase-2-evidence/api/2026-03-11-api-response-times-after.json`
+- `audit/phase-2-evidence/api/2026-03-11-api-response-times-focused-after.json`
 
 Baseline artifact:
 - `audit/artifacts/api-response-times.json`
@@ -63,3 +64,20 @@ The local dev database was seeded and expanded to match the original audit volum
 - We should either:
   - do another optimization pass on `GET /api/issues` and `GET /api/team/accountability-grid-v3`, or
   - benchmark a narrower endpoint set that directly corresponds to the work we changed, if the assignment allows that.
+
+## Focused Post-Change Rerun
+
+After tightening the `GET /api/issues` list path and limiting `accountability-grid-v3` to the requested sprint window, the two slowest audited endpoints were rerun again.
+
+Focused rerun comparison at `50` connections:
+
+| Endpoint | Baseline P95 | Focused rerun P95 | Delta |
+|---|---:|---:|---:|
+| `GET /api/issues` | `155.00 ms` | `154.33 ms` | `-0.43%` |
+| `GET /api/team/accountability-grid-v3` | `152.00 ms` | `162.33 ms` | `+6.80%` |
+
+Interpretation:
+
+- `GET /api/issues` moved slightly in the right direction, but not enough to count as a material improvement.
+- `GET /api/team/accountability-grid-v3` is still above the audit baseline.
+- This confirms the next meaningful Category 3 target is still the accountability-grid path, not the already-cleaned sprint read path.

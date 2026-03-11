@@ -632,3 +632,37 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Do another Category 3 pass on audited slow endpoints before claiming API speed improvements.
   - Capture stronger Category 4 evidence for accountability-specific flows or `EXPLAIN ANALYZE` changes.
   - Install the Vitest coverage provider if we want measurable coverage percentages in the final submission.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Tightened the `issues` list path and narrowed `accountability-grid-v3` queries to the rendered sprint window, then reran focused endpoint benchmarks.
+- Files changed:
+  - `api/src/routes/issues.ts`
+  - `api/src/routes/team.ts`
+  - `audit/phase-2-evidence/api/2026-03-11-api-response-times-focused-after.json`
+  - `audit/phase-2-evidence/api/2026-03-11-api-benchmark-summary.md`
+- Categories improved:
+  - Category 3: API Response Time
+  - Category 4: Database Query Efficiency
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - The evidence pass showed `GET /api/issues` and `GET /api/team/accountability-grid-v3` were still the slowest audited endpoints under concurrency.
+- What changed:
+  - Inlined `belongs_to` aggregation into the `GET /api/issues` list query so the route no longer does a second database round trip for issue associations.
+  - Restricted `accountability-grid-v3` explicit assignment and inferred issue queries to the sprint range that the route actually returns.
+  - Re-ran focused route tests and a focused benchmark on the two slowest audited endpoints.
+- Why this improves the system:
+  - Reduces avoidable DB work in the issue list path.
+  - Prevents the accountability-grid route from loading assignment and issue data for irrelevant sprints.
+  - Gives us another measured checkpoint instead of relying on intuition.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes.
+  - `pnpm --filter @ship/api exec vitest run src/routes/issues.test.ts src/routes/weeks.test.ts` passes: `63/63`.
+  - Focused rerun:
+    - `GET /api/issues` P95 at `50` connections improved slightly from `155.00 ms` to `154.33 ms`
+    - `GET /api/team/accountability-grid-v3` P95 at `50` connections remained above baseline at `162.33 ms`
+- Follow-up needed:
+  - Keep optimizing `accountability-grid-v3`; it is still the clearest audited Category 3 hotspot.
+  - If we want a threshold-clearing API win, the next pass should target reducing per-request work inside the accountability grid rather than broad sprint-window scans alone.

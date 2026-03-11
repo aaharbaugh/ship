@@ -1708,8 +1708,9 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
        LEFT JOIN documents prog ON prog_da.related_id = prog.id AND prog.document_type = 'program'
        WHERE s.workspace_id = $1
          AND s.document_type = 'sprint'
-         AND jsonb_array_length(COALESCE(s.properties->'assignee_ids', '[]'::jsonb)) > 0`,
-      [workspaceId]
+         AND jsonb_array_length(COALESCE(s.properties->'assignee_ids', '[]'::jsonb)) > 0
+         AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3`,
+      [workspaceId, fromSprint, toSprint]
     );
 
     // Build assignments map: personId -> sprintNumber -> assignment
@@ -1764,8 +1765,12 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
        LEFT JOIN documents prog ON proj_prog_da.related_id = prog.id AND prog.document_type = 'program'
        WHERE i.workspace_id = $1
          AND i.document_type = 'issue'
-         AND i.properties->>'assignee_id' IS NOT NULL`,
-      [workspaceId]
+         AND i.properties->>'assignee_id' IS NOT NULL
+         AND i.deleted_at IS NULL
+         AND s.deleted_at IS NULL
+         AND s.archived_at IS NULL
+         AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3`,
+      [workspaceId, fromSprint, toSprint]
     );
 
     // Count issues per person+sprint+project to infer primary project
