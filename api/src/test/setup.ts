@@ -8,6 +8,9 @@ beforeAll(async () => {
   // Ensure test environment
   process.env.NODE_ENV = 'test'
 
+  // Tests can opt into an isolated database by setting TEST_DATABASE_URL.
+  // If unset, the existing local dev database remains the fallback.
+
   // Clean up test data from previous runs to prevent duplicate key errors
   // Use TRUNCATE CASCADE which is faster and bypasses row-level triggers
   // (audit_logs has AU-9 compliance triggers preventing DELETE)

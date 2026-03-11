@@ -13,9 +13,13 @@ config({ path: join(__dirname, '../../.env') });
 const { Pool } = pg;
 
 const isProduction = process.env.NODE_ENV === 'production';
+const isTestRuntime = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true';
+const connectionString = isTestRuntime && process.env.TEST_DATABASE_URL
+  ? process.env.TEST_DATABASE_URL
+  : process.env.DATABASE_URL;
 
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
   // Production-ready pool configuration
   max: isProduction ? 20 : 10, // Max connections (default is 10)
   idleTimeoutMillis: 30000, // Close idle connections after 30 seconds

@@ -666,3 +666,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - Keep optimizing `accountability-grid-v3`; it is still the clearest audited Category 3 hotspot.
   - If we want a threshold-clearing API win, the next pass should target reducing per-request work inside the accountability grid rather than broad sprint-window scans alone.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Separated the API test database path from the normal dev database path so performance measurement and test cleanup no longer have to compete for the same local state.
+- Files changed:
+  - `api/src/db/client.ts`
+  - `api/src/test/setup.ts`
+- Categories improved:
+  - Category 5: Test Coverage and Quality
+  - Category 3: API Response Time
+  - Category 4: Database Query Efficiency
+- Baseline issue:
+  - Focused API route tests truncate the shared local database, which kept invalidating benchmark and profiler reruns during Phase 2 measurement work.
+- What changed:
+  - Added support for `TEST_DATABASE_URL` in the shared database client when running under Vitest/test runtime.
+  - Documented the isolated test database path in API test setup.
+- Why this improves the system:
+  - Lets us run API tests against a separate database without disturbing the seeded benchmark dataset.
+  - Makes future performance and query evidence reruns more reproducible.
+- Evidence captured:
+  - API code still type-checks after the database client change.
+- Follow-up needed:
+  - Point local API tests at a dedicated test database before the next benchmark rerun.
