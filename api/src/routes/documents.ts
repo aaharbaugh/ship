@@ -10,12 +10,52 @@ import { loadContentFromYjsState } from '../utils/yjsConverter.js';
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+interface JsonObject {
+  [key: string]: JsonValue;
+}
+
+interface DocumentRow {
+  id: string;
+  workspace_id: string;
+  document_type: string;
+  title: string;
+  parent_id: string | null;
+  position: number | null;
+  ticket_number: number | null;
+  properties: JsonObject | null;
+  content?: JsonObject | null;
+  yjs_state?: Uint8Array | Buffer | null;
+  created_at?: string | Date | null;
+  updated_at?: string | Date | null;
+  created_by: string;
+  visibility: 'private' | 'workspace';
+  archived_at?: string | Date | null;
+  deleted_at?: string | Date | null;
+  converted_to_id?: string | null;
+  converted_from_id?: string | null;
+  converted_at?: string | Date | null;
+  converted_by?: string | null;
+  can_access?: boolean;
+}
+
+interface ApprovalState {
+  state?: string;
+  approved_by?: string | null;
+}
+
+const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(jsonValueSchema)])
+);
+
+const tiptapContentSchema = z.record(jsonValueSchema);
+
 // Check if user can access a document (visibility check)
 async function canAccessDocument(
   docId: string,
   userId: string,
   workspaceId: string
-): Promise<{ canAccess: boolean; doc: any | null }> {
+): Promise<{ canAccess: boolean; doc: DocumentRow | null }> {
   const result = await pool.query(
     `SELECT d.*,
             (d.visibility = 'workspace' OR d.created_by = $2 OR
@@ -41,7 +81,7 @@ const createDocumentSchema = z.object({
   sprint_id: z.string().uuid().optional().nullable(),
   properties: z.record(z.unknown()).optional(),
   visibility: z.enum(['private', 'workspace']).optional(),
-  content: z.any().optional(),
+  content: tiptapContentSchema.optional(),
   belongs_to: z.array(z.object({
     id: z.string().uuid(),
     type: z.enum(['program', 'project', 'sprint', 'parent']),
@@ -50,7 +90,7 @@ const createDocumentSchema = z.object({
 
 const updateDocumentSchema = z.object({
   title: z.string().min(1).max(255).optional(),
-  content: z.any().optional(),
+  content: tiptapContentSchema.optional(),
   parent_id: z.string().uuid().optional().nullable(),
   position: z.number().int().min(0).optional(),
   properties: z.record(z.unknown()).optional(),
@@ -645,7 +685,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     await client.query('BEGIN');
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     // Track extracted values from content (content is source of truth)
@@ -737,7 +777,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     if (data.properties !== undefined || contentUpdated || hasTopLevelProps) {
       const currentProps = existing.properties || {};
       const dataProps = data.properties || {};
-      let newProps = {
+      let newProps: JsonObject = {
         ...currentProps,
         ...dataProps,
         ...topLevelProps,
@@ -938,7 +978,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
     // When a weekly plan/retro is edited after changes were requested, move it back to re-review.
     if (contentUpdated && (existing.document_type === 'weekly_plan' || existing.document_type === 'weekly_retro')) {
-      const docProps = (existing.properties || {}) as Record<string, unknown>;
+      const docProps = (existing.properties || {}) as JsonObject;
       const personId = typeof docProps.person_id === 'string' ? docProps.person_id : null;
       const projectId = typeof docProps.project_id === 'string' ? docProps.project_id : null;
       const rawWeekNumber = docProps.week_number;
@@ -972,9 +1012,12 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
 
         if (sprintResult.rows.length > 0) {
           const sprint = sprintResult.rows[0];
-          const sprintProps = (sprint.properties || {}) as Record<string, unknown>;
+          const sprintProps = (sprint.properties || {}) as JsonObject;
           const approvalKey = existing.document_type === 'weekly_plan' ? 'plan_approval' : 'review_approval';
-          const approval = sprintProps[approvalKey] as { state?: string; approved_by?: string | null } | undefined;
+          const rawApproval = sprintProps[approvalKey];
+          const approval = typeof rawApproval === 'object' && rawApproval !== null
+            ? rawApproval as ApprovalState
+            : undefined;
 
           if (approval?.state === 'changes_requested') {
             const nextProps = {

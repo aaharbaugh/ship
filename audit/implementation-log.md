@@ -459,3 +459,29 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/api type-check` passes.
 - Follow-up needed:
   - Next Category 1 pass should target deeper schema typing in document-heavy routes like `api/src/routes/documents.ts`.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Tightened document-route boundary typing for access helpers, TipTap content payloads, and document property merges.
+- Files changed:
+  - `api/src/routes/documents.ts`
+- Categories improved:
+  - Category 1: Type Safety
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `api/src/routes/documents.ts` still exposed broad `doc: any` access helpers, `z.any()` content schemas, and untyped update payload arrays in a high-traffic generic route.
+- What changed:
+  - Added explicit `DocumentRow`, `JsonObject`, and approval helper types for document access and update flows.
+  - Replaced `z.any()` TipTap content acceptance with a recursive JSON-like schema.
+  - Replaced the touched `any[]` update payload array with `unknown[]`.
+  - Typed the weekly plan/retro resubmission path so approval-state reads are narrowed before use.
+- Why this improves the system:
+  - Makes one of the loosest shared API routes more compiler-visible without changing runtime behavior.
+  - Reduces the chance of malformed content or property shapes sliding through the generic document endpoints unnoticed.
+  - Extends the Category 1 work beyond specialized routes into the shared document layer.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes.
+- Follow-up needed:
+  - The next Category 1 pass, if we continue, should focus on narrowing generic `properties` handling further or moving some shared document shapes into reusable types.
