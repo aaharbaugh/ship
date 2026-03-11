@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
 
 export interface ConversionDialogProps {
   isOpen: boolean;
@@ -10,6 +10,11 @@ export interface ConversionDialogProps {
 }
 
 export function ConversionDialog({ isOpen, onClose, onConvert, sourceType, title, isConverting }: ConversionDialogProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
   // Handle Escape key
   useEffect(() => {
     if (!isOpen || isConverting) return;
@@ -22,23 +27,67 @@ export function ConversionDialog({ isOpen, onClose, onConvert, sourceType, title
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isConverting, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    lastFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    cancelButtonRef.current?.focus();
+
+    return () => {
+      lastFocusedRef.current?.focus();
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const targetType = sourceType === 'issue' ? 'project' : 'issue';
   const actionLabel = sourceType === 'issue' ? 'Promote to Project' : 'Convert to Issue';
 
   // Handle click outside dialog
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && !isConverting) {
       onClose();
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+
+    const container = e.currentTarget;
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" role="dialog" aria-modal="true" onClick={handleBackdropClick}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      onClick={handleBackdropClick}
+      onKeyDown={handleKeyDown}
+    >
       <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
-        <h2 className="mb-4 text-lg font-semibold text-foreground">{actionLabel}</h2>
-        <p className="mb-4 text-sm text-foreground">
+        <h2 id={titleId} className="mb-4 text-lg font-semibold text-foreground">{actionLabel}</h2>
+        <p id={descriptionId} className="mb-4 text-sm text-foreground">
           Convert <strong>"{title}"</strong> from {sourceType} to {targetType}?
         </p>
         <div className="mb-4 rounded bg-amber-500/10 border border-amber-500/30 p-3">
@@ -60,6 +109,7 @@ export function ConversionDialog({ isOpen, onClose, onConvert, sourceType, title
         </div>
         <div className="flex justify-end gap-2">
           <button
+            ref={cancelButtonRef}
             onClick={onClose}
             disabled={isConverting}
             className="rounded px-3 py-1.5 text-sm text-muted hover:text-foreground transition-colors disabled:opacity-50"

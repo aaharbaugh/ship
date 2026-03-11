@@ -485,3 +485,33 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/api type-check` passes.
 - Follow-up needed:
   - The next Category 1 pass, if we continue, should focus on narrowing generic `properties` handling further or moving some shared document shapes into reusable types.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Improved accessibility for custom modal dialogs by adding dialog naming, focus management, focus trapping, and explicit form labels.
+- Files changed:
+  - `web/src/components/dialogs/ConversionDialog.tsx`
+  - `web/src/components/dialogs/BacklogPickerModal.tsx`
+  - `web/src/components/dialogs/MergeProgramDialog.tsx`
+- Categories improved:
+  - Category 7: Accessibility Compliance
+  - Category 6: Runtime Error and Edge Case Handling
+- Baseline issue:
+  - Several key dialogs were custom overlays instead of Radix dialogs, which meant they lacked reliable dialog names, initial focus behavior, focus return, and keyboard focus trapping.
+  - Some controls inside those dialogs also relied on placeholder-only labeling.
+- What changed:
+  - Added `aria-labelledby` and `aria-describedby` to the custom dialogs so screen readers get stable dialog names and context.
+  - Added initial focus and focus return behavior when dialogs open and close.
+  - Added keyboard focus trapping within the open dialogs.
+  - Added explicit labels for searchable/selectable controls inside the modal workflows.
+  - Marked merge errors as alerts so failure states are announced more clearly.
+- Why this improves the system:
+  - Makes the modal workflows significantly more usable for keyboard and screen-reader users.
+  - Targets serious accessibility failure modes on important product actions instead of making cosmetic-only ARIA tweaks.
+  - Reduces the risk of users getting trapped behind overlays or losing context when dialogs close.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+- Follow-up needed:
+  - Continue Category 7 on the audit’s primary pages, especially `Documents.tsx`, `Projects.tsx`, `ReviewsPage.tsx`, and `WorkspaceSettings.tsx`, and add reproducible Lighthouse/axe evidence.
