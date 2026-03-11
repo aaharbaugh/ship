@@ -1,16 +1,16 @@
 # Phase 2 Progress Log
 
-Use this file to track implementation work as it happens. Keep entries short, factual, and tied to measurable outcomes.
+This file is for short milestone-style progress notes.
 
-## Entry Template
+For the full chunk-by-chunk implementation history, use:
+- `audit/implementation-log.md`
+
+## Milestone Template
 - Date:
-- Category:
-- Change:
-- Root cause:
-- Evidence added:
-- Before:
-- After:
-- Notes / tradeoffs:
+- Milestone:
+- Categories involved:
+- Status:
+- Evidence:
+- Notes:
 
-## Entries
-
+## Milestones

@@ -134,3 +134,87 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Regression test added in `weeks.test.ts` for non-persistent snapshot hydration.
 - Follow-up needed:
   - Rerun `pnpm --filter @ship/api exec vitest run src/routes/weeks.test.ts` on the local machine with Postgres available to verify the new route test end-to-end.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Batched repeated weekly plan and retro lookups in the accountability service.
+- Files changed:
+  - `api/src/services/accountability.ts`
+  - `api/src/services/accountability.test.ts`
+- Categories improved:
+  - Category 4: Database Query Efficiency
+  - Category 3: API Response Time
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `checkWeeklyPersonAccountability(...)` queried `weekly_plan` and `weekly_retro` once per allocation even though those lookups are identical for every allocation in the same person/week.
+- What changed:
+  - Moved the weekly plan and weekly retro document fetches outside the allocation loop.
+  - Reused the fetched documents across all allocations for the same person/week check.
+  - Added a regression test asserting that multiple allocations still trigger only one weekly plan lookup and one weekly retro lookup.
+- Why this improves the system:
+  - Removes redundant database work from a query-heavy accountability path.
+  - Lowers fixed cost for users with multiple allocations in the same week.
+  - Directly addresses one of the service-level query-loop patterns called out in the audit.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes after the batching change.
+  - Regression coverage added in `accountability.test.ts`.
+- Follow-up needed:
+  - Rerun the API service tests locally to validate the new regression case in the database-backed test environment.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Batched missing-standup lookups across active sprints in the accountability service.
+- Files changed:
+  - `api/src/services/accountability.ts`
+  - `api/src/services/accountability.test.ts`
+- Categories improved:
+  - Category 4: Database Query Efficiency
+  - Category 3: API Response Time
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `checkMissingStandups(...)` executed separate "standup today" and "last standup date" queries for each active sprint in a loop.
+- What changed:
+  - Collected active sprint IDs first.
+  - Replaced per-sprint standup existence checks with one batched `parent_id = ANY(...)` query for today’s standups.
+  - Replaced per-sprint last-standup lookups with one grouped query returning `MAX(created_at::date)` by sprint.
+  - Added a regression test verifying the service issues only two batched standup queries across multiple active sprints.
+- Why this improves the system:
+  - Reduces query count in one of the audit’s query-loop hotspots.
+  - Lowers service cost for users participating in multiple active sprints.
+  - Makes the accountability path scale better with workspace complexity.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes.
+  - Regression coverage added in `accountability.test.ts` for batched standup queries.
+- Follow-up needed:
+  - Rerun `pnpm --filter @ship/api exec vitest run src/services/accountability.test.ts` locally to validate the new service behavior end-to-end.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Batched sprint issue counts across owned sprints in the accountability service.
+- Files changed:
+  - `api/src/services/accountability.ts`
+  - `api/src/services/accountability.test.ts`
+- Categories improved:
+  - Category 4: Database Query Efficiency
+  - Category 3: API Response Time
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `checkSprintAccountability(...)` executed one issue-count query per owned sprint inside a loop.
+- What changed:
+  - Fetched issue counts for all owned sprint IDs in one grouped query.
+  - Reused the grouped results while building accountability items.
+  - Added a regression test asserting that issue counts are fetched in one batched query across multiple owned sprints.
+- Why this improves the system:
+  - Further reduces per-sprint query fanout in the accountability path.
+  - Complements the earlier weekly-plan/retro batching and standup batching so the file is materially healthier as a whole.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes after the change.
+  - Regression coverage added in `accountability.test.ts` for grouped issue-count lookup.
+- Follow-up needed:
+  - Rerun `pnpm --filter @ship/api exec vitest run src/services/accountability.test.ts` locally to validate all accountability batching changes together.

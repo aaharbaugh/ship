@@ -294,6 +294,118 @@ describe('Accountability Service', () => {
     });
   });
 
+  describe('query efficiency', () => {
+    it('reuses weekly plan and retro lookups across multiple allocations in the same week', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-04T12:00:00Z'));
+
+      mockMinimalQueries();
+      vi.mocked(getAllocations)
+        .mockResolvedValueOnce([
+          { projectId: 'project-1', projectName: 'Project One' },
+          { projectId: 'project-2', projectName: 'Project Two' },
+        ])
+        .mockResolvedValueOnce([]);
+
+      vi.mocked(pool.query)
+        .mockResolvedValueOnce({ rows: [] } as any) // weekly_plan lookup for current sprint
+        .mockResolvedValueOnce({ rows: [] } as any); // weekly_retro lookup for current sprint
+
+      await checkMissingAccountability(userId, workspaceId);
+
+      const planQueries = vi.mocked(pool.query).mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes("document_type = 'weekly_plan'")
+      );
+      const retroQueries = vi.mocked(pool.query).mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes("document_type = 'weekly_retro'")
+      );
+
+      expect(planQueries).toHaveLength(1);
+      expect(retroQueries).toHaveLength(1);
+    });
+
+    it('batches standup lookups across multiple active sprints', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-02T12:00:00Z'));
+      vi.mocked(isBusinessDay).mockReturnValue(true);
+
+      mockSetupQueries()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'sprint-1',
+              title: 'Week 1',
+              properties: { sprint_number: 1 },
+              issue_count: '2',
+            },
+            {
+              id: 'sprint-2',
+              title: 'Week 2',
+              properties: { sprint_number: 1 },
+              issue_count: '1',
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({
+          rows: [
+            { parent_id: 'sprint-1', last_standup_date: '2024-01-01' },
+            { parent_id: 'sprint-2', last_standup_date: '2023-12-30' },
+          ],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      await checkMissingAccountability(userId, workspaceId);
+
+      const batchedStandupQueries = vi.mocked(pool.query).mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes("document_type = 'standup'") && sql.includes('parent_id = ANY')
+      );
+
+      expect(batchedStandupQueries).toHaveLength(2);
+    });
+
+    it('batches issue counts across owned sprints', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-10T12:00:00Z'));
+      vi.mocked(isBusinessDay).mockReturnValue(false);
+
+      mockSetupQueries()
+        .mockResolvedValueOnce({
+          rows: [
+            {
+              id: 'owned-sprint-1',
+              title: 'Owned Week 1',
+              properties: { sprint_number: 1, status: 'planning' },
+              project_id: 'project-1',
+            },
+            {
+              id: 'owned-sprint-2',
+              title: 'Owned Week 2',
+              properties: { sprint_number: 1, status: 'planning' },
+              project_id: 'project-2',
+            },
+          ],
+        } as any)
+        .mockResolvedValueOnce({
+          rows: [{ sprint_id: 'owned-sprint-2', count: '3' }],
+        } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any)
+        .mockResolvedValueOnce({ rows: [] } as any);
+
+      await checkMissingAccountability(userId, workspaceId);
+
+      const issueCountQueries = vi.mocked(pool.query).mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes('GROUP BY da.related_id')
+      );
+
+      expect(issueCountQueries).toHaveLength(1);
+    });
+  });
+
   describe('next-sprint lookahead', () => {
     it('checks both current AND next sprint for accountability', async () => {
       // Sunday Jan 7 = last day of Week 1
