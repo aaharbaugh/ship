@@ -2,7 +2,7 @@
 
 Measurement date: March 10, 2026
 
-## CEO Overview
+## Overview
 - Accessibility is in decent shape on automated checks, but the product does not fully support its accessibility claim today.
 - The main business risks are confirmed color-contrast failures and a small set of screen-reader issues on important controls.
 - Bottom line: the app is closer to partial compliance than full compliance and should not be described as fully conformant without remediation.

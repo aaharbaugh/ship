@@ -34,7 +34,7 @@ Measurement window: March 10-11, 2026
 | 7. Accessibility Compliance | Partial | Automated checks are decent, but contrast and screen-reader issues remain |
 
 ## Category 1: Type Safety
-Source: [type-safety.md](/home/aaron/projects/gauntlet/ship/ship/audit/type-safety.md)
+Source: [cat-1-type-safety.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-1-type-safety.md)
 
 | Metric | Your Baseline |
 |---|---|
@@ -47,7 +47,7 @@ Source: [type-safety.md](/home/aaron/projects/gauntlet/ship/ship/audit/type-safe
 | Top 5 violation-dense files | `api/src/routes/weeks.ts` (85), `api/src/__tests__/transformIssueLinks.test.ts` (66), `api/src/services/accountability.test.ts` (64), `api/src/__tests__/auth.test.ts` (63), `api/src/routes/projects.ts` (51) |
 
 ## Category 2: Frontend Bundle Size
-Source: [frontend-bundle-size.md](/home/aaron/projects/gauntlet/ship/ship/audit/frontend-bundle-size.md)
+Source: [cat-2-frontend-bundle-size.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-2-frontend-bundle-size.md)
 
 | Metric | Your Baseline |
 |---|---|
@@ -59,7 +59,7 @@ Source: [frontend-bundle-size.md](/home/aaron/projects/gauntlet/ship/ship/audit/
 | Improvement Target | Reduce initial-load bundle weight by shrinking the main entry chunk and moving heavy editor/collaboration code behind effective lazy-loading boundaries. |
 
 ## Category 3: API Response Time
-Source: [api-response-time.md](/home/aaron/projects/gauntlet/ship/ship/audit/api-response-time.md)
+Source: [cat-3-api-response-time.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-3-api-response-time.md)
 
 Final table below uses the `50`-connection baseline.
 
@@ -72,7 +72,7 @@ Final table below uses the `50`-connection baseline.
 | `GET /api/team/accountability-grid-v3` | 55 ms | 145.33 ms | 174 ms |
 
 ## Category 4: Database Query Efficiency
-Source: [database-query-efficiency.md](/home/aaron/projects/gauntlet/ship/ship/audit/database-query-efficiency.md)
+Source: [cat-4-database-query-efficiency.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-4-database-query-efficiency.md)
 
 | User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? |
 |---|---:|---:|---|
@@ -89,7 +89,7 @@ Improvement target:
 - Improve index coverage for repeated JSONB property filters used by dashboard, sprint, and search flows.
 
 ## Category 5: Test Coverage and Quality
-Source: [test-coverage-and-quality.md](/home/aaron/projects/gauntlet/ship/ship/audit/test-coverage-and-quality.md)
+Source: [cat-5-test-coverage-and-quality.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-5-test-coverage-and-quality.md)
 
 | Metric | Your Baseline |
 |---|---|
@@ -104,7 +104,7 @@ Improvement target:
 - Restore web Vitest to green and reduce the current Playwright failure/flaky set before treating the suite as a reliable release gate
 
 ## Category 6: Runtime Error and Edge Case Handling
-Source: [runtime-error-and-edge-case-handling.md](/home/aaron/projects/gauntlet/ship/ship/audit/runtime-error-and-edge-case-handling.md)
+Source: [cat-6-runtime-error-and-edge-case-handling.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-6-runtime-error-and-edge-case-handling.md)
 
 | Metric | Your Baseline |
 |---|---|
@@ -118,7 +118,7 @@ Improvement target:
 - Reduce console-only runtime failures in collaboration, upload, and offline flows by replacing them with explicit recovery states and observable centralized error capture.
 
 ## Category 7: Accessibility Compliance
-Source: [accessibility-compliance.md](/home/aaron/projects/gauntlet/ship/ship/audit/accessibility-compliance.md)
+Source: [cat-7-accessibility-compliance.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-7-accessibility-compliance.md)
 
 | Metric | Your Baseline |
 |---|---|

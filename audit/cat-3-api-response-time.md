@@ -2,7 +2,7 @@
 
 Measurement date: March 11, 2026
 
-## CEO Overview
+## Overview
 - Core API performance is acceptable today and does not show catastrophic latency under the tested load.
 - The main business risk is not average speed, but slower tail latency on list and rollup endpoints that support high-visibility workflows.
 - Bottom line: the API is stable enough for current use, but the heaviest endpoints should be optimized before scale increases.

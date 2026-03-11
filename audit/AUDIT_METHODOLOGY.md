@@ -151,7 +151,7 @@ To keep future audits comparable:
 Recommended audit file layout:
 
 - `audit/AUDIT_METHODOLOGY.md`
-- `audit/type-safety.md`
+- `audit/cat-1-type-safety.md`
 - `audit/<category-name>.md`
 - `audit/final-audit-report.md`
 

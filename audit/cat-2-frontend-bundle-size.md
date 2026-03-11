@@ -2,7 +2,7 @@
 
 Measurement date: March 10, 2026
 
-## CEO Overview
+## Overview
 - The frontend loads more JavaScript than it should, with most of the cost concentrated in one oversized main bundle.
 - The main business risk is slower startup on weaker devices and slower networks, especially for first-time users.
 - Bottom line: performance is serviceable, but bundle size is carrying avoidable weight and should be reduced before more features are added.

@@ -2,7 +2,7 @@
 
 Measurement date: March 10, 2026
 
-## CEO Overview
+## Overview
 - The codebase has a large automated test suite, but the test story is less healthy than the raw test count suggests.
 - The main business risk is false confidence: API tests are strong, but web tests are failing and the end-to-end suite still has real flaky cases.
 - Bottom line: test investment exists, but reliability and coverage reporting need cleanup before leadership should treat the suite as a fully dependable release signal.
