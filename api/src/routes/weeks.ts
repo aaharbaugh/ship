@@ -55,6 +55,67 @@ interface SprintRow {
   retro_id: string | null;
 }
 
+interface WeekIssueSummary {
+  id: string;
+  title: string;
+  state: string;
+  priority: string;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  assignee_archived: boolean;
+  estimate: number | null;
+  ticket_number: number | string | null;
+  display_id: string;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
+}
+
+interface WeekGroup {
+  sprint: { id: string; name: string; sprint_number: number };
+  program: { id: string; name: string; prefix: string | null } | null;
+  issues: WeekIssueSummary[];
+}
+
+interface StandupRow {
+  id: string;
+  parent_id: string;
+  title: string;
+  content: unknown;
+  author_id: string | null;
+  author_name: string | null;
+  author_email: string | null;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
+}
+
+interface SprintReviewIssueRow {
+  id: string;
+  title: string;
+  ticket_number: number | string | null;
+  properties: {
+    state?: string;
+    carryover_from_sprint_id?: string | null;
+  } | null;
+}
+
+interface SprintReviewDraftData {
+  sprint_number: number;
+  program_name: string | null;
+  plan: string | null;
+}
+
+interface TipTapNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TipTapNode[];
+  text?: string;
+}
+
+interface TipTapDocument {
+  type: 'doc';
+  content: TipTapNode[];
+}
+
 function parseCount(value: string | number | null): number {
   if (typeof value === 'number') {
     return value;
@@ -677,7 +738,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     const daysRemaining = isHistorical ? 0 : Math.max(0, Math.ceil((targetSprintEnd.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) + 1);
 
     // Build dynamic WHERE clause for issue filters
-    const params: any[] = [workspaceId, targetSprintNumber, userId, isAdmin];
+    const params: Array<string | number | boolean> = [workspaceId, targetSprintNumber, userId, isAdmin];
     let filterConditions = '';
 
     if (state && typeof state === 'string') {
@@ -732,11 +793,7 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     );
 
     // Group issues by sprint/program
-    const groupedData: Record<string, {
-      sprint: { id: string; name: string; sprint_number: number };
-      program: { id: string; name: string; prefix: string } | null;
-      issues: any[];
-    }> = {};
+    const groupedData: Record<string, WeekGroup> = {};
 
     for (const row of result.rows) {
       const sprintKey = row.sprint_id;
@@ -780,9 +837,9 @@ router.get('/my-week', authMiddleware, async (req: Request, res: Response) => {
     // Calculate totals
     const totalIssues = groups.reduce((sum, g) => sum + g.issues.length, 0);
     const completedIssues = groups.reduce((sum, g) =>
-      sum + g.issues.filter((i: any) => i.state === 'done').length, 0);
+      sum + g.issues.filter((issue) => issue.state === 'done').length, 0);
     const inProgressIssues = groups.reduce((sum, g) =>
-      sum + g.issues.filter((i: any) => i.state === 'in_progress' || i.state === 'in_review').length, 0);
+      sum + g.issues.filter((issue) => issue.state === 'in_progress' || issue.state === 'in_review').length, 0);
 
     res.json({
       groups,
@@ -1094,7 +1151,7 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     const currentProps = existing.rows[0].properties || {};
     const programId = existing.rows[0].program_id;
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;
@@ -1834,7 +1891,7 @@ const createStandupSchema = z.object({
 });
 
 // Helper to format standup response
-function formatStandupResponse(row: any) {
+function formatStandupResponse(row: StandupRow) {
   return {
     id: row.id,
     sprint_id: row.parent_id,
@@ -2063,32 +2120,35 @@ const sprintReviewSchema = z.object({
 });
 
 // Helper to generate pre-filled sprint review content
-async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
+async function generatePrefilledReviewContent(
+  sprintData: SprintReviewDraftData,
+  issues: SprintReviewIssueRow[]
+): Promise<TipTapDocument> {
   // Categorize issues
-  const issuesPlanned = issues.filter(i => {
-    const props = i.properties || {};
+  const issuesPlanned = issues.filter((issue) => {
+    const props = issue.properties || {};
     // An issue is "planned" if it was in the sprint from the start (no carryover_from_sprint_id)
     return !props.carryover_from_sprint_id;
   });
 
-  const issuesCompleted = issues.filter(i => {
-    const props = i.properties || {};
+  const issuesCompleted = issues.filter((issue) => {
+    const props = issue.properties || {};
     return props.state === 'done';
   });
 
-  const issuesIntroduced = issues.filter(i => {
-    const props = i.properties || {};
+  const issuesIntroduced = issues.filter((issue) => {
+    const props = issue.properties || {};
     // Issues introduced mid-sprint would have carryover_from_sprint_id
     return !!props.carryover_from_sprint_id;
   });
 
-  const issuesCancelled = issues.filter(i => {
-    const props = i.properties || {};
+  const issuesCancelled = issues.filter((issue) => {
+    const props = issue.properties || {};
     return props.state === 'cancelled';
   });
 
   // Build TipTap content with suggested sections
-  const content: any = {
+  const content: TipTapDocument = {
     type: 'doc',
     content: [
       {
@@ -2170,11 +2230,11 @@ async function generatePrefilledReviewContent(sprintData: any, issues: any[]) {
       },
       {
         type: 'bulletList',
-        content: issuesCompleted.map(i => ({
+        content: issuesCompleted.map((issue) => ({
           type: 'listItem',
           content: [{
             type: 'paragraph',
-            content: [{ type: 'text', text: `#${i.ticket_number}: ${i.title}` }]
+            content: [{ type: 'text', text: `#${issue.ticket_number}: ${issue.title}` }]
           }]
         }))
       }
@@ -2470,7 +2530,7 @@ router.patch('/:id/review', authMiddleware, async (req: Request, res: Response) 
 
     // Build update query
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     if (content !== undefined) {

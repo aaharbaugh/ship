@@ -429,3 +429,33 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/api type-check` passes.
 - Follow-up needed:
   - Continue the same pass in `api/src/routes/issues.ts` and the remaining untyped helpers in `api/src/routes/weeks.ts`.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Extended the Category 1 API boundary pass into issue and week routes by typing issue extraction, standup formatting, week grouping, and sprint review draft generation.
+- Files changed:
+  - `api/src/routes/issues.ts`
+  - `api/src/routes/weeks.ts`
+- Categories improved:
+  - Category 1: Type Safety
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `api/src/routes/issues.ts` still used `extractIssueFromRow(row: any)`, `states as any`, and `any[]` update payloads.
+  - `api/src/routes/weeks.ts` still used untyped helper paths for grouped week issue summaries, standup response formatting, sprint review prefill generation, and some update payload arrays.
+- What changed:
+  - Added explicit issue row and issue property interfaces in `issues.ts`, and replaced the touched `any[]` payloads with `unknown[]`.
+  - Added explicit interfaces in `weeks.ts` for grouped week issues, standup rows, sprint review draft data, sprint review issue rows, and TipTap review content.
+  - Replaced remaining `any`-driven filters in the touched helper paths with typed array operations.
+  - Narrowed dynamic SQL parameter arrays to real supported types instead of leaving them implicit.
+- Why this improves the system:
+  - Strengthens compiler coverage across three of the audit’s highest-signal API route files: projects, issues, and weeks.
+  - Makes future refactors safer by surfacing row-shape drift and payload mismatches during type-check instead of at runtime.
+  - Continues reducing audit-visible `any` usage in production code instead of just test code.
+- Evidence captured:
+  - `api/src/routes/issues.ts` no longer contains production `any` or `as any` usage in the touched paths.
+  - `api/src/routes/weeks.ts` no longer contains production `any` or `as any` usage in the touched helper paths.
+  - `pnpm --filter @ship/api type-check` passes.
+- Follow-up needed:
+  - Next Category 1 pass should target deeper schema typing in document-heavy routes like `api/src/routes/documents.ts`.
