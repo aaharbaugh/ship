@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import EmojiPicker, { Theme, EmojiClickData } from 'emoji-picker-react';
+import type { ComponentType } from 'react';
+import type { EmojiClickData, PickerProps } from 'emoji-picker-react';
 import { cn } from '@/lib/cn';
 
 interface EmojiPickerPopoverProps {
@@ -11,7 +12,34 @@ interface EmojiPickerPopoverProps {
 
 export function EmojiPickerPopover({ value, onChange, children, className }: EmojiPickerPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [PickerComponent, setPickerComponent] = useState<ComponentType<PickerProps> | null>(null);
+  const [pickerTheme, setPickerTheme] = useState<PickerProps['theme']>();
+  const [loadError, setLoadError] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen || PickerComponent) return;
+
+    let isMounted = true;
+    setLoadError(false);
+
+    void import('emoji-picker-react')
+      .then((module) => {
+        if (!isMounted) return;
+        setPickerComponent(() => module.default);
+        setPickerTheme(module.Theme.DARK);
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to load emoji picker', error);
+        if (isMounted) {
+          setLoadError(true);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, PickerComponent]);
 
   // Close on click outside
   useEffect(() => {
@@ -73,15 +101,23 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
                 Remove emoji
               </button>
             )}
-            <EmojiPicker
-              onEmojiClick={handleEmojiClick}
-              skinTonesDisabled={true}
-              theme={Theme.DARK}
-              height={350}
-              width={300}
-              searchPlaceholder="Search emoji..."
-              previewConfig={{ showPreview: false }}
-            />
+            {loadError ? (
+              <div className="w-[300px] p-4 text-sm text-muted">
+                Emoji picker failed to load. Close and reopen to try again.
+              </div>
+            ) : PickerComponent ? (
+              <PickerComponent
+                onEmojiClick={handleEmojiClick}
+                skinTonesDisabled={true}
+                theme={pickerTheme}
+                height={350}
+                width={300}
+                searchPlaceholder="Search emoji..."
+                previewConfig={{ showPreview: false }}
+              />
+            ) : (
+              <div className="w-[300px] p-4 text-sm text-muted">Loading emoji picker...</div>
+            )}
           </div>
         </div>
       )}

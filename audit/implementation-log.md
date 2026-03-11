@@ -218,3 +218,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Regression coverage added in `accountability.test.ts` for grouped issue-count lookup.
 - Follow-up needed:
   - Rerun `pnpm --filter @ship/api exec vitest run src/services/accountability.test.ts` locally to validate all accountability batching changes together.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Deferred the emoji picker bundle until the user actually opens the project icon popover.
+- Files changed:
+  - `web/src/components/EmojiPicker.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+  - Category 6: Runtime Error and Edge Case Handling
+- Baseline issue:
+  - `emoji-picker-react` was statically imported into the project sidebar emoji control, so the full picker code loaded even when a user never opened the icon picker.
+- What changed:
+  - Replaced the static picker import with an on-demand `import('emoji-picker-react')` inside the popover component.
+  - Added lightweight loading and failure states so the popover stays usable while the chunk loads and fails gracefully if the import ever breaks.
+- Why this improves the system:
+  - Moves a non-critical UI dependency out of the initial bundle path.
+  - Keeps the common project-sidebar path lighter while preserving the same feature when a user opts into it.
+  - Adds a safer UX for a lazily loaded dependency instead of assuming the chunk always succeeds.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+- Follow-up needed:
+  - Run a production build or bundle analyzer pass to capture the actual chunk-size delta for the Phase 2 evidence folder.
