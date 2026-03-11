@@ -7,6 +7,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Load environment variables before creating pool
+if (process.env.NODE_ENV) {
+  config({ path: join(__dirname, `../../.env.${process.env.NODE_ENV}.local`) });
+}
 config({ path: join(__dirname, '../../.env.local') });
 config({ path: join(__dirname, '../../.env') });
 

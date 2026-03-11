@@ -675,6 +675,8 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Files changed:
   - `api/src/db/client.ts`
   - `api/src/test/setup.ts`
+  - `api/.env.test.local.example`
+  - `audit/phase-2-evidence/api/test-vs-benchmark-db-setup.md`
 - Categories improved:
   - Category 5: Test Coverage and Quality
   - Category 3: API Response Time
@@ -689,5 +691,6 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Makes future performance and query evidence reruns more reproducible.
 - Evidence captured:
   - API code still type-checks after the database client change.
+  - Setup instructions recorded for local test/benchmark DB separation.
 - Follow-up needed:
   - Point local API tests at a dedicated test database before the next benchmark rerun.
