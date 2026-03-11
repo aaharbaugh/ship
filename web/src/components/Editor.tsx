@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
-import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
@@ -154,18 +153,6 @@ function extractHypothesisText(content: JSONContent): string | null {
   return hypothesisText;
 }
 
-function hasCodeBlockNode(content: JSONContent): boolean {
-  if (content.type === 'codeBlock') {
-    return true;
-  }
-
-  if (!content.content) {
-    return false;
-  }
-
-  return content.content.some(hasCodeBlockNode);
-}
-
 export function Editor({
   documentId,
   userName,
@@ -234,8 +221,6 @@ export function Editor({
     }
   }, [title]);
   const [provider, setProvider] = useState<CollaborationProvider | null>(null);
-  const [codeBlockExtension, setCodeBlockExtension] = useState<AnyExtension | null>(null);
-  const [shouldLoadCodeBlockHighlighting, setShouldLoadCodeBlockHighlighting] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [isBrowserOnline, setIsBrowserOnline] = useState(navigator.onLine);
   const [connectedUsers, setConnectedUsers] = useState<{ name: string; color: string }[]>([]);
@@ -270,37 +255,6 @@ export function Editor({
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  useEffect(() => {
-    if (!shouldLoadCodeBlockHighlighting || codeBlockExtension) return;
-
-    let cancelled = false;
-
-    void Promise.all([
-      import('@tiptap/extension-code-block-lowlight'),
-      import('lowlight'),
-    ])
-      .then(([codeBlockModule, lowlightModule]) => {
-        if (cancelled) return;
-
-        const lowlight = lowlightModule.createLowlight(lowlightModule.common);
-        setCodeBlockExtension(
-          codeBlockModule.default.configure({
-            lowlight,
-            HTMLAttributes: {
-              class: 'code-block-lowlight',
-            },
-          })
-        );
-      })
-      .catch((error: unknown) => {
-        console.error('[Editor] Failed to load code block highlighting:', error);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [shouldLoadCodeBlockHighlighting, codeBlockExtension]);
 
   const color = userColor || stringToColor(userName);
 
@@ -574,7 +528,6 @@ export function Editor({
       onNavigateToDocument,
       documentType,
       abortSignal: imageUploadAbortRef.current.signal,
-      onRequestCodeBlockHighlighting: () => setShouldLoadCodeBlockHighlighting(true),
     });
   }, [onCreateSubDocument, onNavigateToDocument, documentType, documentId]);
 
@@ -605,12 +558,10 @@ export function Editor({
 
   // Build extensions - only include CollaborationCursor when provider is ready
   const baseExtensions = useMemo(() => {
-    const extensions = [
+    return [
       StarterKit.configure({
         history: false,
         dropcursor: false,
-        // Keep basic code blocks available immediately, then swap to syntax highlighting once loaded.
-        codeBlock: codeBlockExtension ? false : undefined,
       }),
       Placeholder.configure({ placeholder }),
       Collaboration.configure({ document: ydoc }),
@@ -667,13 +618,7 @@ export function Editor({
       PlanReferenceBlockExtension,
       slashCommandsExtension,
     ];
-
-    if (codeBlockExtension) {
-      extensions.splice(1, 0, codeBlockExtension);
-    }
-
-    return extensions;
-  }, [codeBlockExtension, placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension]);
+  }, [placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension]);
 
   const extensions = provider
     ? [
@@ -692,26 +637,7 @@ export function Editor({
         class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[300px]',
       },
     },
-  }, [provider, documentType, codeBlockExtension]);
-
-  useEffect(() => {
-    if (!editor || shouldLoadCodeBlockHighlighting) return;
-
-    const maybeEnableHighlighting = () => {
-      if (hasCodeBlockNode(editor.getJSON())) {
-        setShouldLoadCodeBlockHighlighting(true);
-      }
-    };
-
-    maybeEnableHighlighting();
-    editor.on('create', maybeEnableHighlighting);
-    editor.on('update', maybeEnableHighlighting);
-
-    return () => {
-      editor.off('create', maybeEnableHighlighting);
-      editor.off('update', maybeEnableHighlighting);
-    };
-  }, [editor, shouldLoadCodeBlockHighlighting]);
+  }, [provider, documentType]);
 
   // Refs for stable comment callbacks (avoid re-render loops)
   const commentsRef = useRef(comments);

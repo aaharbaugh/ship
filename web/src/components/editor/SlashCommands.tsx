@@ -147,8 +147,6 @@ interface CreateSlashCommandsOptions {
   documentType?: string;
   /** AbortSignal for cancelling async operations on navigation/cleanup */
   abortSignal?: AbortSignal;
-  /** Request loading optional code block highlighting support */
-  onRequestCodeBlockHighlighting?: () => void;
 }
 
 // Icons for slash commands
@@ -264,7 +262,6 @@ export function createSlashCommands({
   onNavigateToDocument,
   documentType,
   abortSignal,
-  onRequestCodeBlockHighlighting,
 }: CreateSlashCommandsOptions) {
   const slashCommands: SlashCommandItem[] = [
     // Sub-document (requires async callback)
@@ -355,7 +352,6 @@ export function createSlashCommands({
       aliases: ['code', 'codeblock', 'pre', 'snippet'],
       icon: icons.code,
       command: ({ editor, range }) => {
-        onRequestCodeBlockHighlighting?.();
         editor.chain().focus().deleteRange(range).toggleCodeBlock().run();
       },
     },
