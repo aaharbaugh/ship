@@ -694,3 +694,30 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Setup instructions recorded for local test/benchmark DB separation.
 - Follow-up needed:
   - Point local API tests at a dedicated test database before the next benchmark rerun.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Verified the new test/benchmark DB split works and reran the accountability-grid benchmark on a stable seeded dataset.
+- Files changed:
+  - `api/.env.test.local`
+  - `audit/phase-2-evidence/api/2026-03-11-accountability-grid-v3-rerun.json`
+  - `audit/phase-2-evidence/api/2026-03-11-api-benchmark-summary.md`
+- Categories improved:
+  - Category 5: Test Coverage and Quality
+  - Category 3: API Response Time
+- Baseline issue:
+  - We could not trust the accountability-grid benchmark path while tests and benchmarks were sharing one local database.
+- What changed:
+  - Created the local `.env.test.local` test DB config and initialized `ship_test`.
+  - Confirmed focused API tests pass against `ship_test`.
+  - Reseeded and expanded `ship_dev`, then reran `GET /api/team/accountability-grid-v3` on the stable benchmark dataset.
+- Why this improves the system:
+  - Gives us a repeatable local workflow for destructive tests and stable performance measurements.
+  - Removes uncertainty about whether the earlier bad accountability-grid reruns were just database churn artifacts.
+- Evidence captured:
+  - focused API tests still pass: `63/63`
+  - clean accountability-grid rerun at `50` connections: `P95 175.33 ms`
+- Follow-up needed:
+  - The route still needs a deeper optimization pass if we want a positive Category 3 benchmark claim.

@@ -81,3 +81,17 @@ Interpretation:
 - `GET /api/issues` moved slightly in the right direction, but not enough to count as a material improvement.
 - `GET /api/team/accountability-grid-v3` is still above the audit baseline.
 - This confirms the next meaningful Category 3 target is still the accountability-grid path, not the already-cleaned sprint read path.
+
+## Clean Rerun After Test/Benchmark DB Split
+
+After separating API tests onto `ship_test` and keeping benchmarks on the seeded `ship_dev` database, `GET /api/team/accountability-grid-v3` was rerun again under the same `50`-connection profile on a stable dataset.
+
+| Endpoint | Baseline P95 | Prior focused rerun | Clean rerun | Delta vs baseline |
+|---|---:|---:|---:|---:|
+| `GET /api/team/accountability-grid-v3` | `152.00 ms` | `176.67 ms` | `175.33 ms` | `+15.35%` |
+
+Interpretation:
+
+- the clean rerun confirms the earlier result was not just test/DB interference
+- the route is still materially slower than the audit baseline under this benchmark profile
+- the recent refactors reduced overhead and made the route more defensible, but they still have not produced a benchmark win
