@@ -215,7 +215,7 @@ describe('Team API', () => {
       expect(inferredPerson).toBeDefined();
       expect(inferredPerson.weeks[currentSprintNumber].projectId).toBe(projectId);
       expect(inferredPerson.weeks[currentSprintNumber].projectName).toBe('Project Atlas');
-      expect(inferredPerson.weeks[currentSprintNumber].planStatus).toBe('future');
+      expect(inferredPerson.weeks[currentSprintNumber].planStatus).toBe('due');
       expect(inferredPerson.weeks[currentSprintNumber].retroStatus).toBe('future');
     });
   });
