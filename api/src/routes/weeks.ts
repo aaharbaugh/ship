@@ -15,6 +15,58 @@ import { extractText } from '../utils/document-content.js';
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+interface SprintProperties {
+  sprint_number?: number;
+  status?: string;
+  plan?: string | null;
+  success_criteria?: string[] | null;
+  confidence?: number | null;
+  plan_history?: unknown;
+  is_complete?: boolean | null;
+  missing_fields?: string[];
+  planned_issue_ids?: string[] | null;
+  snapshot_taken_at?: string | null;
+  plan_approval?: unknown;
+  review_approval?: unknown;
+  review_rating?: unknown;
+  accountable_id?: string | null;
+  assignee_ids?: string[];
+}
+
+interface SprintRow {
+  id: string;
+  title: string;
+  properties: SprintProperties | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_prefix: string | null;
+  program_accountable_id: string | null;
+  owner_reports_to: string | null;
+  workspace_sprint_start_date: Date | string | null;
+  owner_id: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  issue_count: string | number | null;
+  completed_count: string | number | null;
+  started_count: string | number | null;
+  has_plan: boolean | 't' | 'f';
+  has_retro: boolean | 't' | 'f';
+  retro_outcome: string | null;
+  retro_id: string | null;
+}
+
+function parseCount(value: string | number | null): number {
+  if (typeof value === 'number') {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    return parseInt(value, 10) || 0;
+  }
+
+  return 0;
+}
+
 /**
  * Look up the reports_to user_id for a sprint's owner.
  * The sprint's owner_id is a person document ID; this resolves their supervisor's user_id.
@@ -183,7 +235,7 @@ const updatePlanSchema = z.object({
 
 // Helper to extract sprint from row
 // Dates and status are computed on frontend from sprint_number + workspace.sprint_start_date
-function extractSprintFromRow(row: any) {
+function extractSprintFromRow(row: SprintRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -201,9 +253,9 @@ function extractSprintFromRow(row: any) {
     program_accountable_id: row.program_accountable_id || null,
     owner_reports_to: row.owner_reports_to || null,
     workspace_sprint_start_date: row.workspace_sprint_start_date,
-    issue_count: parseInt(row.issue_count) || 0,
-    completed_count: parseInt(row.completed_count) || 0,
-    started_count: parseInt(row.started_count) || 0,
+    issue_count: parseCount(row.issue_count),
+    completed_count: parseCount(row.completed_count),
+    started_count: parseCount(row.started_count),
     has_plan: row.has_plan === true || row.has_plan === 't',
     has_retro: row.has_retro === true || row.has_retro === 't',
     // Retro outcome summary (populated if retro exists)
@@ -269,6 +321,25 @@ async function takeSprintSnapshot(sprintId: string): Promise<string[]> {
     [sprintId]
   );
   return result.rows.map(row => row.id);
+}
+
+async function hydrateSprintSnapshotForResponse(row: SprintRow): Promise<SprintRow> {
+  const props = row.properties || {};
+  const sprintNumber = props.sprint_number || 1;
+  const workspaceStartDate = row.workspace_sprint_start_date;
+
+  if (!workspaceStartDate || !isSprintActive(sprintNumber, workspaceStartDate) || props.planned_issue_ids) {
+    return row;
+  }
+
+  return {
+    ...row,
+    properties: {
+      ...props,
+      planned_issue_ids: await takeSprintSnapshot(row.id),
+      snapshot_taken_at: null,
+    },
+  };
 }
 
 // Get all active sprints across the workspace
@@ -788,34 +859,7 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
       return;
     }
 
-    const row = result.rows[0];
-    const props = row.properties || {};
-    const sprintNumber = props.sprint_number || 1;
-    const workspaceStartDate = row.workspace_sprint_start_date;
-
-    // Check if sprint is active and needs a snapshot
-    // Take snapshot when: sprint is active (start_date reached) AND no snapshot exists yet
-    if (workspaceStartDate && isSprintActive(sprintNumber, workspaceStartDate) && !props.planned_issue_ids) {
-      // Take the snapshot
-      const sprintId = id as string; // Safe: Express route param is always a string
-      const plannedIssueIds = await takeSprintSnapshot(sprintId);
-      const snapshotTakenAt = new Date().toISOString();
-
-      // Update the sprint properties with the snapshot
-      const newProps = {
-        ...props,
-        planned_issue_ids: plannedIssueIds,
-        snapshot_taken_at: snapshotTakenAt,
-      };
-
-      await pool.query(
-        `UPDATE documents SET properties = $1, updated_at = now() WHERE id = $2`,
-        [JSON.stringify(newProps), id]
-      );
-
-      // Update row properties for response
-      row.properties = newProps;
-    }
+    const row = await hydrateSprintSnapshotForResponse(result.rows[0] as SprintRow);
 
     res.json(extractSprintFromRow(row));
   } catch (err) {
