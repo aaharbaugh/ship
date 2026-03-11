@@ -595,3 +595,40 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - updated evidence file under `audit/phase-2-evidence/accessibility/`
 - Follow-up needed:
   - Add Lighthouse snapshots if the final submission needs score-based accessibility evidence in addition to Playwright and axe coverage.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Captured current Phase 2 evidence for bundle size, API latency, database query counts, and test tooling status.
+- Files changed:
+  - `audit/phase-2-evidence/bundle/2026-03-11-bundle-size-summary.md`
+  - `audit/phase-2-evidence/api/2026-03-11-api-response-times-after.json`
+  - `audit/phase-2-evidence/api/2026-03-11-api-benchmark-summary.md`
+  - `audit/phase-2-evidence/database/2026-03-11-query-profile-summary-after.raw.json`
+  - `audit/phase-2-evidence/database/2026-03-11-database-query-summary.md`
+  - `audit/phase-2-evidence/tests/2026-03-11-test-evidence-summary.md`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+  - Category 3: API Response Time
+  - Category 4: Database Query Efficiency
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - We had several implemented refactors, but the Phase 2 evidence folders still did not show current before/after measurements for the remaining performance and test categories.
+- What changed:
+  - Reran the web production build and documented the post-refactor bundle output against the audit baseline.
+  - Seeded and expanded the local dev database to match the original audit counts, then reran the autocannon API benchmark matrix under the original profile.
+  - Replayed the original database profiler flows against a profiler-enabled API instance and aggregated the post-change query counts.
+  - Re-ran coverage commands to document the current tooling gap explicitly instead of omitting it.
+- Why this improves the system:
+  - Makes the Phase 2 work much easier to defend because the evidence folder now shows both wins and remaining gaps.
+  - Prevents us from overclaiming category progress where the current measurements do not yet meet the assignment threshold.
+- Evidence captured:
+  - Bundle total size dropped from `2,262.65 KB` to `2,104.98 KB`; largest chunk dropped from `2,025.10 KB` to `354.68 KB`.
+  - API benchmark rerun matched the original dataset volume but did not show P95 improvement on the audited endpoint set.
+  - Database query rerun showed the sprint-board flow improving from `16` to `15` normalized queries.
+  - Coverage commands still fail because `@vitest/coverage-v8` is missing for both API and web.
+- Follow-up needed:
+  - Do another Category 3 pass on audited slow endpoints before claiming API speed improvements.
+  - Capture stronger Category 4 evidence for accountability-specific flows or `EXPLAIN ANALYZE` changes.
+  - Install the Vitest coverage provider if we want measurable coverage percentages in the final submission.
