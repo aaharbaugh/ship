@@ -1,12 +1,17 @@
 # Category 4: Database Query Efficiency
 
-Measurement date: March 10, 2026
+Measurement date: March 11, 2026
+
+## CEO Overview
+- The database is not collapsing under current load, but there are clear efficiency problems that will get worse as data grows.
+- The main business risks are unnecessary write work during read flows and backend logic that still performs query-per-item patterns in some services.
+- Bottom line: query counts are manageable now, but there are specific hotspots that need cleanup before they become scale or reliability issues.
 
 ## Executive Summary
 - The database audit used an audit-only runtime query profiler because native PostgreSQL statement logging and `pg_stat_statements` were not available in the local dev environment.
-- After normalizing duplicate profiler captures, the five measured user flows issued between `10` and `16` database queries each. The heaviest flows were `view-document` and `load-sprint-board`, both at `16` queries.
-- No clear classic within-request N+1 pattern was found in the audited flows. The issue list already batch-loads associations, which is the correct direction.
-- The main database risks are not runaway query counts, but query shapes that rely on JSONB property extraction without dedicated expression indexes, plus a `GET /api/weeks/:id` path that performs a write during a read flow.
+- After normalizing duplicate profiler captures, the five measured user flows issued between `10` and `16` database queries each. The heaviest measured flow was still `load-sprint-board` at `16` queries, while `view-document` came back at `15` on the rerun.
+- No clear classic within-request N+1 pattern was found in the five audited flows. The issue list already batch-loads associations, which is the correct direction.
+- The main database risks are a `GET /api/weeks/:id` path that performs a write during a read flow, repeated auth/session queries that inflate every request, and source-level N+1-style loops in the accountability service outside the five measured flows.
 
 ## Measurement Method
 Tools and commands used:
@@ -27,7 +32,7 @@ curl -b /tmp/ship-audit-cookies-3003.txt -c /tmp/ship-audit-cookies-3003.txt \
   -d '{"email":"dev@ship.local","password":"admin123"}' \
   http://localhost:3003/api/auth/login
 
-node audit/artifacts/aggregate-query-profile.mjs
+node audit/artifacts/aggregate-query-profile.mjs audit/artifacts/query-profile.jsonl audit/artifacts/query-profile-summary.rerun.json
 
 node --input-type=module - <<'NODE'
 // Run EXPLAIN ANALYZE against representative query shapes on localhost:5433
@@ -39,12 +44,15 @@ Methodology:
 - Traced five user flows from real frontend request paths: load main page, view a document, list issues, load a sprint board, and search content.
 - Tagged each flow with `X-Audit-Flow` headers so request-level query counts could be grouped and aggregated.
 - Normalized final query counts by dividing raw profiler totals by `2`, because the first profiler version captured both pool-level and client-level query execution.
-- Ran `EXPLAIN ANALYZE` on representative slow or structurally important query shapes from the measured flows.
+- Compared the fresh profiler replay against the existing `EXPLAIN ANALYZE` artifact instead of regenerating the explain markdown in this rerun.
+- Did a source pass over `api/src/services/accountability.ts` to look for N+1-style loops outside the five sampled flows.
 
 Notes:
 - Query profile artifact: `audit/artifacts/query-profile.jsonl`
-- Aggregated summary artifact: `audit/artifacts/query-profile-summary.json`
-- `EXPLAIN ANALYZE` artifact: `audit/artifacts/database-query-explain-summary.md`
+- Aggregated summary artifacts:
+  - Original run: `audit/artifacts/query-profile-summary.json`
+  - March 11, 2026 rerun: `audit/artifacts/query-profile-summary.rerun.json`
+- `EXPLAIN ANALYZE` artifact reused for plan-shape evidence: `audit/artifacts/database-query-explain-summary.md`
 - Native PostgreSQL logging baseline during the audit:
   - `log_statement = 'none'`
   - `log_min_duration_statement = -1`
@@ -56,11 +64,11 @@ Normalized totals below divide raw profiler counts by `2` to remove duplicate in
 
 | User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? |
 |---|---:|---:|---|
-| Load main page | 14 | 12.318 ms | No |
-| View a document | 16 | 3.345 ms | No |
-| List issues | 10 | 2.369 ms | No |
-| Load sprint board | 16 | 2.192 ms | No |
-| Search content | 10 | 2.155 ms | No |
+| Load main page | 14 | 10.325 ms | No |
+| View a document | 15 | 1.945 ms | No |
+| List issues | 10 | 2.241 ms | No |
+| Load sprint board | 16 | 2.696 ms | No |
+| Search content | 10 | 1.847 ms | No |
 
 ## Query Shape Evidence
 Representative query-plan findings from `EXPLAIN ANALYZE`:
@@ -95,11 +103,15 @@ The audited query shapes still show coverage gaps:
   Why it matters: this increases load on a request that should be read-only, creates write amplification during page loads, and makes caching or repeatability harder.
   Evidence: the query profiler captured `UPDATE documents SET properties = $1, updated_at = now() WHERE id = $2` as the slowest query in the sprint-board flow, and the route updates `planned_issue_ids` inside the `GET /api/weeks/:id` handler in [weeks.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/routes/weeks.ts#L798).
 
+- The accountability service contains multiple source-level N+1 candidates outside the five sampled flows.
+  Why it matters: these paths issue one or more follow-up queries per sprint or per allocation, so they will widen with workspace size even if the sampled flows look acceptable today.
+  Evidence: [accountability.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/services/accountability.ts#L175), [accountability.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/services/accountability.ts#L262), [accountability.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/services/accountability.ts#L374), and [accountability.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/services/accountability.ts#L473) all contain `for ... of` loops with inner `await pool.query(...)` calls for standup checks, issue counts, and per-allocation plan/retro lookups.
+
+### Medium
 - The unified `documents` table is carrying multiple important read paths through JSONB property extraction without dedicated expression indexes.
   Why it matters: these queries are still fast on the current dataset, but they depend on post-filtering after broad indexes and are likely to degrade as document volume grows.
   Evidence: `EXPLAIN ANALYZE` for the My Week weekly-plan lookup and project lookup both show `Bitmap Heap Scan` on `documents` using `idx_documents_document_type`, with `person_id`, `week_number`, `assignee_ids`, and `sprint_number` evaluated in filters rather than index conditions.
 
-### Medium
 - Search content currently relies on sequential scans for `title ILIKE '%...%'`.
   Why it matters: search is user-facing and often one of the first places where growth converts a “fast enough” query into a visible regression.
   Evidence: `EXPLAIN ANALYZE` for the search mentions documents query shows a `Seq Scan` on `documents` with `title ~~* '%Audit%'`.
@@ -113,23 +125,24 @@ The audited query shapes still show coverage gaps:
   Evidence: every measured flow includes repeated session lookup, session touch, workspace lookup, and role checks in `audit/artifacts/query-profile-summary.json`.
 
 ### Low
-- No obvious classic within-request N+1 pattern was found in the five audited flows.
-  Why it matters: this narrows future optimization work toward query shape and indexing rather than broad ORM-style batching fixes.
-  Evidence: the issue list explicitly batch-loads associations after the main issue query in [issues.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/routes/issues.ts#L214), and none of the audited flows showed one query per returned item.
+- No obvious classic within-request N+1 pattern was found in the five audited flows themselves.
+  Why it matters: this narrows optimization work in those flows toward query shape and indexing rather than immediate batching fixes.
+  Evidence: the issue list explicitly batch-loads associations after the main issue query in [issues.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/routes/issues.ts#L214), and none of the five replayed flows showed one query per returned item.
 
 ## Suggested Direction
-The next optimization wave should prioritize query shape and indexing on the unified `documents` model before chasing raw query-count reductions. The highest-value targets are the read path that writes during sprint-board load, the property-based weekly-plan and sprint lookups, and search queries using `%...%` title matching.
+The next optimization wave should prioritize three things in order: remove the write from sprint-board reads, collapse the accountability-service query loops into batched queries, and then improve index coverage for JSONB property filters and search.
 
 ## Audit Deliverable
 | User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? |
 |---|---:|---:|---|
-| Load main page | 14 | 12.318 ms | No |
-| View a document | 16 | 3.345 ms | No |
-| List issues | 10 | 2.369 ms | No |
-| Load sprint board | 16 | 2.192 ms | No |
-| Search content | 10 | 2.155 ms | No |
+| Load main page | 14 | 10.325 ms | No |
+| View a document | 15 | 1.945 ms | No |
+| List issues | 10 | 2.241 ms | No |
+| Load sprint board | 16 | 2.696 ms | No |
+| Search content | 10 | 1.847 ms | No |
 
 Improvement target:
-- Reduce query count or query cost in the two heaviest flows (`view-document` and `load-sprint-board`) without changing user-visible behavior.
+- Reduce query count or query cost in the two heaviest measured flows (`load-sprint-board` and `view-document`) without changing user-visible behavior.
 - Remove write work from read-only sprint-board loading.
+- Collapse the accountability-service query loops into batched queries where possible.
 - Improve index coverage for repeated JSONB property filters used by dashboard, sprint, and search flows.

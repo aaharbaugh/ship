@@ -13,8 +13,8 @@ Working reference for auditing the Ship codebase. This is organized around the o
 - The repo already existed locally for this review. I did not re-verify a full dev boot from scratch in this cleanup pass.
 - Expected local dev flow from scripts/docs:
   - install deps with `pnpm install`
-  - start Postgres locally
-  - run migrations
+  - either start native Postgres and run migrations, or use `pnpm docker:up` for the local full-stack Docker flow
+  - if using native Postgres, run migrations
   - start app with `pnpm dev`
 
 #### Docs folder summary
@@ -297,6 +297,14 @@ In plain English: the container expects the code to already be built before pack
 - one `postgres` service
 
 It does not start the frontend or API app.
+
+The repo also has `docker-compose.local.yml`, which is the more complete local-stack path exposed by the root scripts. It starts:
+
+- `postgres` on `localhost:5433`
+- `api` on `localhost:3000`
+- `web` on `localhost:5173`
+
+That file is the clearer answer to “how do I boot the whole app in Docker locally?”
 
 #### Terraform / cloud expectations
 

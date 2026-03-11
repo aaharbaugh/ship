@@ -1,12 +1,20 @@
 # Category 6: Runtime Error and Edge Case Handling
 
 Measurement date: March 10, 2026
+Rerun update: March 10, 2026
+
+## CEO Overview
+- Normal usage looks stable, but failure handling becomes noisy and inconsistent when the app is pushed into offline, collaboration, and media-upload edge cases.
+- The main business risk is user confusion rather than immediate hard crashes: the UI often stays alive while errors pile up underneath it.
+- Bottom line: happy-path reliability is acceptable, but edge-case recovery is not yet robust enough for high-confidence production use.
 
 ## Executive Summary
-- Baseline happy-path runtime behavior is acceptable: focused document-load and reconnection flows completed with `0` observed browser console errors during normal navigation and document open.
+- Baseline happy-path runtime behavior is acceptable: the focused rerun kept document-load and non-fault-injected error-handling flows clean, with `0` observed browser console errors during normal navigation and document open.
 - Runtime resilience drops sharply in collaboration, image-upload, and offline scenarios, where the app emits repeated WebSocket and fetch errors while keeping the editor superficially usable.
 - Server-side unhandled promise rejections were `0` observed in the focused runtime run, but the API process does not register a global `unhandledRejection` handler, so that signal is currently weak.
 - Error handling is present but inconsistent: Ship has a shared React error boundary, yet many failure paths still resolve to `console.error`, `alert()`, silent retry, or stale UI rather than a coherent recovery state.
+- The rerun confirmed the split behind the audit discrepancy: `0` is defensible for happy-path console noise, but edge-case collaboration and image flows can generate repeated console failures within a single session.
+- This rerun is strongest on collaboration/offline/image runtime behavior; malformed-input and named 3G-throttle checklist items remain less directly evidenced in this specific pass.
 
 ## Measurement Method
 Tools and commands used:
@@ -22,6 +30,7 @@ sed -n '1,260p' e2e/images.spec.ts
 sed -n '1,260p' e2e/race-conditions.spec.ts
 sed -n '1,220p' api/src/index.ts
 sg docker -c "env PLAYWRIGHT_WORKERS=1 pnpm test:e2e e2e/error-handling.spec.ts e2e/content-caching.spec.ts e2e/images.spec.ts e2e/race-conditions.spec.ts --reporter=line"
+sg docker -c "env PLAYWRIGHT_WORKERS=1 pnpm test:e2e e2e/error-handling.spec.ts e2e/content-caching.spec.ts e2e/images.spec.ts e2e/race-conditions.spec.ts --reporter=json"
 ```
 
 Methodology:
@@ -30,11 +39,15 @@ Methodology:
 - Treated `e2e/content-caching.spec.ts` and the happy-path portions of `e2e/error-handling.spec.ts` as the “normal usage” baseline for console-noise measurement.
 - Treated image upload, offline editing, and concurrent editing scenarios as edge-case measurements.
 - Reviewed API process startup to verify whether unhandled promise rejections are globally trapped.
+- Re-ran the focused suite through `sg docker` because this repository's Playwright/Testcontainers harness could not access Docker directly from the default shell in this environment.
 
 Notes:
 - The focused runtime subset exposed both browser console noise and request failures during image/offline scenarios. Those were counted as runtime handling findings even when the editor remained interactive.
 - The API process logs many route- and collaboration-level errors, but no global `process.on('unhandledRejection', ...)` hook was found in startup code.
 - React error boundaries were found in [ErrorBoundary.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/ui/ErrorBoundary.tsx), applied at [App.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/App.tsx#L542) and around the editor content in [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx#L980).
+- In the rerun, the first twelve focused happy-path and controlled-failure checks progressed cleanly before the suite entered the noisy image path. The first hard failure remained the image file-picker path in [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts), which timed out waiting for `filechooser`.
+- The rerun also surfaced non-product shell noise from the harness itself: repeated Node warnings that `NO_COLOR` is ignored when `FORCE_COLOR` is set. Those should not be counted as browser application console errors.
+- This report is strongest where the rerun exercised existing error/offline/collaboration specs directly. Malformed-input handling is supported mainly by route validation and source inspection in this pass rather than a fresh dedicated runtime matrix.
 
 ## Baseline
 
@@ -54,8 +67,8 @@ Notes:
 | Network disconnect while editing | Partial | `error-handling.spec.ts` shows text entry survives disconnect/reconnect, but offline/image flows still produce repeated fetch and WebSocket console errors |
 | Temporary API failure | Pass | `error-handling.spec.ts` keeps the page responsive through injected `500` responses |
 | CSRF expiration | Partial | Editor remains usable in the test, but errors are not surfaced as a clear user-facing recovery state |
-| Image upload and offline editing | Fail / noisy partial recovery | `images.spec.ts` produced repeated file-chooser timeouts, WebSocket `429` handshake failures, fetch failures, and offline console errors |
-| Concurrent editing / rapid operations | Partial | Existing E2E suite passes many race-condition cases, but Category 5 surfaced hard failures and flake in simultaneous formatting, stale-data, backlinks, and image persistence paths |
+| Image upload and offline editing | Fail / noisy partial recovery | The rerun again produced repeated file-chooser timeouts, WebSocket `429` handshake failures, `[RealtimeEvents] Error: Event`, request aborts, and offline console errors in `images.spec.ts` |
+| Concurrent editing / rapid operations | Partial / flaky | Existing E2E suite passes many race-condition cases, but the fresh rerun also reproduced a flake in `race-conditions.spec.ts` (`rapid document creation does not cause duplicates`) where the editor never became visible on one of the created URLs |
 
 ## Hotspots
 | Location | Why it is a hotspot |
@@ -71,7 +84,11 @@ Notes:
 ### High
 - Collaboration and image-upload paths degrade noisily instead of failing cleanly.
   Why it matters: these are core editing workflows, and repeated WebSocket `429` handshake failures plus fetch errors create a state where the editor appears alive while synchronization is compromised.
-  Evidence: the focused runtime run logged repeated `WebSocket ... Unexpected response code: 429`, `[RealtimeEvents] Error: Event`, `Error fetching backlinks: TypeError: Failed to fetch`, and offline fetch failures during [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts).
+  Evidence: the original run and rerun both logged repeated `WebSocket ... Unexpected response code: 429`, `[RealtimeEvents] Error: Event`, request aborts, `Error fetching backlinks: TypeError: Failed to fetch`, and offline fetch failures during [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts).
+
+- The image slash-command upload path is still a concrete runtime blocker.
+  Why it matters: this is not just noisy logging; the rerun reproduced a user-facing failure in a core editor workflow.
+  Evidence: [images.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/images.spec.ts) contains a standing `FIXME` for the file chooser path, and the rerun timed out at `page.waitForEvent('filechooser')` while the editor otherwise remained loaded.
 
 - Runtime failures are often console-only or alert-based rather than modeled as durable UI states.
   Why it matters: users can continue interacting without understanding whether data is safe, queued, rejected, or stale.
@@ -92,7 +109,7 @@ Notes:
 
 - Edge-case reliability issues are already visible in the broader E2E baseline.
   Why it matters: runtime handling weaknesses are not isolated to synthetic audit tests; they align with existing failing and flaky product flows.
-  Evidence: Category 5’s full E2E run failed on backlinks removal, simultaneous formatting, inline code/comment shortcuts, table deletion, and TOC rename updates, with additional flake in offline image upload, stale-data, and image persistence flows.
+  Evidence: Category 5’s full E2E run failed on backlinks removal, simultaneous formatting, inline code/comment shortcuts, table deletion, and TOC rename updates, with additional flake in offline image upload, stale-data, and image persistence flows. The fresh focused rerun also reproduced flake in [race-conditions.spec.ts](/home/aaron/projects/gauntlet/ship/ship/e2e/race-conditions.spec.ts) for rapid document creation.
 
 ### Low
 - Input validation and injection handling are stronger than the rest of the runtime story.
@@ -101,7 +118,7 @@ Notes:
 
 - Standard document navigation is not currently polluted by routine browser console errors.
   Why it matters: the base experience is cleaner than the stressed-edge experience, which helps prioritize remediation.
-  Evidence: the focused `content-caching` and non-offline `error-handling` flows completed without observed browser console error output.
+  Evidence: the rerun stayed clean through the `content-caching` flows and the first twelve focused `error-handling`/baseline checks before entering the noisy image path.
 
 ## Silent Failures Identified
 | Reproduction | Silent or weakly surfaced behavior |
@@ -111,6 +128,7 @@ Notes:
 | Cause realtime event parse/socket failure | [useRealtimeEvents.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/hooks/useRealtimeEvents.tsx) logs errors and reconnects, but no structured UI state is shown |
 | Expire CSRF token during document editing | Editor remains interactive in test coverage, but the failure path is not surfaced as a clear action state for the user |
 | Fail document conversion / file upload side effects | Several paths in [Editor.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/Editor.tsx) and file/upload components log errors or use `alert()` instead of durable inline error states |
+| Trigger image upload via `/image` slash command in the rerun harness | The editor remains visible, but the upload path can stall at file-picker initiation while repeated WebSocket errors continue in the console |
 
 ## Suggested Direction
 The next step is not “add more try/catch everywhere.” The higher-value move is to standardize runtime failure handling around a small set of explicit user-facing states for sync, upload, save, and collaboration health, then back that with centralized client/server error capture so edge-case failures stop disappearing into console logs and ad hoc alerts.

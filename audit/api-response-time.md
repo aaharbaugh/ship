@@ -1,11 +1,16 @@
 # Category 3: API Response Time
 
-Measurement date: March 10, 2026
+Measurement date: March 11, 2026
+
+## CEO Overview
+- Core API performance is acceptable today and does not show catastrophic latency under the tested load.
+- The main business risk is not average speed, but slower tail latency on list and rollup endpoints that support high-visibility workflows.
+- Bottom line: the API is stable enough for current use, but the heaviest endpoints should be optimized before scale increases.
 
 ## Executive Summary
-- The API response-time audit was run against a seeded local dataset that meets the required floor: `530` documents, `104` issues, `21` users, and `35` sprints.
+- The API response-time audit was rerun against a seeded local dataset that exceeds the required floor: `572` documents, `104` issues, `22` users, and `35` sprints.
 - The five benchmarked endpoints were selected from actual frontend request patterns in common user flows: My Week, Issues, Projects, Document Detail, and Accountability Grid.
-- Under the final benchmark profile of `80 req/sec` with `10`, `25`, and `50` simultaneous connections, the slowest endpoints at `50` connections were `GET /api/issues` and `GET /api/team/accountability-grid-v3`, both with P95 above `150 ms`.
+- Under the final benchmark profile of `80 req/sec` with `10`, `25`, and `50` simultaneous connections, the slowest endpoints at `50` connections were still `GET /api/issues` and `GET /api/team/accountability-grid-v3`, now both in the mid-`140 ms` P95 range.
 - The dominant risk pattern is not catastrophic latency, but widening tail latency under concurrency in aggregate/list endpoints that likely fan out across document properties, joins, and per-user rollups.
 
 ## Measurement Method
@@ -20,7 +25,7 @@ node --input-type=module - <<'NODE'
 // Add audit-only records to reach 500+ documents and 20+ users
 NODE
 
-pnpm dev
+PORT=3002 CORS_ORIGIN=http://localhost:5173 SESSION_SECRET=audit-secret E2E_TEST=1 pnpm dev
 
 curl -c /tmp/ship-audit-cookies-3002.txt http://localhost:3002/api/csrf-token
 curl -b /tmp/ship-audit-cookies-3002.txt -c /tmp/ship-audit-cookies-3002.txt \
@@ -42,7 +47,7 @@ NODE
 ```
 
 Methodology:
-- Verified the starting dev dataset, then bulk-added audit-only users and documents to meet the category’s minimum data-volume requirement.
+- Reseeded the local Docker development database, then bulk-added audit-only users and documents to exceed the category’s minimum data-volume requirement.
 - Identified important endpoints by tracing frontend API usage in hooks, pages, and components instead of guessing from backend routes alone.
 - Started a clean local API instance and authenticated as the seeded `dev@ship.local` user so benchmarks hit the real protected endpoints used by the frontend.
 - Used `autocannon` as the load-testing tool.
@@ -50,16 +55,16 @@ Methodology:
 - Capped load at `80 req/sec` for the final run to avoid dev/test rate-limit state overwhelming the benchmark and masking handler latency.
 
 Notes:
-- Raw artifact: `audit/artifacts/api-response-times.json`
+- Raw artifact from the original run: `audit/artifacts/api-response-times.json`
 - `autocannon` emits `p90`, `p97.5`, and `p99`, but not an exact `p95`. For this audit, `p95` is interpolated between `p90` and `p97.5` and that is called out explicitly in the artifact.
-- A first benchmark attempt was discarded because the API limiter dominated results with `429` responses. The final artifact uses a clean benchmark instance and zero non-2xx responses across the reported runs.
+- A rerun against `localhost:3000` was discarded because the API limiter was already dirty and returned `429` responses. The valid March 11, 2026 rerun used a clean benchmark instance on `localhost:3002` and produced zero non-2xx responses across the reported runs.
 
 ## Seeded Baseline
 | Metric | Baseline |
 |---|---:|
-| Documents | 530 |
+| Documents | 572 |
 | Issues | 104 |
-| Users | 21 |
+| Users | 22 |
 | Sprints | 35 |
 
 ## Selected Endpoints
@@ -78,49 +83,49 @@ These were chosen from common frontend flows:
 ### 10 Connections
 | Endpoint | P50 | P95 | P99 |
 |---|---:|---:|---:|
-| `GET /api/dashboard/my-week` | 9 ms | 29 ms | 39 ms |
-| `GET /api/issues` | 10 ms | 65.67 ms | 99 ms |
-| `GET /api/projects` | 11 ms | 111 ms | 141 ms |
-| `GET /api/documents/:id` | 11 ms | 71.33 ms | 91 ms |
-| `GET /api/team/accountability-grid-v3` | 10 ms | 81 ms | 110 ms |
+| `GET /api/dashboard/my-week` | 8 ms | 31 ms | 45 ms |
+| `GET /api/issues` | 11 ms | 68.33 ms | 96 ms |
+| `GET /api/projects` | 11 ms | 98.67 ms | 127 ms |
+| `GET /api/documents/:id` | 10 ms | 74.33 ms | 96 ms |
+| `GET /api/team/accountability-grid-v3` | 9 ms | 60 ms | 85 ms |
 
 ### 25 Connections
 | Endpoint | P50 | P95 | P99 |
 |---|---:|---:|---:|
-| `GET /api/dashboard/my-week` | 23 ms | 61.67 ms | 75 ms |
-| `GET /api/issues` | 26 ms | 66 ms | 81 ms |
-| `GET /api/projects` | 20 ms | 49 ms | 60 ms |
-| `GET /api/documents/:id` | 20 ms | 52.67 ms | 63 ms |
-| `GET /api/team/accountability-grid-v3` | 27 ms | 75.33 ms | 92 ms |
+| `GET /api/dashboard/my-week` | 21 ms | 63.67 ms | 80 ms |
+| `GET /api/issues` | 25 ms | 63.67 ms | 78 ms |
+| `GET /api/projects` | 18 ms | 48.33 ms | 59 ms |
+| `GET /api/documents/:id` | 18 ms | 48.67 ms | 60 ms |
+| `GET /api/team/accountability-grid-v3` | 24 ms | 65 ms | 78 ms |
 
 ### 50 Connections
 | Endpoint | P50 | P95 | P99 |
 |---|---:|---:|---:|
-| `GET /api/dashboard/my-week` | 49 ms | 126.33 ms | 146 ms |
-| `GET /api/issues` | 61 ms | 155 ms | 190 ms |
-| `GET /api/projects` | 42 ms | 108 ms | 128 ms |
-| `GET /api/documents/:id` | 37 ms | 100.67 ms | 119 ms |
-| `GET /api/team/accountability-grid-v3` | 58 ms | 152 ms | 182 ms |
+| `GET /api/dashboard/my-week` | 48 ms | 122 ms | 140 ms |
+| `GET /api/issues` | 56 ms | 142.67 ms | 174 ms |
+| `GET /api/projects` | 40 ms | 110 ms | 131 ms |
+| `GET /api/documents/:id` | 34 ms | 87.67 ms | 103 ms |
+| `GET /api/team/accountability-grid-v3` | 55 ms | 145.33 ms | 174 ms |
 
 ## Findings
 
 ### High
 - `GET /api/issues` is the slowest endpoint under the highest tested concurrency.
   Why it matters: it is a core workflow endpoint and reaches the highest tail latency in the final matrix.
-  Evidence: at `50` connections, `GET /api/issues` recorded `P50 61 ms`, `P95 155 ms`, and `P99 190 ms`.
+  Evidence: at `50` connections, `GET /api/issues` recorded `P50 56 ms`, `P95 142.67 ms`, and `P99 174 ms`.
 
 - `GET /api/team/accountability-grid-v3` also degrades materially under concurrency.
   Why it matters: this endpoint likely powers broad management/status views and appears to aggregate more cross-entity state than simple list endpoints.
-  Evidence: at `50` connections, it recorded `P50 58 ms`, `P95 152 ms`, and `P99 182 ms`.
+  Evidence: at `50` connections, it recorded `P50 55 ms`, `P95 145.33 ms`, and `P99 174 ms`.
 
 ### Medium
 - `GET /api/dashboard/my-week` shows noticeable tail growth from `10` to `50` connections.
   Why it matters: this is the default landing experience, so even moderate tail growth affects perceived app responsiveness.
-  Evidence: P95 rose from `29 ms` at `10` connections to `126.33 ms` at `50` connections.
+  Evidence: P95 rose from `31 ms` at `10` connections to `122 ms` at `50` connections.
 
 - List and rollup endpoints widen faster than point reads.
   Why it matters: this suggests query complexity and aggregation cost matter more than simple document fetch overhead.
-  Evidence: `GET /api/documents/:id` remained the fastest at `50` connections (`P95 100.67 ms`) while `GET /api/issues` and `GET /api/team/accountability-grid-v3` were materially slower.
+  Evidence: `GET /api/documents/:id` remained the fastest at `50` connections (`P95 87.67 ms`) while `GET /api/issues` and `GET /api/team/accountability-grid-v3` were materially slower.
 
 ### Low
 - None of the final reported runs returned non-2xx responses.
@@ -145,8 +150,8 @@ Final table below uses the `50`-connection baseline, since that is the highest r
 
 | Endpoint | P50 | P95 | P99 |
 |---|---:|---:|---:|
-| `GET /api/dashboard/my-week` | 49 ms | 126.33 ms | 146 ms |
-| `GET /api/issues` | 61 ms | 155 ms | 190 ms |
-| `GET /api/projects` | 42 ms | 108 ms | 128 ms |
-| `GET /api/documents/:id` | 37 ms | 100.67 ms | 119 ms |
-| `GET /api/team/accountability-grid-v3` | 58 ms | 152 ms | 182 ms |
+| `GET /api/dashboard/my-week` | 48 ms | 122 ms | 140 ms |
+| `GET /api/issues` | 56 ms | 142.67 ms | 174 ms |
+| `GET /api/projects` | 40 ms | 110 ms | 131 ms |
+| `GET /api/documents/:id` | 34 ms | 87.67 ms | 103 ms |
+| `GET /api/team/accountability-grid-v3` | 55 ms | 145.33 ms | 174 ms |

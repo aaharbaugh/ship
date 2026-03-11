@@ -2,10 +2,15 @@
 
 Measurement date: March 10, 2026
 
+## CEO Overview
+- The codebase has a large automated test suite, but the test story is less healthy than the raw test count suggests.
+- The main business risk is false confidence: API tests are strong, but web tests are failing and the end-to-end suite still has real flaky cases.
+- Bottom line: test investment exists, but reliability and coverage reporting need cleanup before leadership should treat the suite as a fully dependable release signal.
+
 ## Executive Summary
 - The codebase contains `1,471` automated tests across API Vitest, web Vitest, and Playwright E2E.
 - The default root command is misleading for leadership and contributors: `pnpm test` only runs the API suite, not web tests and not the `869` Playwright tests.
-- API test reliability is currently strong in a real local environment: `451/451` tests passed in three consecutive runs with no observed flake.
+- API test reliability is currently strong when the suite has working database access: `451/451` tests passed in three consecutive runs with no observed flake, and a fresh elevated rerun also passed `451/451` in `21.11s`.
 - Web unit tests are failing deterministically (`13` failed assertions across `3` files on all repeated runs), and the now-runnable Playwright suite finishes with `851` passed, `6` failed, and `12` flaky tests.
 
 ## Measurement Method
@@ -28,11 +33,12 @@ Methodology:
 - Re-ran the executable suites to check for flake:
   - API suite: `3` full runs
   - Web suite: `3` full runs
-  - Playwright E2E: one full run with `PLAYWRIGHT_WORKERS=1`
+  - Playwright E2E: one full run with `PLAYWRIGHT_WORKERS=1`; flake counts come from Playwright's own run classification, not from three repeated full-suite reruns
 - Attempted coverage collection for both API and web. Both coverage runs failed immediately because `@vitest/coverage-v8` is not installed.
 
 Notes:
 - Root `pnpm test` is not the full product suite.
+- In the default sandbox shell, `pnpm test` can fail before executing the API assertions because Vitest setup cannot reach `127.0.0.1:5433`. That is an environment/access issue in this session, not a red API baseline.
 - Playwright uses Testcontainers-based isolated environments. In this session, the suite was made runnable by executing it through `sg docker -c ...` because the agent process did not initially inherit direct `docker.sock` group access.
 - Coverage percentages could not be measured in this session because the configured coverage provider dependency is missing.
 
@@ -103,6 +109,10 @@ Notes:
   Why it matters: leadership cannot answer basic questions like “what percent of API or web code is covered?” without fixing the test tooling itself.
   Evidence: both API and web coverage commands fail immediately with `Cannot find dependency '@vitest/coverage-v8'`.
 
+- Playwright flake evidence is real but not as strong as the API/web repeated-run evidence.
+  Why it matters: the category prompt asks for three runs when assessing flake, and the current report only has one full executable E2E run plus Playwright's flaky-test classification.
+  Evidence: API and web were repeated three times; Playwright was run once end-to-end because of runtime cost and harness complexity.
+
 - The web unit suite is narrow relative to the size of the frontend.
   Why it matters: only `16` web test files exist, and they are concentrated in hooks, helpers, editor extensions, and one page-level test rather than broad app flow coverage.
   Evidence: web test inventory totals `151` tests across `16` files, with heavy concentration in `hooks/`, `lib/`, and editor extension tests.
@@ -122,7 +132,7 @@ Notes:
 
 - The API suite itself is healthy and reasonably fast.
   Why it matters: backend contributors currently have a dependable regression net for route and service changes.
-  Evidence: `451` API tests passed three times in roughly `23-26` seconds wall-clock.
+  Evidence: `451` API tests passed three times in roughly `23-26` seconds wall-clock, and a fresh rerun passed `451/451` in `21.11s` once database access was available.
 
 ## Suggested Direction
 The first priority is to make the reported test surface honest and dependable: expose web and E2E status separately from root `pnpm test`, restore the web Vitest suite to green, and triage the current Playwright failure/flaky set into deterministic product bugs versus test timing issues. After that, fill the zero-coverage gaps in CAIA/PIV auth, Claude flows, and admin credential workflows, then turn code coverage reporting back on with a working provider package.
@@ -131,7 +141,7 @@ The first priority is to make the reported test surface honest and dependable: e
 | Metric | Your Baseline |
 |---|---|
 | Total tests | `1,471` |
-| Pass / Fail / Flaky | `1,440 / 19 / 12` |
+| Pass / Fail / Flaky | `1,440 / 19 / 12` across API, web, and one full Playwright run |
 | Suite runtime | Root `pnpm test`: `24.67s`; web Vitest: `2.12s`; Playwright E2E: `37.0m` test time, `2381.38s` wall time |
 | Critical flows with zero coverage | `caia-auth` / PIV auth, Claude workflow routes, admin credential workflow, invite acceptance happy path |
 | Code coverage % (if measured) | Not measurable in current repo state; `@vitest/coverage-v8` missing for both API and web |
