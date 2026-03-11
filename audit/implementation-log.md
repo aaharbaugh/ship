@@ -296,3 +296,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - Capture a production bundle diff to quantify the size moved out of the base editor chunk.
   - Consider a later pass for optional code-highlighting support if we still need more Category 2 reduction.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Removed misleading dynamic imports from slash commands so the upload/editor bundle graph reflects real load behavior.
+- Files changed:
+  - `web/src/components/editor/SlashCommands.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+  - Category 5: Testability and verification quality
+- Baseline issue:
+  - `SlashCommands` dynamically imported `upload.ts` and `FileAttachment.tsx`, but those same modules were already statically imported by the editor path, so Vite could not split them and emitted bundle warnings.
+- What changed:
+  - Reused the existing static upload helpers `triggerImageUpload(...)` and `triggerFileUpload(...)` directly from slash commands.
+  - Removed the fake dynamic import pattern that suggested chunking existed when it did not.
+- Why this improves the system:
+  - Makes the bundle graph honest, which gives more reliable evidence for further performance work.
+  - Removes build-time warnings that were masking the true next hotspot.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web build` passes with no mixed static/dynamic import warnings for upload and file attachment paths.
+- Follow-up needed:
+  - The biggest remaining chunks are still the editor bundle (`Editor-*.js` ~442 kB), the emoji picker chunk (`~271 kB`), and a large shared application chunk (`index-*.js` ~969 kB).
+  - Next pass should target either optional code highlighting in `Editor.tsx` or manual chunking in Vite for the large shared vendor/application chunk.
