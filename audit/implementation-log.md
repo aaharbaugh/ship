@@ -401,3 +401,31 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/web build` passes.
 - Follow-up needed:
   - This improves runtime fetch behavior, but not the emitted chunk size. The next Category 2 pass still needs to reduce the underlying highlight.js payload itself.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Tightened project-route boundary types and removed production `any` usage from project extraction and retro helpers.
+- Files changed:
+  - `api/src/routes/projects.ts`
+- Categories improved:
+  - Category 1: Type Safety
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - `api/src/routes/projects.ts` still used `row: any`, `content: any`, and `any[]` update payloads inside core project and retro endpoints.
+  - That limited compiler coverage in one of the main production API files targeted by the audit.
+- What changed:
+  - Added explicit interfaces for project rows, project properties, project sprint rows, retro sprint rows, retro issue rows, and the TipTap retro document structure.
+  - Replaced untyped project and sprint extraction helpers with typed versions.
+  - Added shared typed helpers for count parsing and retro issue-state summaries.
+  - Replaced touched `any[]` database update payloads with `unknown[]`.
+- Why this improves the system:
+  - Makes API boundary assumptions explicit and compiler-checked.
+  - Reduces the chance of row-shape drift silently leaking through future refactors.
+  - Gives us a stronger base for continuing the Category 1 pass in adjacent route files.
+- Evidence captured:
+  - `api/src/routes/projects.ts` no longer contains production `any` or `as any` usage in the touched helpers.
+  - `pnpm --filter @ship/api type-check` passes.
+- Follow-up needed:
+  - Continue the same pass in `api/src/routes/issues.ts` and the remaining untyped helpers in `api/src/routes/weeks.ts`.
