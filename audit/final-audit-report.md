@@ -8,6 +8,20 @@ Measurement window: March 10-11, 2026
 - Weakest areas: backend type-safety discipline, oversized frontend bundle composition, runtime edge-case recovery, and incomplete accessibility conformance.
 - Immediate business risk is moderate rather than existential: the app works, but quality debt is accumulating in places that will slow delivery and create user-facing confusion as scale and complexity grow.
 
+## Audit Notes
+- The repository’s pre-commit hook soft-fails when `comply` is missing, so commits can still proceed.
+- The repo currently instructs contributors to install `comply` with `pip install comply-cli`, but that package name did not resolve in the audited WSL environment and `pipx install comply-cli` failed the same way.
+- Practical implication: open-source compliance scanning is expected by the repo, but the documented installation path appears stale or org-specific and could not be validated during this audit.
+
+## Windows / WSL Issues Encountered
+- Git hooks run in the WSL/Linux shell context, not Windows CMD or PowerShell. Installing CLI tools on Windows did not make them available to the repo hook environment.
+- Python package installation in WSL was blocked by an externally managed Python environment, which prevented the normal `pip install --user ...` workflow.
+- The documented `comply` installation command did not work in WSL. Both `pip install comply-cli` and `pipx install comply-cli` failed because no matching public package could be resolved.
+- Docker-backed local workflows were sensitive to shell context and permissions. In practice, Docker commands were most reliable when run through the approved `sg docker -c ...` path.
+- Some local test and benchmark workflows depended on starting clean API processes on alternate ports because existing local state, especially rate-limiter state on `localhost:3000`, contaminated reruns.
+- Root test commands and local tooling behavior were not always representative of the full product surface. For example, `pnpm test` only exercised the API suite, while additional web and Playwright coverage required separate commands and environment setup.
+- The combination of Windows host tooling, WSL package management, Docker permissions, and repo-specific CLI expectations added non-trivial setup friction that should be treated as an onboarding and operability issue.
+
 ## Category Summary
 | Category | Current Read | Main Risk |
 |---|---|---|
@@ -116,7 +130,7 @@ Source: [accessibility-compliance.md](/home/aaron/projects/gauntlet/ship/ship/au
 
 Improvement target:
 - Add a repo-native Lighthouse workflow for major pages so the audit can publish comparable page scores.
-- Add a documented manual screen-reader pass for login, docs, issues, programs, reviews, and admin/settings surfaces before claiming full Category 7 completion.
+- Fix the manual NVDA issues identified in `/documents`, global app chrome, and `/team`, then keep those controls in regression coverage.
 - Expand keyboard-only regression coverage to `Projects`, `TeamMode`, `ReviewsPage`, `WorkspaceSettings`, and `AdminDashboard`.
 - Add a repo-native contrast audit that includes admin/settings/review surfaces and replace or retokenize low-contrast accent text on the dark theme.
 - Add explicit regression coverage for the Action Items modal post-standup selection flow and the Status Overview person-detail return path.

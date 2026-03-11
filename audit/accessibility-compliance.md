@@ -12,7 +12,8 @@ Measurement date: March 10, 2026
 - The current report includes manually recorded Lighthouse accessibility scores for the major pages, with the lowest score on the Admin Dashboard at `88`.
 - The rerun baseline is strong on automated checks: the focused accessibility Playwright suite passed `18/18`, and the deeper remediation subset passed `3/3`.
 - `0` critical or serious axe violations were observed on the tested pages, but a CSS-level contrast sweep found real color-contrast failures that the narrower page sample did not catch.
-- The main remaining gap against the Category 7 checklist is manual screen-reader verification; Lighthouse scores are now recorded, but the repo environment still does not provide a repo-native Lighthouse workflow.
+- Manual NVDA verification was completed on the major pages and found a small number of real control-labeling issues despite otherwise strong page-level results.
+- The main remaining gap against the Category 7 checklist is a repo-native Lighthouse workflow; the scores in this report were captured manually rather than through a reproducible repo command.
 
 ## Measurement Method
 Tools and commands used:
@@ -39,7 +40,7 @@ Methodology:
 
 Scope exclusions:
 - Lighthouse per-page scoring in the table below was entered from a separate manual run rather than reproduced through a repo-native CLI workflow in this environment.
-- Manual screen-reader verification with VoiceOver/NVDA was not executed in this rerun, so screen-reader conclusions are based on semantics and automated checks rather than live assistive-technology interaction.
+- VoiceOver was not tested in this audit. Manual screen-reader findings below are based on NVDA.
 
 Notes:
 - The focused automated suite passed `18/18` in `40.5s`.
@@ -111,13 +112,9 @@ Additional manual NVDA findings:
   Why it matters: this directly undermines the Section 508 / WCAG 2.1 AA claim and affects legibility on core navigation and admin workflows.
   Evidence: the CSS-level sweep found `text-accent` (`#005ea2`) on the dark app background (`#0d0d0d`) at `2.89:1`, below the `4.5:1` requirement. A concrete example is the admin workspace name link in [AdminDashboard.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/AdminDashboard.tsx#L306).
 
-- The audit cannot yet verify the repository’s per-page Lighthouse accessibility claims because Lighthouse is not installed or wired into the repo workflow.
-  Why it matters: the requested deliverable explicitly asks for Lighthouse scores per major page, and the current audit surface cannot produce them.
-  Evidence: `pnpm exec lighthouse --version` failed because the command is not available in this environment.
-
-- Manual screen-reader verification remains unmeasured in this rerun.
-  Why it matters: automated axe coverage and semantic inspection are necessary, but they do not prove real NVDA/VoiceOver usability for page structure, announcements, and control interaction.
-  Evidence: this rerun executed only automated Playwright/axe checks; no live assistive-technology session was run.
+- The repository still lacks a reproducible, repo-native Lighthouse workflow.
+  Why it matters: the requested deliverable explicitly asks for Lighthouse scores per major page, and the current audit surface cannot regenerate those scores from a standard repo command.
+  Evidence: `pnpm exec lighthouse --version` failed because the command is not available in this environment, so the page scores in this report were captured manually.
 
 ### Medium
 - Keyboard reachability is broadly complete, but there are still concrete workflow/navigation issues.
@@ -136,6 +133,10 @@ Additional manual NVDA findings:
   Why it matters: these surfaces are the most likely places for accessible-name drift, focus-order regressions, or modal-state issues to appear over time.
   Evidence: source inspection shows dense interactive surfaces in [Projects.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/Projects.tsx), [TeamMode.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/TeamMode.tsx), [ReviewsPage.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/ReviewsPage.tsx), [WorkspaceSettings.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/WorkspaceSettings.tsx), and [AdminDashboard.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/AdminDashboard.tsx).
 
+- Manual NVDA testing found a small set of real label/context issues despite otherwise passing page structure and control interaction.
+  Why it matters: these are user-facing accessibility defects on important controls, not theoretical semantics gaps.
+  Evidence: the Delete Document control in `/documents`, the user-initial icon, the Settings button, the toolbar toggle, and the Team Mode “View as current week” icon were all flagged in manual NVDA use.
+
 ### Low
 - The automated baseline supports the claim that accessibility engineering is a first-class concern in the codebase.
   Why it matters: accessibility is not just documented; it is reflected in explicit axe, contrast, keyboard, focus, and ARIA regression coverage.
@@ -151,8 +152,7 @@ Additional manual NVDA findings:
 | [StatusOverviewHeatmap.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/StatusOverviewHeatmap.tsx) | Manual audit found navigation into a person/detail flow without a return/back affordance |
 | [TopBar.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/components/TopBar.tsx) | Manual NVDA audit found the user-initial icon and Settings / toolbar toggle controls do not announce enough context |
 | [Projects.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/Projects.tsx) | Button-dense bulk-action and filtering surface plus accent-text usage that should be included in contrast review |
-| [TeamMode.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/TeamMode.tsx) | Complex interactive dashboard with multiple inline controls and modal paths |
-| [TeamMode.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/TeamMode.tsx) | Manual NVDA audit found the “View as current week” icon is not screen-reader understandable |
+| [TeamMode.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/TeamMode.tsx) | Complex interactive dashboard with multiple inline controls and modal paths; manual NVDA audit also found the “View as current week” icon is not screen-reader understandable |
 | [ReviewsPage.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/ReviewsPage.tsx) | Dense review controls, panels, and stateful buttons that need continued keyboard/screen-reader verification |
 | [WorkspaceSettings.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/WorkspaceSettings.tsx) | Tabbed settings/admin surface with many action buttons and list operations |
 | [Documents.tsx](/home/aaron/projects/gauntlet/ship/ship/web/src/pages/Documents.tsx) | Empty-state links use the same accent-text pattern and should be treated as contrast review targets |
@@ -179,7 +179,7 @@ Keyboard completeness note:
 
 Improvement target:
 - Add a repo-native Lighthouse workflow for major pages so the audit can publish comparable page scores.
-- Add a documented manual screen-reader pass for login, docs, issues, programs, reviews, and admin/settings surfaces before claiming full Category 7 completion.
+- Fix the manual NVDA issues identified in `/documents`, global app chrome, and `/team`, then keep those controls in regression coverage.
 - Expand keyboard-only regression coverage to `Projects`, `TeamMode`, `ReviewsPage`, `WorkspaceSettings`, and `AdminDashboard`.
 - Add a repo-native contrast audit that includes admin/settings/review surfaces and replace or retokenize low-contrast accent text on the dark theme.
 - Add explicit regression coverage for the Action Items modal post-standup selection flow and the Status Overview person-detail return path.
