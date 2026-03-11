@@ -569,3 +569,29 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - Stabilize the flaky login/setup path and rerun for a clean broad-suite pass.
   - Add Lighthouse snapshots if we need score-delta evidence instead of violation-based evidence.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Stabilized the Playwright accessibility environment so the broad automated accessibility suite now passes cleanly.
+- Files changed:
+  - `e2e/fixtures/isolated-env.ts`
+  - `audit/phase-2-evidence/accessibility/2026-03-11-playwright-axe-summary.md`
+- Categories improved:
+  - Category 7: Accessibility Compliance
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - The broad accessibility suite had one intermittent failure where login stayed on `/login`, and the run also showed `EADDRINUSE :::10000` startup noise.
+- What changed:
+  - Split the Playwright isolated-environment worker ports so the API and preview server no longer compete for the same worker port range.
+  - Reran the broad accessibility suite and updated the evidence summary with the stabilized result.
+- Why this improves the system:
+  - Removes infrastructure flake from the accessibility evidence path so the audit result is reproducible.
+  - Gives us a cleaner signal that the remaining Category 7 work is actually green, not just “green except for setup noise.”
+- Evidence captured:
+  - rerun result: `18 passed`
+  - duration: about `40.6s`
+  - updated evidence file under `audit/phase-2-evidence/accessibility/`
+- Follow-up needed:
+  - Add Lighthouse snapshots if the final submission needs score-based accessibility evidence in addition to Playwright and axe coverage.

@@ -28,9 +28,9 @@ Covered checks:
 
 ## Broad accessibility suite
 
-- Status: mostly pass with one flaky test
-- Result: `17 passed`, `1 flaky`
-- Duration: about `53.6s`
+- Initial status: mostly pass with one flaky test
+- Initial result: `17 passed`, `1 flaky`
+- Initial duration: about `53.6s`
 
 Passing coverage included:
 - login page axe audit
@@ -57,13 +57,29 @@ Supporting context from the run:
 - the failing assertion was `expect(page).not.toHaveURL('/login')`
 - there was also API startup noise showing `EADDRINUSE :::10000`, but the suite recovered and completed
 
+## Stabilization Rerun
+
+Fix applied before rerun:
+- updated `e2e/fixtures/isolated-env.ts` so API and preview servers use different worker-port ranges
+- API now uses the base worker port range and preview uses an offset range, which avoids API/preview collisions like `EADDRINUSE :::10000`
+
+Rerun command:
+
+```bash
+sg docker -c "env PLAYWRIGHT_WORKERS=1 pnpm test:e2e e2e/accessibility.spec.ts e2e/status-colors-accessibility.spec.ts --reporter=line"
+```
+
+Rerun result:
+- Status: pass
+- Result: `18 passed`
+- Duration: about `40.6s`
+
 ## Interpretation
 
 - The targeted remediation checks are currently green.
-- The broader automated accessibility baseline is also effectively green aside from one flaky login/setup path.
+- The broader automated accessibility baseline is now green after stabilizing the isolated test environment.
 - This evidence supports the claim that the current Category 7 work improved keyboard, modal, focus, and labeling behavior without introducing regressions in the existing automated accessibility checks.
 
 ## Follow-up
 
-- Rerun the broad suite after stabilizing the login/setup flake if we want a clean `18/18`.
 - Add Lighthouse before/after snapshots if the assignment submission needs score-based evidence in addition to axe/Playwright evidence.
