@@ -17,9 +17,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { IndexeddbPersistence } from 'y-indexeddb';
 import { cn } from '@/lib/cn';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { ScrollFade } from '@/components/ui/ScrollFade';
@@ -91,6 +89,8 @@ interface EditorProps {
 }
 
 type SyncStatus = 'connecting' | 'cached' | 'synced' | 'disconnected';
+type CollaborationProvider = import('y-websocket').WebsocketProvider;
+type PersistenceProvider = import('y-indexeddb').IndexeddbPersistence;
 
 // Generate a consistent color from a string
 function stringToColor(str: string): string {
@@ -225,7 +225,7 @@ export function Editor({
       el.style.height = `${el.scrollHeight}px`;
     }
   }, [title]);
-  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [provider, setProvider] = useState<CollaborationProvider | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [isBrowserOnline, setIsBrowserOnline] = useState(navigator.onLine);
   const [connectedUsers, setConnectedUsers] = useState<{ name: string; color: string }[]>([]);
@@ -284,45 +284,57 @@ export function Editor({
 
   // Setup IndexedDB persistence and WebSocket provider
   useEffect(() => {
-    let wsProvider: WebsocketProvider | null = null;
+    let wsProvider: CollaborationProvider | null = null;
+    let indexeddbProvider: PersistenceProvider | null = null;
     let hasCachedContent = false;
     let cancelled = false;
     // Store the updateUsers callback so we can properly remove it on cleanup
     let updateUsersCallback: (() => void) | null = null;
+    setSyncStatus('connecting');
 
-    // Create IndexedDB persistence for content caching
-    // This loads cached content BEFORE WebSocket connects for instant navigation
-    const indexeddbProvider = new IndexeddbPersistence(`ship-${roomPrefix}-${documentId}`, ydoc);
+    const initializeProviders = async () => {
+      const [{ WebsocketProvider }, { IndexeddbPersistence }] = await Promise.all([
+        import('y-websocket'),
+        import('y-indexeddb'),
+      ]);
 
-    // Wait for IndexedDB to load cached content (with timeout)
-    // This ensures cached content shows instantly before WebSocket syncs
-    const waitForCache = new Promise<void>((resolve) => {
-      // Resolve immediately if already synced
-      if (indexeddbProvider.synced) {
-        hasCachedContent = true;
-        setSyncStatus('cached');
-        resolve();
-        return;
-      }
+      if (cancelled) return;
 
-      // Wait for sync event
-      const onSynced = () => {
-        hasCachedContent = true;
-        setSyncStatus((prev) => prev === 'connecting' ? 'cached' : prev);
-        console.log(`[Editor] IndexedDB synced for ${roomPrefix}:${documentId}`);
-        resolve();
-      };
-      indexeddbProvider.on('synced', onSynced);
+      // Create IndexedDB persistence for content caching
+      // This loads cached content BEFORE WebSocket connects for instant navigation
+      indexeddbProvider = new IndexeddbPersistence(`ship-${roomPrefix}-${documentId}`, ydoc);
 
-      // Timeout after 300ms - don't block forever if no cache exists
-      setTimeout(() => {
-        indexeddbProvider.off('synced', onSynced);
-        resolve();
-      }, 300);
-    });
+      // Wait for IndexedDB to load cached content (with timeout)
+      // This ensures cached content shows instantly before WebSocket syncs
+      await new Promise<void>((resolve) => {
+        if (!indexeddbProvider) {
+          resolve();
+          return;
+        }
 
-    // Connect WebSocket AFTER cache loads (or timeout)
-    waitForCache.then(() => {
+        // Resolve immediately if already synced
+        if (indexeddbProvider.synced) {
+          hasCachedContent = true;
+          setSyncStatus('cached');
+          resolve();
+          return;
+        }
+
+        const onSynced = () => {
+          hasCachedContent = true;
+          setSyncStatus((prev) => prev === 'connecting' ? 'cached' : prev);
+          console.log(`[Editor] IndexedDB synced for ${roomPrefix}:${documentId}`);
+          resolve();
+        };
+        indexeddbProvider.on('synced', onSynced);
+
+        // Timeout after 300ms - don't block forever if no cache exists
+        setTimeout(() => {
+          indexeddbProvider?.off('synced', onSynced);
+          resolve();
+        }, 300);
+      });
+
       if (cancelled) return;
 
       // In production, use current host with wss:// (through CloudFront)
@@ -351,7 +363,9 @@ export function Editor({
               }
             });
             // Also clear IndexedDB for future visits
-            indexeddbProvider.clearData().then(() => {
+            const persistence = indexeddbProvider;
+            if (!persistence) return;
+            persistence.clearData().then(() => {
               console.log(`[Editor] IndexedDB cache cleared for ${documentId} (fresh from JSON)`);
               hasCachedContent = false;
             }).catch((err) => {
@@ -427,7 +441,9 @@ export function Editor({
           // Content updated via API - clear IndexedDB cache to prevent stale content merge
           console.log(`[Editor] Content updated via API for ${documentId}, clearing IndexedDB cache`);
           // Clear the IndexedDB cache so stale content doesn't merge with new content
-          indexeddbProvider.clearData().then(() => {
+          const persistence = indexeddbProvider;
+          if (!persistence) return;
+          persistence.clearData().then(() => {
             console.log(`[Editor] IndexedDB cache cleared for ${documentId}`);
             hasCachedContent = false;
           }).catch((err) => {
@@ -473,6 +489,13 @@ export function Editor({
       if (!cancelled) {
         setProvider(wsProvider);
       }
+    };
+
+    void initializeProviders().catch((error: unknown) => {
+      console.error(`[Editor] Failed to initialize collaboration providers for ${documentId}:`, error);
+      if (!cancelled) {
+        setSyncStatus(hasCachedContent ? 'cached' : 'disconnected');
+      }
     });
 
     return () => {
@@ -495,7 +518,7 @@ export function Editor({
         wsProvider.destroy();
       }
       // Destroy IndexedDB persistence
-      indexeddbProvider.destroy();
+      indexeddbProvider?.destroy();
       // Clear provider state
       setProvider(null);
       setConnectedUsers([]);

@@ -269,3 +269,30 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - Capture a production build diff to quantify the editor chunk split for the bundle evidence folder.
   - Continue inside `Editor.tsx` if we want a second-pass split of optional editor features like code highlighting or collaboration persistence.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Deferred collaboration transport and offline persistence libraries until the editor actually initializes them.
+- Files changed:
+  - `web/src/components/Editor.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+  - Category 6: Runtime Error and Edge Case Handling
+- Baseline issue:
+  - `Editor.tsx` imported `y-websocket` and `y-indexeddb` at module load time even though those libraries are only used inside the collaboration setup effect.
+- What changed:
+  - Replaced top-level imports of `y-websocket` and `y-indexeddb` with dynamic imports inside the collaboration initialization effect.
+  - Added guarded failure handling so editor sync status falls back cleanly if those async provider imports fail.
+  - Tightened nullable persistence cleanup around cache-clearing paths.
+- Why this improves the system:
+  - Shrinks the synchronous editor chunk by moving collaboration transport and persistence code behind the point of actual use.
+  - Keeps the editor shell lighter while preserving the same collaboration behavior once initialization completes.
+  - Makes async provider startup failure visible in a controlled way instead of assuming the chunk always loads.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+- Follow-up needed:
+  - Capture a production bundle diff to quantify the size moved out of the base editor chunk.
+  - Consider a later pass for optional code-highlighting support if we still need more Category 2 reduction.
