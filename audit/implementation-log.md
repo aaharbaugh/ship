@@ -753,3 +753,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - Add targeted tests around `accountability-grid-v3` in `team.ts`.
   - Add higher-value page/editor coverage on the web side instead of broad low-signal tests.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Added direct route coverage for `GET /api/team/accountability-grid-v3`, which was the clearest backend coverage gap after the first coverage pass.
+- Files changed:
+  - `api/src/routes/team.test.ts`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - The first working coverage run showed `src/routes/team.ts` at only `9.05%` line coverage even though it contains the `accountability-grid-v3` hotspot we have been refactoring.
+- What changed:
+  - Added dedicated route tests for non-admin rejection.
+  - Added coverage for explicit sprint assignments with completed weekly plan/retro documents.
+  - Added coverage for inferred assignments built from sprint issue ownership when no explicit assignment exists.
+- Why this improves the system:
+  - Exercises the main response-shaping logic in the route instead of leaving one of the highest-risk backend files mostly untested.
+  - Gives us a targeted path to improve coverage where the audit evidence says it matters most.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes after adding the new tests.
+  - Route execution still needs a local rerun against the accessible test database outside this sandbox.
+- Follow-up needed:
+  - Run `pnpm --filter @ship/api exec vitest run src/routes/team.test.ts` locally and refresh coverage.
