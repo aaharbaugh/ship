@@ -522,7 +522,8 @@ function ProjectRowContent({ project, visibleColumns, programNameById }: Project
       {/* ICE Score */}
       {visibleColumns.has('score') && (
         <td className="px-4 py-3 text-sm text-center font-medium" role="gridcell">
-          <span className="inline-flex items-center justify-center rounded bg-accent/20 px-2 py-0.5 text-accent whitespace-nowrap">
+          <span className="inline-flex items-center justify-center rounded bg-accent/20 px-2 py-0.5 text-foreground whitespace-nowrap">
+            <span className="sr-only">ICE score </span>
             {project.ice_score}
           </span>
         </td>
@@ -537,13 +538,13 @@ function ProjectRowContent({ project, visibleColumns, programNameById }: Project
       {visibleColumns.has('designReview') && (
         <td className="px-4 py-3 text-sm" role="gridcell">
           {project.has_design_review ? (
-            <span className="inline-flex items-center gap-1.5 text-green-500">
-              <CheckIcon className="h-4 w-4" />
+            <span className="inline-flex items-center gap-1.5 text-green-600">
+              <CheckIcon className="h-4 w-4" aria-hidden="true" />
               <span className="font-medium">Approved</span>
             </span>
           ) : (
             <span className="inline-flex items-center gap-1.5 text-muted">
-              <XCircleIcon className="h-4 w-4" />
+              <XCircleIcon className="h-4 w-4" aria-hidden="true" />
               <span>Not Approved</span>
             </span>
           )}
@@ -570,11 +571,11 @@ function ICEBadge({ value }: { value: number | null }) {
     return <span className="font-medium text-muted">&mdash;</span>;
   }
   const colors = {
-    1: 'text-red-500',
-    2: 'text-orange-500',
-    3: 'text-yellow-500',
-    4: 'text-lime-500',
-    5: 'text-green-500',
+    1: 'text-red-600',
+    2: 'text-orange-600',
+    3: 'text-foreground',
+    4: 'text-lime-700',
+    5: 'text-green-700',
   };
   return (
     <span className={cn('font-medium', colors[value as keyof typeof colors] || 'text-muted')}>

@@ -57,6 +57,7 @@ export function DocumentsPage() {
 
   // Context menu state for list view
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; selection: UseSelectionReturn } | null>(null);
+  const searchInputId = 'documents-search';
 
   // Column visibility for list view
   const {
@@ -197,7 +198,9 @@ export function DocumentsPage() {
   // Search filter content for toolbar (matches Issues pattern)
   const searchFilterContent = (
     <div className="w-48">
+      <label htmlFor={searchInputId} className="sr-only">Search documents</label>
       <input
+        id={searchInputId}
         type="text"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -426,7 +429,12 @@ function DocumentBulkActionBar({
   onClearSelection,
 }: DocumentBulkActionBarProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-2">
+    <div
+      className="flex items-center gap-3 border-b border-border bg-muted/30 px-6 py-2"
+      role="region"
+      aria-label="Bulk actions"
+      aria-live="polite"
+    >
       <span className="text-sm text-muted">
         {selectedCount} selected
       </span>
@@ -434,6 +442,7 @@ function DocumentBulkActionBar({
       <button
         onClick={onDelete}
         className="flex items-center gap-1.5 rounded px-2 py-1 text-sm text-red-600 hover:bg-red-500/10 transition-colors"
+        aria-label={`Delete ${selectedCount} selected document${selectedCount === 1 ? '' : 's'}`}
       >
         <TrashIcon className="h-4 w-4" />
         Delete
@@ -442,6 +451,7 @@ function DocumentBulkActionBar({
       <button
         onClick={onClearSelection}
         className="text-sm text-muted hover:text-foreground transition-colors"
+        aria-label="Clear document selection"
       >
         Clear selection
       </button>

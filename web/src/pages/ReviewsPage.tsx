@@ -661,27 +661,27 @@ export function ReviewsPage() {
         )}
         <span className="text-muted">Review Status:</span>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.approved }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.approved }} aria-hidden="true" />
           <span>Approved</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.needs_review }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.needs_review }} aria-hidden="true" />
           <span>Needs Review</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.late }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.late }} aria-hidden="true" />
           <span>Late</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.changed }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.changed }} aria-hidden="true" />
           <span>Changed</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.changes_requested }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.changes_requested }} aria-hidden="true" />
           <span>Changes Requested</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.empty }} />
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: REVIEW_COLORS.empty }} aria-hidden="true" />
           <span>No Submission</span>
         </div>
         <span className="text-muted">Left = Plan, Right = Retro</span>
@@ -783,6 +783,8 @@ export function ReviewsPage() {
                     key={`program-${row.id}`}
                     onClick={() => toggleProgram(row.id === '__unassigned__' ? null : row.id)}
                     className="flex h-10 w-[240px] items-center gap-2 border-b border-border bg-border/30 px-3 hover:bg-border/50 text-left"
+                    aria-label={`${collapsedPrograms.has(row.id) ? 'Expand' : 'Collapse'} ${row.name} with ${row.peopleCount} people`}
+                    aria-expanded={!collapsedPrograms.has(row.id)}
                   >
                     <svg
                       className={cn('w-3 h-3 transition-transform', !collapsedPrograms.has(row.id) && 'rotate-90')}

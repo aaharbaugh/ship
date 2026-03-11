@@ -515,3 +515,32 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/web type-check` passes.
 - Follow-up needed:
   - Continue Category 7 on the audit’s primary pages, especially `Documents.tsx`, `Projects.tsx`, `ReviewsPage.tsx`, and `WorkspaceSettings.tsx`, and add reproducible Lighthouse/axe evidence.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Hardened accessibility on audit-priority pages by adding labels, tab semantics, non-color cues, and clearer bulk-action context.
+- Files changed:
+  - `web/src/pages/Documents.tsx`
+  - `web/src/pages/Projects.tsx`
+  - `web/src/pages/ReviewsPage.tsx`
+  - `web/src/pages/WorkspaceSettings.tsx`
+- Categories improved:
+  - Category 7: Accessibility Compliance
+- Baseline issue:
+  - Key audit pages still had placeholder-only inputs, weak tab semantics, some color-only meaning, and bulk-action/status surfaces that lacked enough context for assistive tech.
+- What changed:
+  - Added explicit labels for document search, invite form controls, PIV subject input, and token form controls.
+  - Added `tabpanel`/`tab` semantics to workspace settings navigation.
+  - Added clearer ARIA context to document bulk actions and review-program expand/collapse controls.
+  - Reduced reliance on accent-only or color-only status communication in project and review surfaces.
+  - Marked review legend swatches as decorative so screen readers announce the labels, not unlabeled color boxes.
+- Why this improves the system:
+  - Improves keyboard and screen-reader comprehension on the exact page types the audit prioritizes.
+  - Addresses accessibility failures that affect real navigation and action flows, not just isolated widgets.
+  - Makes page state easier to understand without depending on color perception alone.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+- Follow-up needed:
+  - Add reproducible Lighthouse/axe evidence for these pages and keep pushing on contrast hotspots if scores still miss the assignment threshold.
