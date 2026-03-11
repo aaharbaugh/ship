@@ -19,25 +19,42 @@ Commands run:
 
 ```bash
 pnpm --filter @ship/api test:coverage
-pnpm --filter @ship/web exec vitest run --coverage
+pnpm --filter @ship/web test:coverage
 ```
 
 Results:
 
-- API coverage command failed with:
-  - `MISSING DEPENDENCY  Cannot find dependency '@vitest/coverage-v8'`
-- Web coverage command failed with:
-  - `MISSING DEPENDENCY  Cannot find dependency '@vitest/coverage-v8'`
+- Coverage provider installed: `@vitest/coverage-v8@^4.0.17` in both workspace apps
+- API coverage completed successfully:
+  - all tests passed: `28 files`, `455 tests`
+  - overall line coverage: `41.12%`
+  - route hotspot coverage:
+    - `src/routes/issues.ts`: `58.89%` lines
+    - `src/routes/weeks.ts`: `59.95%` lines
+    - `src/routes/team.ts`: `9.05%` lines
+  - service hotspot coverage:
+    - `src/services/accountability.ts`: `81.2%` lines
+- Web coverage completed successfully:
+  - all tests passed: `16 files`, `153 tests`
+  - overall line coverage: `28.72%`
+  - stronger area:
+    - `src/hooks`: `71.56%` lines
+  - still weak audited page coverage:
+    - `src/pages/Dashboard.tsx`: `37.09%` lines
 
 ## Interpretation
 
 - The test surface is much healthier than the audit baseline:
   - unit tests are green
-  - warning noise was cleaned up
+  - most warning noise was cleaned up
   - one flaky accessibility infrastructure issue was fixed
-- Coverage reporting is still not in a submission-ready state because the configured Vitest coverage provider is missing from the repo.
+- Coverage reporting now works in both apps, which means Category 5 is measurable instead of blocked on tooling.
+- The current reports are strong enough to direct the next test investment honestly:
+  - backend hotspot coverage is decent in `issues.ts`, `weeks.ts`, and `accountability.ts`
+  - `team.ts` remains under-covered despite being one of the main performance hotspots
+  - frontend hooks are reasonably covered, but page/editor coverage is still shallow
 
 ## Honest Read
 
-- Category 5 has strong reliability progress.
-- Category 5 still has an open tooling gap until `@vitest/coverage-v8` is installed and wired successfully.
+- Category 5 now has both green suites and working coverage infrastructure.
+- Category 5 is improved, but not finished; the next meaningful gain is targeted tests for `team.ts` and critical frontend page/editor flows.

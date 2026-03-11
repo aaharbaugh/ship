@@ -721,3 +721,35 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - clean accountability-grid rerun at `50` connections: `P95 175.33 ms`
 - Follow-up needed:
   - The route still needs a deeper optimization pass if we want a positive Category 3 benchmark claim.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Unblocked Vitest coverage in both apps and converted the earlier missing-provider failure into measurable Category 5 evidence.
+- Files changed:
+  - `api/package.json`
+  - `web/package.json`
+  - `pnpm-lock.yaml`
+  - `.gitignore`
+  - `audit/phase-2-evidence/tests/2026-03-11-test-evidence-summary.md`
+- Categories improved:
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - Coverage commands were part of the Phase 2 evidence plan, but both apps failed with a missing `@vitest/coverage-v8` dependency, so we could not produce coverage data at all.
+- What changed:
+  - Installed `@vitest/coverage-v8` at a version aligned with the existing Vitest major version.
+  - Added a matching `test:coverage` script to the web app for the same workflow used by the API app.
+  - Ignored generated `coverage/` output so local evidence runs do not leave noisy untracked artifacts in the repo.
+  - Re-ran coverage and updated the test evidence summary with real measurements.
+- Why this improves the system:
+  - Gives us repeatable, documented coverage evidence instead of a broken command path.
+  - Makes it easier to decide where the next meaningful tests belong rather than guessing.
+- Evidence captured:
+  - API coverage passes with overall line coverage at `41.12%`.
+  - Web coverage passes with overall line coverage at `28.72%`.
+  - Backend hotspot coverage is strongest in `issues.ts`, `weeks.ts`, and `accountability.ts`.
+  - `team.ts` remains the clearest backend test gap.
+- Follow-up needed:
+  - Add targeted tests around `accountability-grid-v3` in `team.ts`.
+  - Add higher-value page/editor coverage on the web side instead of broad low-signal tests.
