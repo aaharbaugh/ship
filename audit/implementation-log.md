@@ -243,3 +243,29 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
 - Follow-up needed:
   - Run a production build or bundle analyzer pass to capture the actual chunk-size delta for the Phase 2 evidence folder.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Lazy-loaded the main rich-text editor so document pages do not eagerly pull the full editor stack into the initial route bundle.
+- Files changed:
+  - `web/src/components/UnifiedEditor.tsx`
+  - `web/src/pages/PersonEditor.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+- Baseline issue:
+  - `UnifiedEditor` and `PersonEditorPage` imported `Editor.tsx` directly, which meant TipTap, collaboration, lowlight, and Yjs dependencies loaded immediately with the page entry points.
+- What changed:
+  - Switched both editor entry points to `React.lazy(...)` imports for `Editor.tsx`.
+  - Added `Suspense` fallbacks so the UI shows a normal loading state while the editor chunk is fetched.
+- Why this improves the system:
+  - Moves the heaviest editor code behind a dedicated async boundary.
+  - Gives Vite a clear code-splitting seam around the most expensive frontend path in the app.
+  - Preserves behavior while reducing the amount of editor code tied to initial route evaluation.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+- Follow-up needed:
+  - Capture a production build diff to quantify the editor chunk split for the bundle evidence folder.
+  - Continue inside `Editor.tsx` if we want a second-pass split of optional editor features like code highlighting or collaboration persistence.
