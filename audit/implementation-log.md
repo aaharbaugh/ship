@@ -350,3 +350,29 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
     - remaining largest chunk is now `Editor-*.js` at about `442.03 kB` minified
 - Follow-up needed:
   - The next Category 2 hotspot is the editor bundle, especially optional code-block highlighting and other heavy editor-only features inside `Editor.tsx`.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Moved syntax-highlighting code out of the base editor bundle by loading the enhanced code-block extension asynchronously.
+- Files changed:
+  - `web/src/components/Editor.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+- Baseline issue:
+  - The editor bundle still eagerly included `@tiptap/extension-code-block-lowlight` and `lowlight/common`, keeping syntax highlighting inside the main editor payload.
+- What changed:
+  - Removed the static lowlight/code-block imports from the editor module.
+  - Loaded the enhanced code-block extension asynchronously after the editor shell is available.
+  - Kept basic code-block support available immediately through StarterKit until the highlighted variant is ready.
+- Why this improves the system:
+  - Shrinks the base editor chunk so the normal editing surface loads less code up front.
+  - Creates a separate async boundary around syntax highlighting, which is a more optional editor feature than the core document experience.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+  - `pnpm --filter @ship/web build` passes.
+  - Base editor chunk dropped from about `442.03 kB` minified (`135.78 kB` gzip) to about `246.61 kB` minified (`74.85 kB` gzip).
+- Follow-up needed:
+  - A large async highlighting chunk remains (`index-o3JoAw-h.js` about `955.62 kB` minified, `301.20 kB` gzip), which means the next Category 2 pass should specifically reduce the lowlight/highlight.js payload rather than just split it.

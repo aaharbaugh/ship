@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useEditor, EditorContent, JSONContent } from '@tiptap/react';
+import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCursor from '@tiptap/extension-collaboration-cursor';
@@ -8,8 +9,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { ResizableImage } from './editor/ResizableImage';
 import Dropcursor from '@tiptap/extension-dropcursor';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
@@ -39,9 +38,6 @@ import { PlanReferenceBlockExtension } from './editor/PlanReferenceBlock';
 import { useCommentsQuery, useCreateComment, useUpdateComment } from '@/hooks/useCommentsQuery';
 import { BubbleMenu } from '@tiptap/react';
 import 'tippy.js/dist/tippy.css';
-
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common);
 
 interface EditorProps {
   documentId: string;
@@ -226,6 +222,7 @@ export function Editor({
     }
   }, [title]);
   const [provider, setProvider] = useState<CollaborationProvider | null>(null);
+  const [codeBlockExtension, setCodeBlockExtension] = useState<AnyExtension | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [isBrowserOnline, setIsBrowserOnline] = useState(navigator.onLine);
   const [connectedUsers, setConnectedUsers] = useState<{ name: string; color: string }[]>([]);
@@ -258,6 +255,35 @@ export function Editor({
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void Promise.all([
+      import('@tiptap/extension-code-block-lowlight'),
+      import('lowlight'),
+    ])
+      .then(([codeBlockModule, lowlightModule]) => {
+        if (cancelled) return;
+
+        const lowlight = lowlightModule.createLowlight(lowlightModule.common);
+        setCodeBlockExtension(
+          codeBlockModule.default.configure({
+            lowlight,
+            HTMLAttributes: {
+              class: 'code-block-lowlight',
+            },
+          })
+        );
+      })
+      .catch((error: unknown) => {
+        console.error('[Editor] Failed to load code block highlighting:', error);
+      });
+
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -562,73 +588,76 @@ export function Editor({
   }, []);
 
   // Build extensions - only include CollaborationCursor when provider is ready
-  const baseExtensions = [
-    StarterKit.configure({
-      history: false,
-      dropcursor: false,
-      codeBlock: false, // Disable default code block to use CodeBlockLowlight
-    }),
-    CodeBlockLowlight.configure({
-      lowlight,
-      HTMLAttributes: {
-        class: 'code-block-lowlight',
-      },
-    }),
-    Placeholder.configure({ placeholder }),
-    Collaboration.configure({ document: ydoc }),
-    Link.configure({
-      openOnClick: true,
-      HTMLAttributes: {
-        class: 'text-accent hover:underline cursor-pointer',
-      },
-    }),
-    ResizableImage,
-    Dropcursor.configure({
-      color: '#3b82f6',
-      width: 2,
-    }),
-    Table.configure({
-      resizable: true,
-      HTMLAttributes: {
-        class: 'tiptap-table',
-      },
-    }),
-    TableRow,
-    TableCell,
-    TableHeader,
-    TaskList.configure({
-      HTMLAttributes: {
-        class: 'task-list',
-      },
-    }),
-    TaskItem.configure({
-      nested: true,
-      HTMLAttributes: {
-        class: 'task-item',
-      },
-    }),
-    ImageUploadExtension.configure({
-      onUploadStart: () => {},
-      onUploadComplete: () => {},
-      onUploadError: (error) => console.error('Upload error:', error),
-      abortController: imageUploadAbortRef.current,
-    }),
-    FileAttachmentExtension,
-    DocumentEmbed,
-    DragHandleExtension,
-    DetailsExtension,
-    DetailsSummary,
-    DetailsContent,
-    mentionExtension,
-    EmojiExtension,
-    TableOfContentsExtension,
-    HypothesisBlockExtension,
-    CommentMark.configure({ onAddComment: handleAddComment }),
-    CommentDisplayExtension,
-    AIScoringDisplayExtension,
-    PlanReferenceBlockExtension,
-    slashCommandsExtension,
-  ];
+  const baseExtensions = useMemo(() => {
+    const extensions = [
+      StarterKit.configure({
+        history: false,
+        dropcursor: false,
+        // Keep basic code blocks available immediately, then swap to syntax highlighting once loaded.
+        codeBlock: codeBlockExtension ? false : undefined,
+      }),
+      Placeholder.configure({ placeholder }),
+      Collaboration.configure({ document: ydoc }),
+      Link.configure({
+        openOnClick: true,
+        HTMLAttributes: {
+          class: 'text-accent hover:underline cursor-pointer',
+        },
+      }),
+      ResizableImage,
+      Dropcursor.configure({
+        color: '#3b82f6',
+        width: 2,
+      }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'tiptap-table',
+        },
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'task-list',
+        },
+      }),
+      TaskItem.configure({
+        nested: true,
+        HTMLAttributes: {
+          class: 'task-item',
+        },
+      }),
+      ImageUploadExtension.configure({
+        onUploadStart: () => {},
+        onUploadComplete: () => {},
+        onUploadError: (error) => console.error('Upload error:', error),
+        abortController: imageUploadAbortRef.current,
+      }),
+      FileAttachmentExtension,
+      DocumentEmbed,
+      DragHandleExtension,
+      DetailsExtension,
+      DetailsSummary,
+      DetailsContent,
+      mentionExtension,
+      EmojiExtension,
+      TableOfContentsExtension,
+      HypothesisBlockExtension,
+      CommentMark.configure({ onAddComment: handleAddComment }),
+      CommentDisplayExtension,
+      AIScoringDisplayExtension,
+      PlanReferenceBlockExtension,
+      slashCommandsExtension,
+    ];
+
+    if (codeBlockExtension) {
+      extensions.splice(1, 0, codeBlockExtension);
+    }
+
+    return extensions;
+  }, [codeBlockExtension, placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension]);
 
   const extensions = provider
     ? [
@@ -647,7 +676,7 @@ export function Editor({
         class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[300px]',
       },
     },
-  }, [provider, documentType]);
+  }, [provider, documentType, codeBlockExtension]);
 
   // Refs for stable comment callbacks (avoid re-render loops)
   const commentsRef = useRef(comments);
