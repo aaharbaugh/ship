@@ -376,3 +376,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - Base editor chunk dropped from about `442.03 kB` minified (`135.78 kB` gzip) to about `246.61 kB` minified (`74.85 kB` gzip).
 - Follow-up needed:
   - A large async highlighting chunk remains (`index-o3JoAw-h.js` about `955.62 kB` minified, `301.20 kB` gzip), which means the next Category 2 pass should specifically reduce the lowlight/highlight.js payload rather than just split it.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Gated syntax-highlighting loading so the large highlight payload is requested only when a document actually uses code blocks.
+- Files changed:
+  - `web/src/components/Editor.tsx`
+  - `web/src/components/editor/SlashCommands.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+- Baseline issue:
+  - After splitting highlighting out of the base editor, the large async highlight chunk was still being fetched on every editor mount, even for documents with no code blocks.
+- What changed:
+  - Added a lightweight code-block detector that watches the editor document and only requests syntax highlighting when a code block is present.
+  - Wired the slash-command "Code Block" action to request highlighting at the moment a user explicitly inserts one.
+- Why this improves the system:
+  - Preserves the lighter base editor while avoiding unnecessary fetches for the many documents that never use code blocks.
+  - Shifts highlighting closer to true on-demand behavior instead of editor-wide eager loading.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+  - `pnpm --filter @ship/web build` passes.
+- Follow-up needed:
+  - This improves runtime fetch behavior, but not the emitted chunk size. The next Category 2 pass still needs to reduce the underlying highlight.js payload itself.

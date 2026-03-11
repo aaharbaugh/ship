@@ -154,6 +154,18 @@ function extractHypothesisText(content: JSONContent): string | null {
   return hypothesisText;
 }
 
+function hasCodeBlockNode(content: JSONContent): boolean {
+  if (content.type === 'codeBlock') {
+    return true;
+  }
+
+  if (!content.content) {
+    return false;
+  }
+
+  return content.content.some(hasCodeBlockNode);
+}
+
 export function Editor({
   documentId,
   userName,
@@ -223,6 +235,7 @@ export function Editor({
   }, [title]);
   const [provider, setProvider] = useState<CollaborationProvider | null>(null);
   const [codeBlockExtension, setCodeBlockExtension] = useState<AnyExtension | null>(null);
+  const [shouldLoadCodeBlockHighlighting, setShouldLoadCodeBlockHighlighting] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [isBrowserOnline, setIsBrowserOnline] = useState(navigator.onLine);
   const [connectedUsers, setConnectedUsers] = useState<{ name: string; color: string }[]>([]);
@@ -259,6 +272,8 @@ export function Editor({
   }, []);
 
   useEffect(() => {
+    if (!shouldLoadCodeBlockHighlighting || codeBlockExtension) return;
+
     let cancelled = false;
 
     void Promise.all([
@@ -285,7 +300,7 @@ export function Editor({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [shouldLoadCodeBlockHighlighting, codeBlockExtension]);
 
   const color = userColor || stringToColor(userName);
 
@@ -559,6 +574,7 @@ export function Editor({
       onNavigateToDocument,
       documentType,
       abortSignal: imageUploadAbortRef.current.signal,
+      onRequestCodeBlockHighlighting: () => setShouldLoadCodeBlockHighlighting(true),
     });
   }, [onCreateSubDocument, onNavigateToDocument, documentType, documentId]);
 
@@ -677,6 +693,25 @@ export function Editor({
       },
     },
   }, [provider, documentType, codeBlockExtension]);
+
+  useEffect(() => {
+    if (!editor || shouldLoadCodeBlockHighlighting) return;
+
+    const maybeEnableHighlighting = () => {
+      if (hasCodeBlockNode(editor.getJSON())) {
+        setShouldLoadCodeBlockHighlighting(true);
+      }
+    };
+
+    maybeEnableHighlighting();
+    editor.on('create', maybeEnableHighlighting);
+    editor.on('update', maybeEnableHighlighting);
+
+    return () => {
+      editor.off('create', maybeEnableHighlighting);
+      editor.off('update', maybeEnableHighlighting);
+    };
+  }, [editor, shouldLoadCodeBlockHighlighting]);
 
   // Refs for stable comment callbacks (avoid re-render loops)
   const commentsRef = useRef(comments);
