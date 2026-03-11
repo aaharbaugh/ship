@@ -544,3 +544,28 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/web type-check` passes.
 - Follow-up needed:
   - Add reproducible Lighthouse/axe evidence for these pages and keep pushing on contrast hotspots if scores still miss the assignment threshold.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Captured reproducible Playwright and axe accessibility evidence for the current Category 7 work.
+- Files changed:
+  - `audit/phase-2-evidence/accessibility/2026-03-11-playwright-axe-summary.md`
+- Categories improved:
+  - Category 7: Accessibility Compliance
+- Baseline issue:
+  - The accessibility work was implemented, but the assignment also requires reproducible evidence instead of claim-only writeups.
+- What changed:
+  - Ran the repo’s existing Playwright accessibility suites and remediation subset with Docker-backed isolated environments.
+  - Recorded the commands, scope, results, and the one flaky non-axe login/setup issue in the accessibility evidence folder.
+- Why this improves the system:
+  - Turns the accessibility refactor into submission-ready evidence.
+  - Gives us a repeatable command path for reruns after future fixes.
+- Evidence captured:
+  - remediation subset: `3 passed`
+  - broad suite: `17 passed`, `1 flaky`
+  - summary file stored under `audit/phase-2-evidence/accessibility/`
+- Follow-up needed:
+  - Stabilize the flaky login/setup path and rerun for a clean broad-suite pass.
+  - Add Lighthouse snapshots if we need score-delta evidence instead of violation-based evidence.
