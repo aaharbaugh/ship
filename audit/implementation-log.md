@@ -321,3 +321,32 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Follow-up needed:
   - The biggest remaining chunks are still the editor bundle (`Editor-*.js` ~442 kB), the emoji picker chunk (`~271 kB`), and a large shared application chunk (`index-*.js` ~969 kB).
   - Next pass should target either optional code highlighting in `Editor.tsx` or manual chunking in Vite for the large shared vendor/application chunk.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Added route-level lazy loading in the app router so page code no longer ships in one oversized shared application chunk.
+- Files changed:
+  - `web/src/main.tsx`
+- Categories improved:
+  - Category 2: Bundle Size and Frontend Performance
+- Baseline issue:
+  - `web/src/main.tsx` statically imported nearly every page in the app, which produced a massive shared application chunk around `969.03 kB` minified (`263.20 kB` gzip).
+- What changed:
+  - Converted the major route pages and layout entry points to `React.lazy(...)`.
+  - Wrapped the router in `Suspense` with a consistent loading fallback so routes can load asynchronously.
+- Why this improves the system:
+  - Prevents the initial app shell from eagerly evaluating the entire page layer.
+  - Creates real route-level code splitting that better matches how users navigate the product.
+  - Makes the bundle structure easier to explain and defend as an intentional performance refactor.
+- Evidence captured:
+  - `pnpm --filter @ship/web type-check` passes.
+  - `pnpm --filter @ship/web test` passes: `16` files, `153` tests passed.
+  - `pnpm --filter @ship/web build` passes.
+  - Largest shared chunk dropped from about `969.03 kB` minified (`263.20 kB` gzip) to route chunks like:
+    - `UnifiedDocumentPage-*.js` about `134.45 kB` minified
+    - `App-*.js` about `88.45 kB` minified
+    - remaining largest chunk is now `Editor-*.js` at about `442.03 kB` minified
+- Follow-up needed:
+  - The next Category 2 hotspot is the editor bundle, especially optional code-block highlighting and other heavy editor-only features inside `Editor.tsx`.
