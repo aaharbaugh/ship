@@ -987,3 +987,27 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - delta vs baseline `155 ms`: `-37.85%`
 - Follow-up needed:
   - Category 3 evidence is now in a much stronger state; the next best move is to shift to whichever remaining category gap is weakest.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Added a focused `EXPLAIN ANALYZE` helper for the batched issue association query so we can verify whether the new index actually changes the database plan.
+- Files changed:
+  - `scripts/explain-issues-belongs-to-query.js`
+  - `scripts/run-issues-belongs-to-explain.sh`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 4: Database Query Efficiency
+- Baseline issue:
+  - The benchmark rerun after adding the new association index was slower, so we need plan-level evidence before keeping or claiming that migration as a win.
+- What changed:
+  - Added a helper that selects a representative batch of issue IDs from the benchmark DB and runs `EXPLAIN (ANALYZE, BUFFERS)` on the exact `document_id = ANY(...)` association query shape.
+- Why this improves the system:
+  - Lets us validate the index decision against the actual database plan instead of guessing from noisy route-level timing alone.
+  - Gives us a repeatable way to capture stronger Category 4 evidence.
+- Evidence captured:
+  - Helper is ready for local execution on the benchmark database.
+- Follow-up needed:
+  - Run `bash scripts/run-issues-belongs-to-explain.sh`
+  - Use the plan output to validate future query/index changes before claiming a Category 4 win.
