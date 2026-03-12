@@ -20,6 +20,7 @@ Raw artifact:
 - `audit/phase-2-evidence/api/2026-03-11-api-response-times-after.json`
 - `audit/phase-2-evidence/api/2026-03-11-api-response-times-focused-after.json`
 - `audit/phase-2-evidence/api/2026-03-11-accountability-grid-v3-benchmark-mode.json`
+- `audit/phase-2-evidence/api/2026-03-11-issues-benchmark-mode.json`
 
 Baseline artifact:
 - `audit/artifacts/api-response-times.json`
@@ -129,3 +130,35 @@ Interpretation:
   - one key audited hotspot improved materially
   - other audited endpoints, especially `GET /api/issues`, still did not
 - If we need two endpoints over the threshold, there is still more work to do.
+
+## Clean Benchmark-Mode Rerun For `GET /api/issues`
+
+After reverting the issues list route from per-row inline `belongs_to` aggregation back to a single batched association lookup, `GET /api/issues` was rerun in the same benchmark mode.
+
+Comparison:
+
+| Endpoint | Baseline P95 | Benchmark-mode rerun | Delta vs baseline |
+|---|---:|---:|---:|
+| `GET /api/issues` | `155.00 ms` | `96.33 ms` | `-37.85%` |
+
+Notes:
+
+- The benchmark-mode rerun produced `0` non-2xx responses and `11,659` successful `200` responses.
+- `autocannon` does not emit an exact `p95`, so the rerun `p95` was interpolated from:
+  - `p90 = 93 ms`
+  - `p97.5 = 101 ms`
+- Interpolation method:
+  - `p95 = 93 + ((95 - 90) / (97.5 - 90)) * (101 - 93) = 96.33 ms`
+
+Interpretation:
+
+- `GET /api/issues` now clears the assignment threshold for a meaningful API improvement.
+- Together with the clean `accountability-grid-v3` rerun, Category 3 now has two benchmarked endpoints with strong improvement under the stabilized benchmark workflow.
+
+## Updated Honest Read
+
+- Category 3 is now in good shape.
+- Clean benchmark-mode reruns show:
+  - `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms` interpolated `p95` (`-30.26%`)
+  - `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95` (`-37.85%`)
+- The earlier “no measurable win” results were caused by a mix of route-side inefficiency, shared DB churn, auth setup problems, and benchmark contamination from rate limiting.

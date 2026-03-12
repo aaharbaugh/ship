@@ -163,21 +163,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
              d.started_at, d.completed_at, d.cancelled_at, d.reopened_at,
              d.converted_from_id,
              u.name as assignee_name,
-             CASE WHEN person_doc.archived_at IS NOT NULL THEN true ELSE false END as assignee_archived,
-             COALESCE((
-               SELECT json_agg(
-                 json_build_object(
-                   'id', da.related_id,
-                   'type', da.relationship_type,
-                   'title', related.title,
-                   'color', related.properties->>'color'
-                 )
-                 ORDER BY da.relationship_type, da.created_at
-               )
-               FROM document_associations da
-               LEFT JOIN documents related ON related.id = da.related_id
-               WHERE da.document_id = d.id
-             ), '[]'::json) as belongs_to
+             CASE WHEN person_doc.archived_at IS NOT NULL THEN true ELSE false END as assignee_archived
       FROM documents d
       LEFT JOIN users u ON (d.properties->>'assignee_id')::uuid = u.id
       LEFT JOIN documents person_doc ON person_doc.workspace_id = d.workspace_id
@@ -270,13 +256,16 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       d.updated_at DESC`;
 
     const result = await pool.query(query, params);
+    const associationsMap = await getBelongsToAssociationsBatch(
+      result.rows.map((row) => row.id)
+    );
 
     const issues = result.rows.map(row => {
       const issue = extractIssueFromRow(row);
       return {
         ...issue,
         display_id: `#${issue.ticket_number}`,
-        belongs_to: row.belongs_to || [],
+        belongs_to: associationsMap.get(row.id) || [],
       };
     });
 
