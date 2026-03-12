@@ -20,7 +20,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 | 2. Frontend Bundle Size | Met | The load path is materially better and the largest frontend hotspots were split or removed. | Shared app chunk removed, editor base chunk reduced, syntax-highlighting payload removed. | Mostly evidence framing polish, not implementation. |
 | 3. API Response Time | Met | Two audited endpoints now have clean benchmark-mode wins over the required threshold. | `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms`; `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95`. | None required for the threshold; only optional polish remains. |
 | 4. Database Query Efficiency | Partial | Real improvements exist, but threshold-clearing database proof is still incomplete. | `GET /api/weeks/:id` no longer writes on reads; accountability batching is real; profiler showed sprint-board query-count reduction. | Still missing a defensible threshold-clearing flow or query-plan win. |
-| 5. Test Coverage and Quality | Likely met | The test story is much healthier, honest, and measurable now. | API and web suites pass; coverage runs now work; targeted tests were added for hotspot routes. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission. |
+| 5. Test Coverage and Quality | Strong progress | The test story is much healthier, honest, and measurable now. | API and web suites pass; coverage runs now work; targeted tests were added for hotspot routes. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission. |
 | 6. Runtime Error / Edge Cases | Likely met | Runtime handling is better than baseline, especially around process-level failures and safer degraded behavior. | uncaught exception / unhandled rejection traps, safer lazy-load fallbacks, cleaner test/runtime feedback loop. | Could use one final focused pass on user-facing failure recovery if we want a stronger demo. |
 | 7. Accessibility | Met | Accessibility now has both implementation work and automated evidence. | dialog fixes, page-level ARIA/label/contrast improvements, remediation/broad accessibility runs passing. | Optional Lighthouse score snapshots if desired. |
 
@@ -46,6 +46,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 ### Category 5
 - The biggest gain here is trustworthiness.
 - Tests are green, root scripts are more honest, and coverage is no longer blocked.
+- This category is substantially improved, even though coverage depth is still not where an ideal long-term target would be.
 
 ### Category 6
 - This category is better than the repo baseline, but it has the least polished evidence narrative compared to Categories 2, 3, and 7.

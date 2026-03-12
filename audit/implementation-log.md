@@ -994,7 +994,7 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
 - Commit:
 - Summary: Added a focused `EXPLAIN ANALYZE` helper for the batched issue association query so we can verify whether the new index actually changes the database plan.
 - Files changed:
-  - `scripts/explain-issues-belongs-to-query.js`
+  - `api/scripts/explain-issues-belongs-to-query.ts`
   - `scripts/run-issues-belongs-to-explain.sh`
   - `audit/implementation-log.md`
 - Categories improved:
