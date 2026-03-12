@@ -829,3 +829,53 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm --filter @ship/api type-check` passes after the logging change.
 - Follow-up needed:
   - Re-run the targeted API test files locally to confirm the output is quieter as expected.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Added an explicit benchmark mode that bypasses API rate limiting so local load tests measure handler latency instead of throttling.
+- Files changed:
+  - `api/src/app.ts`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 3: API Response Time
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - The focused `autocannon` rerun produced thousands of non-2xx responses after roughly 10,000 requests, which contaminated latency data with rate-limiter behavior instead of route performance.
+- What changed:
+  - Added `BENCHMARK_MODE=1` support to bypass both the general API limiter and the login limiter during intentional local benchmark runs.
+- Why this improves the system:
+  - Makes benchmark reruns reproducible and comparable to route behavior rather than middleware throttling.
+  - Keeps the protective rate limits intact for normal dev, test, and production flows.
+- Evidence captured:
+  - `pnpm --filter @ship/api type-check` passes after the benchmark-mode change.
+- Follow-up needed:
+  - Restart the benchmark API process with `BENCHMARK_MODE=1` and rerun `autocannon`.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Added repeatable benchmark helper scripts so API evidence collection no longer depends on fragile multi-line shell commands.
+- Files changed:
+  - `scripts/start-api-benchmark.sh`
+  - `scripts/login-benchmark-session.js`
+  - `scripts/run-accountability-grid-benchmark.sh`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 3: API Response Time
+  - Category 5: Test Coverage and Quality
+- Baseline issue:
+  - Long manual login and benchmark commands were repeatedly getting mangled by terminal wrapping, which blocked clean reruns of the accountability-grid benchmark.
+- What changed:
+  - Added a short script to start the API in benchmark mode on the benchmark DB.
+  - Added a Node helper to create a logged-in session and save the cookie header.
+  - Added a focused `autocannon` wrapper for the accountability-grid route.
+- Why this improves the system:
+  - Makes the benchmark flow reproducible and much less error-prone.
+  - Reduces the risk of invalid evidence caused by malformed shell commands instead of application behavior.
+- Evidence captured:
+  - The helper scripts are in place and executable for local reruns.
+- Follow-up needed:
+  - Run the three scripts in order and capture the clean latency output.
