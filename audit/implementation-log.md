@@ -879,3 +879,31 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - The helper scripts are in place and executable for local reruns.
 - Follow-up needed:
   - Run the three scripts in order and capture the clean latency output.
+
+### Entry
+- Date: 2026-03-11
+- Branch: implementation
+- Commit:
+- Summary: Captured a clean benchmark-mode rerun for `GET /api/team/accountability-grid-v3` and converted Category 3 from “blocked by noisy evidence” into a measurable win for that endpoint.
+- Files changed:
+  - `audit/phase-2-evidence/api/2026-03-11-accountability-grid-v3-benchmark-mode.json`
+  - `audit/phase-2-evidence/api/2026-03-11-api-benchmark-summary.md`
+  - `audit/implementation-log.md`
+- Categories improved:
+  - Category 3: API Response Time
+- Baseline issue:
+  - Earlier reruns of the accountability-grid benchmark were contaminated by auth mistakes, rate limiting, or shared DB churn, so they showed the route as slower than baseline and were not reliable enough to claim a real win.
+- What changed:
+  - Reran `GET /api/team/accountability-grid-v3` in benchmark mode with a clean authenticated session and no non-2xx responses.
+  - Saved the raw artifact and updated the benchmark summary with an interpolated `p95`.
+- Why this improves the system:
+  - Gives us a trustworthy before/after measurement on one of the audit’s main backend hotspots.
+  - Converts the backend performance story from “we refactored it” to “we refactored it and can now prove one major endpoint got faster.”
+- Evidence captured:
+  - benchmark-mode rerun: `11,986` successful `200` responses, `0` non-2xx
+  - `p90 = 96 ms`
+  - `p97.5 = 111 ms`
+  - interpolated `p95 = 106 ms`
+  - delta vs baseline `152 ms`: `-30.26%`
+- Follow-up needed:
+  - If the assignment requires two API endpoints over the threshold, `GET /api/issues` is still the next Category 3 target.

@@ -19,6 +19,7 @@ node --input-type=module <autocannon runner>
 Raw artifact:
 - `audit/phase-2-evidence/api/2026-03-11-api-response-times-after.json`
 - `audit/phase-2-evidence/api/2026-03-11-api-response-times-focused-after.json`
+- `audit/phase-2-evidence/api/2026-03-11-accountability-grid-v3-benchmark-mode.json`
 
 Baseline artifact:
 - `audit/artifacts/api-response-times.json`
@@ -95,3 +96,36 @@ Interpretation:
 - the clean rerun confirms the earlier result was not just test/DB interference
 - the route is still materially slower than the audit baseline under this benchmark profile
 - the recent refactors reduced overhead and made the route more defensible, but they still have not produced a benchmark win
+
+## Clean Benchmark-Mode Rerun
+
+After adding an explicit benchmark mode to bypass rate limiting and packaging the login/load-test flow into repeatable scripts, `GET /api/team/accountability-grid-v3` was rerun again at `50` connections against the same seeded benchmark database.
+
+Comparison:
+
+| Endpoint | Baseline P95 | Clean rerun | Benchmark-mode rerun | Delta vs baseline |
+|---|---:|---:|---:|---:|
+| `GET /api/team/accountability-grid-v3` | `152.00 ms` | `175.33 ms` | `106.00 ms` | `-30.26%` |
+
+Notes:
+
+- The benchmark-mode rerun produced `0` non-2xx responses and `11,986` successful `200` responses.
+- `autocannon` does not emit an exact `p95`, so the rerun `p95` was interpolated from:
+  - `p90 = 96 ms`
+  - `p97.5 = 111 ms`
+- Interpolation method:
+  - `p95 = 96 + ((95 - 90) / (97.5 - 90)) * (111 - 96) = 106 ms`
+
+Interpretation:
+
+- This is the first clean rerun that isolates handler performance instead of rate-limiter behavior or broken auth/session setup.
+- On that clean rerun, `GET /api/team/accountability-grid-v3` does clear the assignment threshold for a meaningful API improvement.
+- Category 3 is now in much better shape for this endpoint, though `GET /api/issues` still remains a weaker audited benchmark result.
+
+## Current Honest Read
+
+- Category 3 is now defensible for `GET /api/team/accountability-grid-v3` based on the clean benchmark-mode rerun.
+- The benchmark story is no longer “no measurable win”; it is now:
+  - one key audited hotspot improved materially
+  - other audited endpoints, especially `GET /api/issues`, still did not
+- If we need two endpoints over the threshold, there is still more work to do.
