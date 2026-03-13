@@ -372,6 +372,14 @@ export async function analyzeRetro(
 
 /** Check if Bedrock client is available (for UI to decide whether to render quality assistant) */
 export function isAiAvailable(): boolean {
+  if (process.env.NODE_ENV === 'test') {
+    return false;
+  }
+
+  if (!process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_PROFILE && !process.env.AWS_WEB_IDENTITY_TOKEN_FILE) {
+    return false;
+  }
+
   return getClient() !== null;
 }
 

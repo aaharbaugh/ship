@@ -174,7 +174,7 @@ test.describe('Request Changes UI', () => {
 
     // The sidebar should show a Request Changes button (via ApprovalButton or review queue controls)
     // Wait for the page to fully load
-    await expect(page.getByText('Weekly Plan')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { name: 'Weekly Plan' })).toBeVisible({ timeout: 10000 });
   });
 
   test('Reviews page shows all legend colors', async ({ page }) => {

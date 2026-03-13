@@ -31,9 +31,33 @@ async function loginAsAdmin(page: Page) {
   await login(page, 'dev@ship.local', 'admin123');
 }
 
-// Login as bob (member)
+// Create and login as a fresh member so multi-user visibility tests do not
+// depend on seeded credentials or pre-existing workspace state.
 async function loginAsMember(page: Page) {
-  await login(page, 'bob.martinez@ship.local', 'admin123');
+  await loginAsAdmin(page);
+  const csrfToken = await getCsrfToken(page);
+
+  const workspaceResponse = await page.request.get('/api/workspaces/current');
+  expect(workspaceResponse.ok()).toBe(true);
+  const workspaceData = await workspaceResponse.json();
+  const workspaceId = workspaceData.data.workspace.id as string;
+
+  const email = `private-doc-member-${Date.now()}@ship.local`;
+  const inviteResponse = await page.request.post(`/api/workspaces/${workspaceId}/invites`, {
+    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    data: { email, role: 'member' },
+  });
+  expect(inviteResponse.ok()).toBe(true);
+  const inviteData = await inviteResponse.json();
+  const token = inviteData.data.invite.token as string;
+
+  await page.context().clearCookies();
+  await page.goto(`/invite/${token}`);
+  await expect(page.getByText("You're Invited!")).toBeVisible({ timeout: 10000 });
+  await page.locator('#name').fill('Private Doc Member');
+  await page.locator('#password').fill('admin123');
+  await page.getByRole('button', { name: 'Create Account & Accept' }).click();
+  await expect(page).toHaveURL(/\/docs/, { timeout: 10000 });
 }
 
 // Helper to get CSRF token - uses relative URLs to go through vite proxy
