@@ -1052,6 +1052,10 @@ Use this file as the running record for Phase 2 implementation. Add one entry ea
   - `pnpm run test:api`: `458 passed`
   - targeted reviewed E2E subset: `26 passed`
   - later full-suite rerun after cleanup and memory stabilization: `707 passed`, `80 failed`, `8 flaky`, `82 did not run`
+  - additional stabilized targeted suites:
+    - `e2e/authorization.spec.ts`: `17 passed`
+    - `e2e/backlinks.spec.ts`: `8 passed`
 - Follow-up needed:
-  - Continue focused cleanup in `authorization.spec.ts`, `accountability-week.spec.ts`, and related weekly/workspace authorization flows.
+  - Continue focused cleanup in the remaining editor-heavy and cross-workflow suites that were not covered by the recent deterministic rewrites.
   - Treat `pnpm run test:e2e:smoke` as the release gate until the broader Playwright suite is further reduced and stabilized.
+  - Use targeted Playwright runs for remaining backlog work instead of repeating long full-suite runs on low-memory machines.

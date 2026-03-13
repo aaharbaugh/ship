@@ -99,7 +99,11 @@ For the full chunk-by-chunk implementation history, use:
   - deterministic reviewed E2E subset: `26 passed`
   - deploy-gate smoke suite is defined and intended as the near-term release gate
   - full Playwright rerun after memory cleanup reached `707 passed`, `80 failed`, `8 flaky`, `82 did not run`
+  - later targeted reruns stabilized:
+    - `e2e/authorization.spec.ts`: `17 passed`
+    - `e2e/backlinks.spec.ts`: `8 passed`
   - failure analysis and optimization plan captured in audit docs
 - Notes:
   - The biggest improvement is not “full E2E green”; it is that the audit now has a defendable verification strategy and a documented split between stable release-gating checks and the larger remediation backlog.
   - Category 5 is materially stronger than it was on 2026-03-11, even though the broad Playwright suite still needs continued reduction and cleanup.
+  - Current stopping point is favorable: the repo has a clean worktree, the deploy-gate smoke path remains the practical release gate, and recent high-signal E2E clusters are now green in isolation.
