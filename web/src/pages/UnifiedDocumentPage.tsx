@@ -460,7 +460,7 @@ export function UnifiedDocumentPage() {
         </div>
         <button
           onClick={() => navigate('/docs')}
-          className="text-sm text-accent hover:underline"
+          className="text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/80"
         >
           Go to Documents
         </button>
