@@ -88,3 +88,18 @@ For the full chunk-by-chunk implementation history, use:
 - Notes:
   - Estimated overall Phase 2 completion is now in the low-80% range.
   - The main remaining weakness is Category 4 proof depth, not broad implementation coverage.
+
+- Date: 2026-03-13
+- Milestone: Audit verification and E2E gating reset
+- Categories involved: Category 5, Category 7
+- Status: In progress
+- Evidence:
+  - `pnpm run test:web`: `153 passed`
+  - `pnpm run test:api`: `458 passed`
+  - deterministic reviewed E2E subset: `26 passed`
+  - deploy-gate smoke suite is defined and intended as the near-term release gate
+  - full Playwright rerun after memory cleanup reached `707 passed`, `80 failed`, `8 flaky`, `82 did not run`
+  - failure analysis and optimization plan captured in audit docs
+- Notes:
+  - The biggest improvement is not “full E2E green”; it is that the audit now has a defendable verification strategy and a documented split between stable release-gating checks and the larger remediation backlog.
+  - Category 5 is materially stronger than it was on 2026-03-11, even though the broad Playwright suite still needs continued reduction and cleanup.

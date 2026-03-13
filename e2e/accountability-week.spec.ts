@@ -68,7 +68,13 @@ test.describe('Week Accountability Flow', () => {
         title: 'Plan Test Sprint',
         document_type: 'sprint',
         belongs_to: [{ id: program.id, type: 'program' }, { id: project.id, type: 'project' }],
-        properties: { sprint_number: 1, owner_id: personId, assignee_ids: [personId], status: 'active' },
+        properties: {
+          sprint_number: 1,
+          owner_id: userId,
+          assignee_ids: [personId],
+          project_id: project.id,
+          status: 'active',
+        },
       },
     });
     expect(sprintResponse.ok()).toBe(true);
