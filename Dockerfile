@@ -1,35 +1,45 @@
-# Use ECR Public Node.js image (Docker Hub is blocked in government environments)
-FROM public.ecr.aws/docker/library/node:20-slim
-
-# Set working directory
+FROM public.ecr.aws/docker/library/node:20-slim AS base
 WORKDIR /app
-
-# Disable SSL strict mode for government VPN environments (MUST be before any npm commands)
 RUN npm config set strict-ssl false
+RUN npm install -g pnpm@10.27.0 && pnpm config set strict-ssl false
 
-# Install pnpm
-RUN npm install -g pnpm@9.15.4 && pnpm config set strict-ssl false
-
-# Copy package files for dependency installation
+FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.json ./
 COPY api/package.json ./api/
+COPY web/package.json ./web/
 COPY shared/package.json ./shared/
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# Install production dependencies only (ignore prepare scripts that require dev deps)
+FROM deps AS build
+COPY api ./api
+COPY web ./web
+COPY shared ./shared
+RUN pnpm run build:shared && pnpm --filter @ship/api build && pnpm --filter @ship/web build
+
+FROM base AS prod-deps
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY tsconfig.json ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+COPY shared/package.json ./shared/
 RUN pnpm install --frozen-lockfile --prod --ignore-scripts && pnpm store prune
 
-# Copy pre-built dist directories (built locally before deployment)
-COPY shared/dist/ ./shared/dist/
-COPY api/dist/ ./api/dist/
-
-# Expose port
-EXPOSE 80
-
-# Set production environment
+FROM public.ecr.aws/docker/library/node:20-slim AS runtime
+WORKDIR /app
 ENV NODE_ENV=production
-ENV VITE_APP_ENV=production
-ENV PORT=80
+ENV PORT=8080
 
-# Start the application (run migrations first to ensure schema exists)
+COPY package.json pnpm-workspace.yaml ./
+COPY api/package.json ./api/
+COPY web/package.json ./web/
+COPY shared/package.json ./shared/
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/api/dist ./api/dist
+COPY --from=build /app/shared/dist ./shared/dist
+COPY --from=build /app/web/dist ./web/dist
+
+EXPOSE 8080
+
 WORKDIR /app/api
 CMD ["sh", "-c", "node dist/db/migrate.js && node dist/index.js"]

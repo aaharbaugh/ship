@@ -19,6 +19,7 @@ const UPLOADS_DIR = join(__dirname, '../../uploads');
 // S3 configuration
 const S3_BUCKET_NAME = process.env.S3_UPLOADS_BUCKET || '';
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+const USE_S3_UPLOADS = process.env.NODE_ENV === 'production' && Boolean(S3_BUCKET_NAME && process.env.CDN_DOMAIN);
 
 // Max file size: 1GB (1073741824 bytes)
 const MAX_FILE_SIZE = 1073741824;
@@ -117,10 +118,8 @@ filesRouter.post('/upload', authMiddleware, async (req: Request, res: Response) 
       [fileId, workspaceId, userId, filename, mimeType, sizeBytes, s3Key]
     );
 
-    // For local development: use a local upload endpoint
-    // For production: generate S3 presigned URL for direct browser upload
-    const isProduction = process.env.NODE_ENV === 'production';
-    const uploadUrl = isProduction
+    // Use S3 direct uploads only when explicitly configured.
+    const uploadUrl = USE_S3_UPLOADS
       ? await generateS3PresignedUrl(s3Key, mimeType, sizeBytes)
       : `/api/files/${fileId}/local-upload`;
 
@@ -243,13 +242,9 @@ filesRouter.post('/:id/confirm', authMiddleware, async (req: Request, res: Respo
 
     const file = fileResult.rows[0];
 
-    // For production: verify file exists in S3
-    // For local dev: file was already saved in local-upload
-
     // Generate CDN URL
-    const isProduction = process.env.NODE_ENV === 'production';
     let cdnUrl: string;
-    if (isProduction) {
+    if (USE_S3_UPLOADS) {
       const cdnDomain = process.env.CDN_DOMAIN;
       if (!cdnDomain) {
         throw new Error('CDN_DOMAIN environment variable is required in production');
@@ -375,8 +370,7 @@ filesRouter.delete('/:id', authMiddleware, async (req: Request, res: Response) =
     const file = fileResult.rows[0];
 
     // Delete from storage (local or S3)
-    const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction && S3_BUCKET_NAME) {
+    if (USE_S3_UPLOADS && S3_BUCKET_NAME) {
       const client = getS3Client();
       const command = new DeleteObjectCommand({
         Bucket: S3_BUCKET_NAME,
