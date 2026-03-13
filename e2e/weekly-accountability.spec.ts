@@ -74,11 +74,43 @@ async function createTestProject(
   return project.id;
 }
 
+async function getCurrentSprintNumber(
+  page: import('@playwright/test').Page,
+  apiUrl: string,
+  projectId: string
+): Promise<number> {
+  const response = await page.request.get(
+    `${apiUrl}/api/weekly-plans/project-allocation-grid/${projectId}`
+  );
+  expect(response.ok()).toBe(true);
+  const grid = await response.json();
+  expect(grid.currentSprintNumber).toBeGreaterThanOrEqual(1);
+  return grid.currentSprintNumber;
+}
+
+async function getNextUnusedWeekNumber(
+  page: import('@playwright/test').Page,
+  apiUrl: string,
+  personId: string,
+  kind: 'plan' | 'retro'
+): Promise<number> {
+  const basePath = kind === 'plan' ? 'weekly-plans' : 'weekly-retros'
+  const response = await page.request.get(`${apiUrl}/api/${basePath}?person_id=${personId}`)
+  expect(response.ok()).toBe(true)
+  const docs = await response.json()
+  const maxWeekNumber = docs.reduce((max: number, doc: { properties?: { week_number?: number } }) => {
+    const weekNumber = doc.properties?.week_number ?? 0
+    return Math.max(max, weekNumber)
+  }, 0)
+  return maxWeekNumber + 1
+}
+
 test.describe('Weekly Plan API', () => {
   test('POST /weekly-plans creates new weekly plan document', async ({ page, apiServer }) => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project for Weekly Plan');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
 
     // Create weekly plan
     const response = await page.request.post(`${apiServer.url}/api/weekly-plans`, {
@@ -86,7 +118,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
 
@@ -99,7 +131,7 @@ test.describe('Weekly Plan API', () => {
     expect(plan.title).toMatch(/^Week \d+ Plan/)
     expect(plan.properties.person_id).toBe(personId);
     expect(plan.properties.project_id).toBe(projectId);
-    expect(plan.properties.week_number).toBe(1);
+    expect(plan.properties.week_number).toBe(weekNumber);
     expect(plan.properties.submitted_at).toBeNull();
   });
 
@@ -108,10 +140,11 @@ test.describe('Weekly Plan API', () => {
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Idempotent');
 
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
     const planData = {
       person_id: personId,
       project_id: projectId,
-      week_number: 2,
+      week_number: weekNumber,
     };
 
     // First creation - should return 201
@@ -132,16 +165,18 @@ test.describe('Weekly Plan API', () => {
 
     // Same document should be returned
     expect(plan2.id).toBe(plan1.id);
-    expect(plan2.properties.week_number).toBe(2);
+    expect(plan2.properties.week_number).toBe(weekNumber);
   });
 
   test('GET /weekly-plans queries plans by person and project', async ({ page, apiServer }) => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Query');
+    const firstWeekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
+    const weekNumbers = [firstWeekNumber, firstWeekNumber + 1, firstWeekNumber + 2]
 
     // Create a few plans
-    for (const weekNum of [3, 4, 5]) {
+    for (const weekNum of weekNumbers) {
       await page.request.post(`${apiServer.url}/api/weekly-plans`, {
         headers: { 'x-csrf-token': csrfToken },
         data: {
@@ -171,6 +206,7 @@ test.describe('Weekly Plan API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Get By ID');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
 
     // Create a plan
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-plans`, {
@@ -178,7 +214,7 @@ test.describe('Weekly Plan API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 6,
+        week_number: weekNumber,
       },
     });
     const created = await createResponse.json();
@@ -189,7 +225,7 @@ test.describe('Weekly Plan API', () => {
     const plan = await getResponse.json();
 
     expect(plan.id).toBe(created.id);
-    expect(plan.properties.week_number).toBe(6);
+    expect(plan.properties.week_number).toBe(weekNumber);
   });
 
   test('POST /weekly-plans returns 404 for non-existent person', async ({ page, apiServer }) => {
@@ -234,6 +270,7 @@ test.describe('Weekly Retro API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project for Weekly Retro');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
 
     // Create weekly retro
     const response = await page.request.post(`${apiServer.url}/api/weekly-retros`, {
@@ -241,7 +278,7 @@ test.describe('Weekly Retro API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
 
@@ -254,7 +291,7 @@ test.describe('Weekly Retro API', () => {
     expect(retro.title).toMatch(/^Week \d+ Retro/)
     expect(retro.properties.person_id).toBe(personId);
     expect(retro.properties.project_id).toBe(projectId);
-    expect(retro.properties.week_number).toBe(1);
+    expect(retro.properties.week_number).toBe(weekNumber);
     expect(retro.properties.submitted_at).toBeNull();
   });
 
@@ -263,10 +300,11 @@ test.describe('Weekly Retro API', () => {
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro Idempotent');
 
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
     const retroData = {
       person_id: personId,
       project_id: projectId,
-      week_number: 2,
+      week_number: weekNumber,
     };
 
     // First creation - should return 201
@@ -287,16 +325,18 @@ test.describe('Weekly Retro API', () => {
 
     // Same document should be returned
     expect(retro2.id).toBe(retro1.id);
-    expect(retro2.properties.week_number).toBe(2);
+    expect(retro2.properties.week_number).toBe(weekNumber);
   });
 
   test('GET /weekly-retros queries retros by person and project', async ({ page, apiServer }) => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro Query');
+    const firstWeekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
+    const weekNumbers = [firstWeekNumber, firstWeekNumber + 1, firstWeekNumber + 2]
 
     // Create a few retros
-    for (const weekNum of [3, 4, 5]) {
+    for (const weekNum of weekNumbers) {
       await page.request.post(`${apiServer.url}/api/weekly-retros`, {
         headers: { 'x-csrf-token': csrfToken },
         data: {
@@ -326,6 +366,7 @@ test.describe('Weekly Retro API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro Get By ID');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
 
     // Create a retro
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-retros`, {
@@ -333,7 +374,7 @@ test.describe('Weekly Retro API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 6,
+        week_number: weekNumber,
       },
     });
     const created = await createResponse.json();
@@ -344,7 +385,7 @@ test.describe('Weekly Retro API', () => {
     const retro = await getResponse.json();
 
     expect(retro.id).toBe(created.id);
-    expect(retro.properties.week_number).toBe(6);
+    expect(retro.properties.week_number).toBe(weekNumber);
   });
 });
 
@@ -388,6 +429,8 @@ test.describe('Project Allocation Grid API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Allocation');
+    const currentSprintNumber = await getCurrentSprintNumber(page, apiServer.url, projectId);
+    const allocatedWeekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
 
     // Create a program for the sprint
     const programResponse = await page.request.post(`${apiServer.url}/api/documents`, {
@@ -405,7 +448,7 @@ test.describe('Project Allocation Grid API', () => {
       data: {
         title: 'Test Sprint',
         program_id: program.id,
-        sprint_number: 1,
+        sprint_number: allocatedWeekNumber,
         owner_id: userId,
       },
     });
@@ -419,7 +462,7 @@ test.describe('Project Allocation Grid API', () => {
         properties: {
           project_id: projectId,
           assignee_ids: [personId],
-          sprint_number: 1,
+          sprint_number: allocatedWeekNumber,
         },
       },
     });
@@ -445,7 +488,7 @@ test.describe('Project Allocation Grid API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: allocatedWeekNumber,
       },
     });
     const plan = await planResponse.json();
@@ -462,12 +505,11 @@ test.describe('Project Allocation Grid API', () => {
     const personInGrid = grid.people.find((p: { id: string }) => p.id === personId);
     expect(personInGrid, 'Person should appear in allocation grid').toBeTruthy();
 
-    // Person should have week 1 data
-    const week1Data = personInGrid.weeks[1];
-    if (week1Data) {
-      expect(week1Data.isAllocated).toBe(true);
-      expect(week1Data.planId).toBe(plan.id);
-    }
+    expect(allocatedWeekNumber).toBeGreaterThanOrEqual(currentSprintNumber)
+    const allocatedWeekData = personInGrid.weeks[allocatedWeekNumber];
+    expect(allocatedWeekData, `Person should have week ${allocatedWeekNumber} data`).toBeTruthy();
+    expect(allocatedWeekData.isAllocated).toBe(true);
+    expect(allocatedWeekData.planId).toBe(plan.id);
   });
 
   test('Allocation grid returns 404 for non-existent project', async ({ page, apiServer }) => {
@@ -491,6 +533,7 @@ test.describe('Content Version History API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project History Empty');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
 
     // Create weekly plan
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-plans`, {
@@ -498,7 +541,7 @@ test.describe('Content Version History API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
     const plan = await createResponse.json();
@@ -521,6 +564,7 @@ test.describe('Content Version History API', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro History');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
 
     // Create weekly retro
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-retros`, {
@@ -528,7 +572,7 @@ test.describe('Content Version History API', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
     const retro = await createResponse.json();
@@ -580,6 +624,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Navigation');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'plan')
 
     // Create weekly plan
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-plans`, {
@@ -587,7 +632,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
     const plan = await createResponse.json();
@@ -606,6 +651,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
     const { csrfToken, userId } = await loginAndGetContext(page, apiServer.url);
     const personId = await getPersonIdForUser(page, apiServer.url, userId);
     const projectId = await createTestProject(page, apiServer.url, csrfToken, 'Test Project Retro Nav');
+    const weekNumber = await getNextUnusedWeekNumber(page, apiServer.url, personId, 'retro')
 
     // Create weekly retro
     const createResponse = await page.request.post(`${apiServer.url}/api/weekly-retros`, {
@@ -613,7 +659,7 @@ test.describe('Weekly Plan/Retro Document Navigation', () => {
       data: {
         person_id: personId,
         project_id: projectId,
-        week_number: 1,
+        week_number: weekNumber,
       },
     });
     const retro = await createResponse.json();
