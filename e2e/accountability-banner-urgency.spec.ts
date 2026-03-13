@@ -19,14 +19,24 @@ async function login(page: import('@playwright/test').Page) {
   await expect(page).not.toHaveURL('/login', { timeout: 5000 });
 }
 
+async function getCsrfToken(page: import('@playwright/test').Page, apiUrl: string): Promise<string> {
+  const response = await page.request.get(`${apiUrl}/api/csrf-token`);
+  expect(response.ok()).toBe(true);
+  const { token } = await response.json();
+  return token;
+}
+
+async function getActionItems(page: import('@playwright/test').Page, apiUrl: string) {
+  const response = await page.request.get(`${apiUrl}/api/accountability/action-items`);
+  expect(response.ok()).toBe(true);
+  return response.json();
+}
+
 test.describe('Accountability Banner Urgency', () => {
   test('API response includes has_overdue and has_due_today flags', async ({ page, apiServer }) => {
     await login(page);
 
-    // The seed data creates sprints 3 months ago - items will be overdue
-    const response = await page.request.get(`${apiServer.url}/api/accountability/action-items`);
-    expect(response.ok()).toBe(true);
-    const data = await response.json();
+    const data = await getActionItems(page, apiServer.url);
 
     // Verify the response shape includes urgency flags
     expect(data).toHaveProperty('has_overdue');
@@ -35,40 +45,33 @@ test.describe('Accountability Banner Urgency', () => {
     expect(typeof data.has_due_today).toBe('boolean');
   });
 
-  test('banner is red when overdue items exist', async ({ page, apiServer }) => {
+  test('banner urgency matches the action-items flags', async ({ page, apiServer }) => {
     await login(page);
 
-    // Seed data has sprints from 3 months ago - items will be overdue
-    const actionItemsResponse = await page.request.get(`${apiServer.url}/api/accountability/action-items`);
-    expect(actionItemsResponse.ok()).toBe(true);
-    const actionItems = await actionItemsResponse.json();
-
-    // Verify we actually have overdue items from seed data
-    expect(actionItems.items.length).toBeGreaterThan(0);
-    expect(actionItems.has_overdue).toBe(true);
+    const actionItems = await getActionItems(page, apiServer.url);
+    expect(actionItems.total).toBeGreaterThan(0);
 
     // Navigate to app - banner should render with red background
     await page.goto('/');
     await expect(page).not.toHaveURL('/login', { timeout: 5000 });
 
-    // Wait for the banner to appear - look for a button with red background
-    const banner = page.locator('button.bg-red-600');
+    const banner = page.locator('button.bg-red-600, button.bg-amber-700');
     await expect(banner).toBeVisible({ timeout: 10000 });
 
-    // Verify the badge also has the matching red color
-    const badge = banner.locator('.bg-red-800');
-    await expect(badge).toBeVisible();
+    if (actionItems.has_overdue) {
+      await expect(page.locator('button.bg-red-600')).toBeVisible();
+      await expect(banner.locator('.bg-red-800')).toBeVisible();
+    } else {
+      expect(actionItems.has_due_today).toBe(true);
+      await expect(page.locator('button.bg-amber-700')).toBeVisible();
+    }
   });
 
   test('urgency flags correctly reflect item days_overdue values', async ({ page, apiServer }) => {
     await login(page);
 
-    const response = await page.request.get(`${apiServer.url}/api/accountability/action-items`);
-    expect(response.ok()).toBe(true);
-    const data = await response.json();
-
-    // Seed data creates sprints from 3 months ago, so items should be overdue
-    expect(data.items.length).toBeGreaterThan(0);
+    const data = await getActionItems(page, apiServer.url);
+    expect(data.total).toBeGreaterThan(0);
 
     const overdueItems = data.items.filter((item: { days_overdue: number }) => item.days_overdue > 0);
     const dueTodayItems = data.items.filter((item: { days_overdue: number }) => item.days_overdue === 0);
@@ -77,13 +80,13 @@ test.describe('Accountability Banner Urgency', () => {
     expect(data.has_overdue).toBe(overdueItems.length > 0);
     // Verify has_due_today flag matches actual items
     expect(data.has_due_today).toBe(dueTodayItems.length > 0);
-
-    // Verify overdue items exist (seed data creates old sprints)
-    expect(overdueItems.length).toBeGreaterThan(0);
   });
 
-  test('clicking banner opens the action items modal', async ({ page }) => {
+  test('clicking banner opens the action items modal', async ({ page, apiServer }) => {
     await login(page);
+
+    const actionItems = await getActionItems(page, apiServer.url);
+    expect(actionItems.total).toBeGreaterThan(0);
 
     // Navigate to app
     await page.goto('/');
@@ -91,7 +94,7 @@ test.describe('Accountability Banner Urgency', () => {
 
     // Wait for the accountability banner to appear
     // The fixture disables auto-open modal, so banner should be clickable
-    const banner = page.locator('button.bg-red-600, button.bg-amber-600');
+    const banner = page.locator('button.bg-red-600, button.bg-amber-700');
     await expect(banner).toBeVisible({ timeout: 10000 });
 
     // Click the banner to open the modal

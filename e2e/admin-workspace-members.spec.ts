@@ -10,27 +10,32 @@ async function loginAsSuperAdmin(page: Page) {
   await expect(page).not.toHaveURL('/login', { timeout: 10000 })
 }
 
+async function openFirstWorkspace(page: Page): Promise<string> {
+  await page.goto('/admin')
+
+  const workspaceLink = page.locator('table a[href*="/admin/workspaces/"]').first()
+  await expect(workspaceLink).toBeVisible({ timeout: 10000 })
+
+  const workspaceName = (await workspaceLink.textContent())?.trim() || 'Workspace'
+  await workspaceLink.click()
+
+  await expect(page).toHaveURL(/\/admin\/workspaces\//)
+  return workspaceName
+}
+
 test.describe('Admin Workspace Detail Page', () => {
   test.beforeEach(async ({ page }) => {
     await loginAsSuperAdmin(page)
   })
 
   test('can navigate to workspace detail by clicking workspace name', async ({ page }) => {
-    await page.goto('/admin')
+    const workspaceName = await openFirstWorkspace(page)
 
-    // Click on a workspace name (should be a link)
-    // Note: The isolated-env fixture seeds "Test Workspace", not "Ship Workspace"
-    const workspaceLink = page.getByRole('link', { name: /Test Workspace/i }).first()
-    await workspaceLink.click()
-
-    // Should navigate to workspace detail page
-    await expect(page).toHaveURL(/\/admin\/workspaces\//)
-    await expect(page.getByText('Workspace: Test Workspace')).toBeVisible()
+    await expect(page.getByRole('heading', { name: new RegExp(`Workspace:\\s*${workspaceName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) })).toBeVisible()
   })
 
   test('workspace detail page shows members table', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Should show members section with table
     await expect(page.getByRole('heading', { name: /Members \(\d+\)/ })).toBeVisible()
@@ -40,16 +45,14 @@ test.describe('Admin Workspace Detail Page', () => {
   })
 
   test('workspace detail page shows pending invites section', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Should show pending invites section
     await expect(page.getByRole('heading', { name: /Pending Invites/ })).toBeVisible()
   })
 
   test('workspace detail page shows add existing user section', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Should show "Add Existing User" section
     await expect(page.getByRole('heading', { name: 'Add Existing User' })).toBeVisible()
@@ -58,8 +61,7 @@ test.describe('Admin Workspace Detail Page', () => {
   })
 
   test('workspace detail page shows invite form', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Should show invite form
     await expect(page.getByRole('heading', { name: 'Invite New Member' })).toBeVisible()
@@ -68,8 +70,7 @@ test.describe('Admin Workspace Detail Page', () => {
   })
 
   test('back button returns to admin dashboard', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Click back button
     await page.getByRole('button').filter({ has: page.locator('svg') }).first().click()
@@ -85,8 +86,7 @@ test.describe('Admin Workspace Member Management', () => {
   })
 
   test('can change member role', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Find a member with "Member" role and change to "Admin"
     const memberRow = page.locator('tr').filter({ hasText: 'Member' }).first()
@@ -104,8 +104,7 @@ test.describe('Admin Workspace Member Management', () => {
   })
 
   test('can send invite to new email', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Generate unique email
     const testEmail = `test-admin-${Date.now()}@example.com`
@@ -119,8 +118,7 @@ test.describe('Admin Workspace Member Management', () => {
   })
 
   test('can revoke invite', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // First create an invite
     const testEmail = `test-revoke-${Date.now()}@example.com`
@@ -137,8 +135,7 @@ test.describe('Admin Workspace Member Management', () => {
   })
 
   test('can copy invite link', async ({ page }) => {
-    await page.goto('/admin')
-    await page.getByRole('link', { name: /Test Workspace/i }).first().click()
+    await openFirstWorkspace(page)
 
     // Create an invite first
     const testEmail = `test-copy-${Date.now()}@example.com`
@@ -160,17 +157,7 @@ test.describe('Admin User Search', () => {
   })
 
   test('user search shows results when typing', async ({ page }) => {
-    // Navigate to a workspace with few members (test space has 1 member after our test)
-    await page.goto('/admin')
-
-    // Find a workspace that might have available users to add
-    const workspaceLink = page.getByRole('link').filter({ hasText: /test space/i }).first()
-    if (await workspaceLink.isVisible()) {
-      await workspaceLink.click()
-    } else {
-      // Fall back to Ship Workspace
-      await page.getByRole('link', { name: /Test Workspace/i }).first().click()
-    }
+    await openFirstWorkspace(page)
 
     // Type in search box
     await page.getByPlaceholder('Search by email...').fill('dev')
@@ -186,54 +173,42 @@ test.describe('Admin User Search', () => {
   })
 
   test('selecting user from search enables Add User button', async ({ page }) => {
-    await page.goto('/admin')
+    await openFirstWorkspace(page)
 
-    // Go to test space (fewer members, more users to add)
-    const testSpaceLink = page.getByRole('link').filter({ hasText: /test space/i }).first()
-    if (await testSpaceLink.isVisible()) {
-      await testSpaceLink.click()
+    // Search for a user
+    await page.getByPlaceholder('Search by email...').fill('bob')
+    await page.waitForTimeout(500)
 
-      // Search for a user
-      await page.getByPlaceholder('Search by email...').fill('bob')
-      await page.waitForTimeout(500)
+    // If results show, click one
+    const userResult = page.locator('button').filter({ hasText: /bob/i }).first()
+    if (await userResult.isVisible()) {
+      await userResult.click()
 
-      // If results show, click one
-      const userResult = page.locator('button').filter({ hasText: /bob/i }).first()
-      if (await userResult.isVisible()) {
-        await userResult.click()
-
-        // Add User button should now be enabled
-        const addButton = page.getByRole('button', { name: 'Add User' })
-        await expect(addButton).not.toBeDisabled()
-      }
+      // Add User button should now be enabled
+      const addButton = page.getByRole('button', { name: 'Add User' })
+      await expect(addButton).not.toBeDisabled()
     }
   })
 
   test('can add existing user to workspace', async ({ page }) => {
-    await page.goto('/admin')
+    await openFirstWorkspace(page)
 
-    // Go to test space
-    const testSpaceLink = page.getByRole('link').filter({ hasText: /test space/i }).first()
-    if (await testSpaceLink.isVisible()) {
-      await testSpaceLink.click()
+    // Get initial member count
+    const memberHeading = page.getByRole('heading', { name: /Members \((\d+)\)/ })
+    const headingText = await memberHeading.textContent()
+    const initialCount = parseInt(headingText?.match(/\d+/)?.[0] || '0')
 
-      // Get initial member count
-      const memberHeading = page.getByRole('heading', { name: /Members \((\d+)\)/ })
-      const headingText = await memberHeading.textContent()
-      const initialCount = parseInt(headingText?.match(/\d+/)?.[0] || '0')
+    // Search for a user not in the workspace
+    await page.getByPlaceholder('Search by email...').fill('carol')
+    await page.waitForTimeout(500)
 
-      // Search for a user not in the workspace
-      await page.getByPlaceholder('Search by email...').fill('carol')
-      await page.waitForTimeout(500)
+    const userResult = page.locator('button').filter({ hasText: /carol/i }).first()
+    if (await userResult.isVisible()) {
+      await userResult.click()
+      await page.getByRole('button', { name: 'Add User' }).click()
 
-      const userResult = page.locator('button').filter({ hasText: /carol/i }).first()
-      if (await userResult.isVisible()) {
-        await userResult.click()
-        await page.getByRole('button', { name: 'Add User' }).click()
-
-        // Member count should increase
-        await expect(page.getByRole('heading', { name: /Members \((\d+)\)/ })).toContainText(`(${initialCount + 1})`, { timeout: 5000 })
-      }
+      // Member count should increase
+      await expect(page.getByRole('heading', { name: /Members \((\d+)\)/ })).toContainText(`(${initialCount + 1})`, { timeout: 5000 })
     }
   })
 })
