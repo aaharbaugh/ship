@@ -37,6 +37,53 @@ test.describe('Deploy Gate Smoke', () => {
     return response.json()
   }
 
+  async function createDocument(
+    page: Page,
+    options: {
+      title: string
+      document_type: 'wiki' | 'issue' | 'program' | 'project' | 'sprint'
+      visibility?: 'private' | 'workspace'
+      parent_id?: string | null
+      properties?: Record<string, unknown>
+    }
+  ) {
+    const csrfToken = await getCsrfToken(page)
+    const response = await page.request.post('/api/documents', {
+      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+      data: {
+        title: options.title,
+        document_type: options.document_type,
+        visibility: options.visibility,
+        parent_id: options.parent_id ?? null,
+        properties: options.properties,
+      },
+    })
+
+    expect(response.ok()).toBe(true)
+    return response.json()
+  }
+
+  async function getCurrentUser(page: Page) {
+    const response = await page.request.get('/api/auth/me')
+    expect(response.ok()).toBe(true)
+    const data = await response.json()
+    return data.data.user
+  }
+
+  async function createActionableSprintItem(page: Page) {
+    const user = await getCurrentUser(page)
+    return createDocument(page, {
+      title: `Deploy Gate Week ${Date.now()}`,
+      document_type: 'sprint',
+      properties: {
+        sprint_number: 1,
+        owner_id: user.id,
+        status: 'planning',
+        assignee_ids: [user.id],
+      },
+    })
+  }
+
   async function clearQueryCache(page: Page) {
     await page.evaluate(async () => {
       const databases = await indexedDB.databases()
@@ -99,12 +146,17 @@ test.describe('Deploy Gate Smoke', () => {
 
   test('programs smoke: seeded program detail opens successfully', async ({ page }) => {
     await login(page)
+    const title = `Deploy Gate Program ${Date.now()}`
+    await createDocument(page, { title, document_type: 'program' })
     await page.goto('/programs')
     await page.waitForLoadState('networkidle')
+    await clearQueryCache(page)
+    await page.reload()
+    await page.waitForLoadState('networkidle')
 
-    const firstProgramRow = page.locator('table tbody tr').first()
-    await expect(firstProgramRow).toBeVisible({ timeout: 10000 })
-    await firstProgramRow.click()
+    const programRow = page.locator('table tbody tr').filter({ hasText: title }).first()
+    await expect(programRow).toBeVisible({ timeout: 10000 })
+    await programRow.click()
 
     await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/, { timeout: 15000 })
     await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
@@ -114,12 +166,17 @@ test.describe('Deploy Gate Smoke', () => {
 
   test('projects smoke: seeded project detail opens successfully', async ({ page }) => {
     await login(page)
+    const title = `Deploy Gate Project ${Date.now()}`
+    await createDocument(page, { title, document_type: 'project' })
     await page.goto('/projects')
     await page.waitForLoadState('networkidle')
+    await clearQueryCache(page)
+    await page.reload()
+    await page.waitForLoadState('networkidle')
 
-    const firstProjectRow = page.locator('table tbody tr').first()
-    await expect(firstProjectRow).toBeVisible({ timeout: 10000 })
-    await firstProjectRow.click()
+    const projectRow = page.locator('table tbody tr').filter({ hasText: title }).first()
+    await expect(projectRow).toBeVisible({ timeout: 10000 })
+    await projectRow.click()
 
     await expect(page).toHaveURL(/\/documents\/[a-f0-9-]+/, { timeout: 15000 })
     const projectSidebar = page.getByLabel('Document list')
@@ -148,6 +205,7 @@ test.describe('Deploy Gate Smoke', () => {
 
   test('accountability smoke: banner renders and modal opens when action items exist', async ({ page }) => {
     await login(page)
+    await createActionableSprintItem(page)
     await page.goto('/')
     await page.waitForLoadState('networkidle')
 
