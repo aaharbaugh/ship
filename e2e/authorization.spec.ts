@@ -52,17 +52,11 @@ async function createMemberSession(page: Page) {
   const token = inviteData.data.invite.token as string
 
   await page.context().clearCookies()
-
-  const acceptResponse = await page.request.post(`/api/invites/${token}/accept`, {
-    headers: { 'Content-Type': 'application/json' },
-    data: {
-      name: 'Authorization Member',
-      password: 'admin123',
-    },
-  })
-  expect(acceptResponse.status()).toBe(201)
-
-  await page.goto('/docs')
+  await page.goto(`/invite/${token}`)
+  await expect(page.getByText("You're Invited!")).toBeVisible({ timeout: 10000 })
+  await page.locator('#name').fill('Authorization Member')
+  await page.locator('#password').fill('admin123')
+  await page.getByRole('button', { name: 'Create Account & Accept' }).click()
   await expect(page).toHaveURL(/\/docs/, { timeout: 10000 })
 }
 

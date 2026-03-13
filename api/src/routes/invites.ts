@@ -248,6 +248,7 @@ router.post('/:token/accept', async (req: Request, res: Response): Promise<void>
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: SESSION_TIMEOUT_MS,
+      path: '/',
     });
 
     res.status(HTTP_STATUS.CREATED).json({
