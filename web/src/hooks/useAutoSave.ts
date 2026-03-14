@@ -67,13 +67,14 @@ export function useAutoSave({ onSave, onError, throttleMs = 500, maxRetries = 3 
     // Throttle: if enough time has passed, save immediately
     if (timeSinceLastSave >= throttleMs) {
       saveSequenceRef.current++;
-      save(value, saveSequenceRef.current);
+      void save(value, saveSequenceRef.current);
+      return;
     }
 
-    // Always schedule a trailing save
+    // Schedule a trailing save when still inside the throttle window.
     timeoutRef.current = setTimeout(() => {
       saveSequenceRef.current++;
-      save(value, saveSequenceRef.current);
+      void save(value, saveSequenceRef.current);
     }, throttleMs);
   }, [save, throttleMs]);
 

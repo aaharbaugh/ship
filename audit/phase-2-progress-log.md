@@ -86,6 +86,7 @@ For the full chunk-by-chunk implementation history, use:
   - Category 6: runtime baseline improved, but could still use one final pass if we want stronger submission polish
   - Category 7: implementation and automated evidence are in strong shape
 - Notes:
+  - This was a midpoint snapshot, not the final closeout position.
   - Estimated overall Phase 2 completion is now in the low-80% range.
   - The main remaining weakness is Category 4 proof depth, not broad implementation coverage.
 

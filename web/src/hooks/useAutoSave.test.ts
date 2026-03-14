@@ -39,4 +39,26 @@ describe('useAutoSave', () => {
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'network down' }));
   });
+
+  it('does not issue a duplicate trailing save after an immediate save', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    const { result } = renderHook(() =>
+      useAutoSave({
+        onSave,
+        throttleMs: 10,
+      })
+    );
+
+    act(() => {
+      result.current('Updated title');
+    });
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave).toHaveBeenCalledWith('Updated title');
+  });
 });

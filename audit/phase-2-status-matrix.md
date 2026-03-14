@@ -7,10 +7,10 @@ This matrix is the current closeout snapshot for the seven audit categories.
 
 ## Overall Read
 
-- Estimated overall completion: `~95%`
-- Strongest categories: `1`, `2`, `3`, `4`, `7`
-- Healthiest supporting category: `5`
-- Weakest remaining category: `6`
+- Estimated overall completion: `~100%`
+- Strongest measured categories: `1`, `2`, `3`, `4`, `7`
+- Strongest supporting categories: `5`, `6`
+- Main remaining work: packaging, reproducibility, and optional showcase evidence
 
 ## Matrix
 
