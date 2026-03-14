@@ -18,6 +18,7 @@ import { PlanQualityBanner, RetroQualityBanner } from '@/components/PlanQualityB
 import { useAutoSave } from '@/hooks/useAutoSave';
 import type { Person } from '@/components/PersonCombobox';
 import type { BelongsTo } from '@ship/shared';
+import { useToast } from '@/components/ui/Toast';
 
 const Editor = lazy(async () => {
   const module = await import('@/components/Editor');
@@ -206,6 +207,7 @@ export function UnifiedEditor({
 }: UnifiedEditorProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [isChangingType, setIsChangingType] = useState(false);
 
   // Track missing required fields after type changes
@@ -234,6 +236,9 @@ export function UnifiedEditor({
   const throttledTitleSave = useAutoSave({
     onSave: async (title: string) => {
       if (title) await onUpdate({ title });
+    },
+    onError: (error) => {
+      showToast(`Auto-save failed: ${error.message}`, 'error', 5000);
     },
   });
 

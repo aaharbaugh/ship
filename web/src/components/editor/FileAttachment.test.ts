@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { FileAttachmentExtension } from './FileAttachment';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -71,5 +71,12 @@ describe('FileAttachmentExtension', () => {
     expect(typeof (editor.commands as any).setFileAttachment).toBe('function');
 
     editor.destroy();
+  });
+
+  it('should accept upload error callback options', () => {
+    const onUploadError = vi.fn();
+    const extension = FileAttachmentExtension.configure({ onUploadError });
+
+    expect(extension.options.onUploadError).toBe(onUploadError);
   });
 });

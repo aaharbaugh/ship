@@ -133,6 +133,34 @@ Notes:
 ## Suggested Direction
 The next step is not “add more try/catch everywhere.” The higher-value move is to standardize runtime failure handling around a small set of explicit user-facing states for sync, upload, save, and collaboration health, then back that with centralized client/server error capture so edge-case failures stop disappearing into console logs and ad hoc alerts.
 
+## 2026-03-14 Improvement Update
+
+A focused remediation pass landed after the original runtime writeup to reduce the most visible alert-only and silent-failure paths.
+
+Focused verification:
+
+```bash
+pnpm --filter @ship/web test FileAttachment.test.ts InviteAccept.test.tsx
+pnpm --filter @ship/web type-check
+```
+
+Concrete runtime gaps improved:
+
+- Editor collaboration recovery
+  - revoked-access and converted-document fallbacks in `Editor.tsx` now use durable toasts instead of blocking `alert()` dialogs
+- Upload failure visibility
+  - image uploads now surface failure toasts through the editor upload callback
+  - file attachments now surface blocked-type, oversize, and upload-failure states through the same callback model instead of `alert()`
+- Autosave exhaustion visibility
+  - `useAutoSave.ts` now supports an explicit `onError` callback, and the active title-save paths in `PersonEditor.tsx` and `UnifiedEditor.tsx` surface exhausted retry failures as user-visible toasts
+- Admin/settings async recovery
+  - key role-management failures in `AdminWorkspaceDetail.tsx` and `WorkspaceSettings.tsx` now use toasts instead of blocking alerts
+
+Updated read:
+
+- Category 6 is still the least polished evidence package in Phase 2, but the remaining weak spots are narrower now.
+- The app has fewer console-only and alert-only failure paths in the highest-value user workflows than it did at the original audit baseline.
+
 ## Audit Deliverable
 | Metric | Your Baseline |
 |---|---|

@@ -123,6 +123,8 @@ For the full chunk-by-chunk implementation history, use:
     - `pnpm --filter @ship/web type-check`
   - editor access-revoked / conversion fallback flows now show durable toasts instead of blocking alerts
   - admin workspace detail and workspace settings now surface key role-management errors via toasts instead of alerts
+  - upload failure handling now uses editor-level callbacks and durable toasts for image/file failures
+  - autosave exhaustion can now surface user-visible failure toasts in active title-save flows
 - Notes:
   - Category 5 now has a cleaner threshold-clearing story through explicit critical-path additions.
   - Category 6 still has room for a more formal before/after evidence package, but the user-facing recovery behavior is materially better than the earlier baseline.

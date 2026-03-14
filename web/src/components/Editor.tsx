@@ -600,10 +600,12 @@ export function Editor({
       ImageUploadExtension.configure({
         onUploadStart: () => {},
         onUploadComplete: () => {},
-        onUploadError: (error) => console.error('Upload error:', error),
+        onUploadError: (error: Error) => showToast(`Image upload failed: ${error.message}`, 'error', 5000),
         abortController: imageUploadAbortRef.current,
       }),
-      FileAttachmentExtension,
+      FileAttachmentExtension.configure({
+        onUploadError: (error: Error) => showToast(`File upload failed: ${error.message}`, 'error', 5000),
+      }),
       DocumentEmbed,
       DragHandleExtension,
       DetailsExtension,
@@ -619,7 +621,7 @@ export function Editor({
       PlanReferenceBlockExtension,
       slashCommandsExtension,
     ];
-  }, [placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension]);
+  }, [placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension, showToast]);
 
   const extensions = provider
     ? [

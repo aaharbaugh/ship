@@ -2,11 +2,12 @@ import { useRef, useCallback, useEffect } from 'react';
 
 interface UseAutoSaveOptions {
   onSave: (value: string) => Promise<void>;
+  onError?: (error: Error) => void;
   throttleMs?: number; // Default 500ms
   maxRetries?: number; // Default 3
 }
 
-export function useAutoSave({ onSave, throttleMs = 500, maxRetries = 3 }: UseAutoSaveOptions) {
+export function useAutoSave({ onSave, onError, throttleMs = 500, maxRetries = 3 }: UseAutoSaveOptions) {
   const lastSaveTimeRef = useRef(0);
   const pendingValueRef = useRef<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,11 +44,12 @@ export function useAutoSave({ onSave, throttleMs = 500, maxRetries = 3 }: UseAut
         await save(value, sequence, retryCount + 1);
       } else {
         console.error('Auto-save failed after retries:', err);
+        onError?.(err instanceof Error ? err : new Error('Auto-save failed'));
       }
     } finally {
       isSavingRef.current = false;
     }
-  }, [onSave, maxRetries]);
+  }, [onSave, onError, maxRetries]);
 
   const throttledSave = useCallback((value: string) => {
     const now = Date.now();

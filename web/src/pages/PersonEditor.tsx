@@ -8,6 +8,7 @@ import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { PersonCombobox, type Person } from '@/components/PersonCombobox';
 import { PropertyRow } from '@/components/ui/PropertyRow';
 import { apiGet, apiPatch, apiDelete } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
 
 const Editor = lazy(async () => {
   const module = await import('@/components/Editor');
@@ -50,6 +51,7 @@ export function PersonEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const { createDocument } = useDocuments();
   const { isWorkspaceAdmin } = useWorkspace();
   const { data: teamMembers } = useAssignableMembersQuery();
@@ -126,6 +128,9 @@ export function PersonEditorPage() {
       if (!id) return;
       const title = newTitle || 'Untitled';
       await apiPatch(`/api/documents/${id}`, { title });
+    },
+    onError: (error) => {
+      showToast(`Auto-save failed: ${error.message}`, 'error', 5000);
     },
   });
 
