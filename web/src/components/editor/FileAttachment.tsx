@@ -48,7 +48,7 @@ function formatFileSize(bytes: number): string {
 
 // React component for rendering file attachment
 function FileAttachmentComponent({ node }: { node: any }) {
-  const { filename, url, size, mimeType, uploading } = node.attrs;
+  const { filename, url, size, mimeType, uploading, error } = node.attrs;
   const [uploadProgress, setUploadProgress] = useState(uploading ? 0 : 100);
 
   const fileIcon = getFileIcon(mimeType);
@@ -62,6 +62,11 @@ function FileAttachmentComponent({ node }: { node: any }) {
           <div className="file-attachment-name">{filename}</div>
           {formattedSize && (
             <div className="file-attachment-meta">{formattedSize}</div>
+          )}
+          {!uploading && error && (
+            <div className="file-attachment-meta text-red-500" role="alert">
+              Upload failed: {error}
+            </div>
           )}
           {uploading && (
             <div className="file-attachment-progress">
@@ -118,6 +123,9 @@ export const FileAttachmentExtension = Node.create({
       uploading: {
         default: false,
       },
+      error: {
+        default: null,
+      },
     };
   },
 
@@ -144,7 +152,10 @@ export const FileAttachmentExtension = Node.create({
         ({ commands }: any) =>
           commands.insertContent({
             type: this.name,
-            attrs: options,
+            attrs: {
+              ...options,
+              error: null,
+            },
           }),
     } as any;
   },
@@ -294,6 +305,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal, o
         size: file.size,
         mimeType: effectiveMimeType,
         uploading: false,
+        error: null,
       });
       view.dispatch(transaction);
     }
@@ -314,7 +326,6 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal, o
     console.error('File upload failed:', { filename: file.name, error: errorMessage, fullError: error });
     options?.onUploadError?.(error instanceof Error ? error : new Error(`Upload failed: ${errorMessage}`));
 
-    // Remove the failed upload node
     const { state, view } = editor;
     let attachmentPos: number | null = null;
 
@@ -331,7 +342,14 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal, o
     });
 
     if (attachmentPos !== null) {
-      const transaction = state.tr.delete(attachmentPos, attachmentPos + 1);
+      const transaction = state.tr.setNodeMarkup(attachmentPos, undefined, {
+        filename: file.name,
+        url: '',
+        size: file.size,
+        mimeType: effectiveMimeType,
+        uploading: false,
+        error: errorMessage,
+      });
       view.dispatch(transaction);
     }
   }

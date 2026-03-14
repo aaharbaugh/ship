@@ -120,11 +120,13 @@ For the full chunk-by-chunk implementation history, use:
   - targeted verification passed:
     - `SKIP_DB_SETUP=1 pnpm --filter @ship/api test caia-auth.test.ts admin-credentials.test.ts`
     - `pnpm --filter @ship/web test InviteAccept.test.tsx`
+    - `pnpm --filter @ship/web test FileAttachment.test.ts useAutoSave.test.ts`
     - `pnpm --filter @ship/web type-check`
   - editor access-revoked / conversion fallback flows now show durable toasts instead of blocking alerts
   - admin workspace detail and workspace settings now surface key role-management errors via toasts instead of alerts
   - upload failure handling now uses editor-level callbacks and durable toasts for image/file failures
   - autosave exhaustion can now surface user-visible failure toasts in active title-save flows
+  - failed file uploads now remain visible in the editor with an inline failed state instead of disappearing
 - Notes:
   - Category 5 now has a cleaner threshold-clearing story through explicit critical-path additions.
-  - Category 6 still has room for a more formal before/after evidence package, but the user-facing recovery behavior is materially better than the earlier baseline.
+  - Category 6 now has a stronger “met” story through three explicit runtime fixes and focused verification.

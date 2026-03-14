@@ -21,7 +21,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 | 3. API Response Time | Met | Two audited endpoints now have clean benchmark-mode wins over the required threshold. | `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms`; `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95`. | None required for the threshold; only optional polish remains. |
 | 4. Database Query Efficiency | Met | The measured `view-document` flow now clears the required query-count reduction threshold. | Normalized query count dropped from `15` to `11` (`-26.7%`); read-path session writes were throttled and document/context reads were collapsed. | Optional extra flow proof only; the threshold is met. |
 | 5. Test Coverage and Quality | Met | The suite is now honest, measurable, and clears the assignment threshold through direct critical-path additions. | API and web suites pass, coverage runs work, and new direct tests cover `admin-credentials`, `caia-auth`, and invite acceptance. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission, but the threshold is now satisfied. |
-| 6. Runtime Error / Edge Cases | Likely met | Runtime handling is better than baseline, especially around process-level failures and clearer user-facing recovery on editor, upload, autosave, and admin flows. | uncaught exception / unhandled rejection traps, toast-based recovery for editor conversion/access loss, upload failure callbacks, autosave exhaustion toasts, and reduced blocking alerts in admin/settings flows. | Could use one final before/after evidence package if we want a stronger demo claim. |
+| 6. Runtime Error / Edge Cases | Met | Runtime handling is better than baseline and now has explicit user-facing recovery on editor, upload, autosave, and admin flows. | uncaught exception / unhandled rejection traps, toast-based recovery for editor conversion/access loss, persistent failed-upload state, autosave exhaustion toasts, and reduced blocking alerts in admin/settings flows. | Mostly evidence packaging polish now, not missing core fixes. |
 | 7. Accessibility | Met | Accessibility now has both implementation work and automated evidence. | dialog fixes, page-level ARIA/label/contrast improvements, remediation/broad accessibility runs passing. | Optional Lighthouse score snapshots if desired. |
 
 ## Category Notes
@@ -50,8 +50,8 @@ This matrix is the current closeout snapshot for the seven audit categories.
 - Coverage depth is still not where an ideal long-term target would be, but the Phase 2 bar is now met.
 
 ### Category 6
-- This category is better than the repo baseline, and the user-facing story is stronger now that editor, upload, autosave, and admin/settings failures use durable toasts instead of blocking alerts.
-- It still has the least polished evidence narrative compared to Categories 2, 3, and 7.
+- This category is now supportable as met: three concrete runtime gaps were fixed and at least one directly reduces user confusion/data-loss risk.
+- The evidence package is still less elegant than Categories 2, 3, and 7, but the implementation bar is now met.
 
 ### Category 7
 - This is submission-ready.
@@ -60,10 +60,10 @@ This matrix is the current closeout snapshot for the seven audit categories.
 ## Recommended Final Position
 
 - Treat Categories `1`, `2`, `3`, `4`, and `7` as clear measured wins.
-- Treat Category `5` as a clear win and Category `6` as the last polishing-focused risk.
+- Treat Categories `5` and `6` as clear wins, with Category `6` now best presented as a user-recovery improvement rather than a pure benchmark category.
 
 ## Recommended Remaining Work
 
 1. Stop major implementation and focus on packaging evidence cleanly.
 2. Use the demo/writeup to emphasize the measured wins in Categories `1` through `4` and `7`.
-3. If one more pass is available, spend it on Category `6` polish rather than reopening already-met targets.
+3. If one more pass is available, spend it on presentation polish rather than reopening already-met targets.

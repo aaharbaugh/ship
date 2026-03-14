@@ -79,4 +79,17 @@ describe('FileAttachmentExtension', () => {
 
     expect(extension.options.onUploadError).toBe(onUploadError);
   });
+
+  it('should expose an error attribute for failed uploads', () => {
+    const extension = FileAttachmentExtension;
+    const attrs = extension.config.addAttributes?.call({
+      name: 'fileAttachment',
+      options: {},
+      storage: {},
+      parent: undefined,
+    } as never) as Record<string, { default: unknown }>;
+
+    expect(attrs?.error).toBeDefined();
+    expect(attrs?.error.default).toBeNull();
+  });
 });

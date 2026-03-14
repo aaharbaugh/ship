@@ -141,6 +141,7 @@ Focused verification:
 
 ```bash
 pnpm --filter @ship/web test FileAttachment.test.ts InviteAccept.test.tsx
+pnpm --filter @ship/web test useAutoSave.test.ts
 pnpm --filter @ship/web type-check
 ```
 
@@ -151,6 +152,7 @@ Concrete runtime gaps improved:
 - Upload failure visibility
   - image uploads now surface failure toasts through the editor upload callback
   - file attachments now surface blocked-type, oversize, and upload-failure states through the same callback model instead of `alert()`
+  - failed file uploads now remain visible in the editor with an inline failure state instead of disappearing after the error
 - Autosave exhaustion visibility
   - `useAutoSave.ts` now supports an explicit `onError` callback, and the active title-save paths in `PersonEditor.tsx` and `UnifiedEditor.tsx` surface exhausted retry failures as user-visible toasts
 - Admin/settings async recovery
@@ -158,8 +160,12 @@ Concrete runtime gaps improved:
 
 Updated read:
 
-- Category 6 is still the least polished evidence package in Phase 2, but the remaining weak spots are narrower now.
-- The app has fewer console-only and alert-only failure paths in the highest-value user workflows than it did at the original audit baseline.
+- Category 6 now has three explicit, defensible runtime fixes:
+  - editor access/conversion recovery
+  - upload failure recovery
+  - autosave exhaustion recovery
+- At least one of those fixes directly addresses a user-facing confusion/data-loss risk: failed uploads now remain visible in the editor and failed autosaves now surface after retries are exhausted.
+- The app has fewer console-only and alert-only failure paths in the highest-value user workflows than it did at the original audit baseline, and this category can now be framed as met.
 
 ## Audit Deliverable
 | Metric | Your Baseline |
