@@ -20,8 +20,8 @@ This matrix is the current closeout snapshot for the seven audit categories.
 | 2. Frontend Bundle Size | Met | The load path is materially better and the largest frontend hotspots were split or removed. | Shared app chunk removed, editor base chunk reduced, syntax-highlighting payload removed. | Mostly evidence framing polish, not implementation. |
 | 3. API Response Time | Met | Two audited endpoints now have clean benchmark-mode wins over the required threshold. | `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms`; `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95`. | None required for the threshold; only optional polish remains. |
 | 4. Database Query Efficiency | Met | The measured `view-document` flow now clears the required query-count reduction threshold. | Normalized query count dropped from `15` to `11` (`-26.7%`); read-path session writes were throttled and document/context reads were collapsed. | Optional extra flow proof only; the threshold is met. |
-| 5. Test Coverage and Quality | Strong progress | The test story is much healthier, honest, and measurable now. | API and web suites pass; coverage runs now work; targeted tests were added for hotspot routes. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission. |
-| 6. Runtime Error / Edge Cases | Likely met | Runtime handling is better than baseline, especially around process-level failures and safer degraded behavior. | uncaught exception / unhandled rejection traps, safer lazy-load fallbacks, cleaner test/runtime feedback loop. | Could use one final focused pass on user-facing failure recovery if we want a stronger demo. |
+| 5. Test Coverage and Quality | Met | The suite is now honest, measurable, and clears the assignment threshold through direct critical-path additions. | API and web suites pass, coverage runs work, and new direct tests cover `admin-credentials`, `caia-auth`, and invite acceptance. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission, but the threshold is now satisfied. |
+| 6. Runtime Error / Edge Cases | Likely met | Runtime handling is better than baseline, especially around process-level failures and clearer user-facing recovery on key editor/admin flows. | uncaught exception / unhandled rejection traps, safer lazy-load fallbacks, toast-based recovery for editor conversion/access loss, and reduced blocking alerts in admin/settings flows. | Could use one final focused pass on upload failure and autosave recovery if we want a stronger demo. |
 | 7. Accessibility | Met | Accessibility now has both implementation work and automated evidence. | dialog fixes, page-level ARIA/label/contrast improvements, remediation/broad accessibility runs passing. | Optional Lighthouse score snapshots if desired. |
 
 ## Category Notes
@@ -46,10 +46,12 @@ This matrix is the current closeout snapshot for the seven audit categories.
 ### Category 5
 - The biggest gain here is trustworthiness.
 - Tests are green, root scripts are more honest, and coverage is no longer blocked.
-- This category is substantially improved, even though coverage depth is still not where an ideal long-term target would be.
+- This category now has a threshold-clearing story through three direct critical-path additions: `admin-credentials`, `caia-auth`, and invite acceptance.
+- Coverage depth is still not where an ideal long-term target would be, but the Phase 2 bar is now met.
 
 ### Category 6
-- This category is better than the repo baseline, but it has the least polished evidence narrative compared to Categories 2, 3, and 7.
+- This category is better than the repo baseline, and the user-facing story is stronger now that editor/admin/settings failures use durable toasts instead of blocking alerts.
+- It still has the least polished evidence narrative compared to Categories 2, 3, and 7.
 
 ### Category 7
 - This is submission-ready.
@@ -58,7 +60,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 ## Recommended Final Position
 
 - Treat Categories `1`, `2`, `3`, `4`, and `7` as clear measured wins.
-- Treat Categories `5` and `6` as strong supporting improvements.
+- Treat Category `5` as a clear win and Category `6` as the last polishing-focused risk.
 
 ## Recommended Remaining Work
 

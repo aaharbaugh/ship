@@ -8,6 +8,11 @@ beforeAll(async () => {
   // Ensure test environment
   process.env.NODE_ENV = 'test'
 
+  // Some route tests fully mock their dependencies and don't need a database.
+  if (process.env.SKIP_DB_SETUP === '1') {
+    return
+  }
+
   // Tests can opt into an isolated database by setting TEST_DATABASE_URL.
   // If unset, the existing local dev database remains the fallback.
 

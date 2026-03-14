@@ -36,6 +36,7 @@ import { AIScoringDisplayExtension } from './editor/AIScoringDisplay';
 import { PlanReferenceBlockExtension } from './editor/PlanReferenceBlock';
 import { useCommentsQuery, useCreateComment, useUpdateComment } from '@/hooks/useCommentsQuery';
 import { BubbleMenu } from '@tiptap/react';
+import { useToast } from '@/components/ui/Toast';
 import 'tippy.js/dist/tippy.css';
 
 interface EditorProps {
@@ -257,6 +258,7 @@ export function Editor({
   }, []);
 
   const color = userColor || stringToColor(userName);
+  const { showToast } = useToast();
 
   // Auto-focus and select title if "Untitled" (new document)
   // Uses double requestAnimationFrame to run AFTER useFocusOnNavigate's
@@ -409,8 +411,7 @@ export function Editor({
           console.log(`[Editor] Access revoked for document ${documentId}`);
           // Disable auto-reconnect since access was revoked
           wsProvider!.shouldConnect = false;
-          // Show user-friendly message
-          alert('Access to this document has been revoked. The document is now private.');
+          showToast('Access to this document was revoked. Returning to the previous view.', 'error', 5000);
           // Navigate back if possible
           onBack?.();
         } else if (event?.code === 4100) {
@@ -424,12 +425,12 @@ export function Editor({
               onDocumentConverted(conversionInfo.newDocId, conversionInfo.newDocType);
             } else {
               // Fallback if callback not provided or info missing
-              alert('This document was converted. Please refresh to view the new document.');
+              showToast('This document was converted. Refresh to open the new document.', 'info', 5000);
               onBack?.();
             }
           } catch {
             console.error('[Editor] Failed to parse conversion info:', event.reason);
-            alert('This document was converted. Please refresh to view the new document.');
+            showToast('This document was converted. Refresh to open the new document.', 'info', 5000);
             onBack?.();
           }
         } else if (event?.code === 4101) {
@@ -518,7 +519,7 @@ export function Editor({
       setProvider(null);
       setConnectedUsers([]);
     };
-  }, [documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted]);
+  }, [documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted, showToast]);
 
   // Create slash commands extension (memoized to avoid recreation)
   // documentId is in deps to ensure fresh AbortSignal when switching documents

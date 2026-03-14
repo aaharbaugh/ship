@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api, WorkspaceMember, WorkspaceInvite, AuditLog, ApiToken, ApiTokenCreateResponse } from '@/lib/api';
 import { archivedPersonsKey } from '@/contexts/ArchivedPersonsContext';
 import { cn } from '@/lib/cn';
+import { useToast } from '@/components/ui/Toast';
 
 type Tab = 'members' | 'invites' | 'tokens' | 'audit';
 
@@ -15,6 +16,7 @@ export function WorkspaceSettingsPage() {
   const { currentWorkspace, isWorkspaceAdmin } = useWorkspace();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Derive active tab from URL query params
@@ -93,7 +95,7 @@ export function WorkspaceSettingsPage() {
     // Check if this is the last admin
     const admins = members.filter(m => m.role === 'admin');
     if (admins.length === 1 && admins[0].userId === userId && newRole === 'member') {
-      alert('Cannot demote the last admin. Promote another member first.');
+      showToast('Cannot demote the last admin. Promote another member first.', 'error');
       return;
     }
 
@@ -110,7 +112,7 @@ export function WorkspaceSettingsPage() {
     const admins = members.filter(m => m.role === 'admin');
     const member = members.find(m => m.userId === userId);
     if (member?.role === 'admin' && admins.length === 1) {
-      alert('Cannot archive the last admin. Promote another member first.');
+      showToast('Cannot archive the last admin. Promote another member first.', 'error');
       return;
     }
 

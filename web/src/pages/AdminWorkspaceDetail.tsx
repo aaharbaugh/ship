@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/date-utils';
+import { useToast } from '@/components/ui/Toast';
 
 interface Member {
   userId: string;
@@ -34,6 +35,7 @@ export function AdminWorkspaceDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { isSuperAdmin } = useAuth();
+  const { showToast } = useToast();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -148,7 +150,7 @@ export function AdminWorkspaceDetailPage() {
     if (res.success) {
       setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
     } else if (res.error?.message) {
-      alert(res.error.message);
+      showToast(res.error.message, 'error');
     }
   }
 
@@ -160,7 +162,7 @@ export function AdminWorkspaceDetailPage() {
     if (res.success) {
       setMembers(prev => prev.filter(m => m.userId !== userId));
     } else if (res.error?.message) {
-      alert(res.error.message);
+      showToast(res.error.message, 'error');
     }
   }
 

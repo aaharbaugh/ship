@@ -107,3 +107,22 @@ For the full chunk-by-chunk implementation history, use:
   - The biggest improvement is not “full E2E green”; it is that the audit now has a defendable verification strategy and a documented split between stable release-gating checks and the larger remediation backlog.
   - Category 5 is materially stronger than it was on 2026-03-11, even though the broad Playwright suite still needs continued reduction and cleanup.
   - Current stopping point is favorable: the repo has a clean worktree, the deploy-gate smoke path remains the practical release gate, and recent high-signal E2E clusters are now green in isolation.
+
+- Date: 2026-03-14
+- Milestone: Critical-path test closure and runtime UX recovery pass
+- Categories involved: Category 5, Category 6
+- Status: Completed
+- Evidence:
+  - new direct critical-path tests added for:
+    - `admin-credentials`
+    - `caia-auth`
+    - invite acceptance
+  - targeted verification passed:
+    - `SKIP_DB_SETUP=1 pnpm --filter @ship/api test caia-auth.test.ts admin-credentials.test.ts`
+    - `pnpm --filter @ship/web test InviteAccept.test.tsx`
+    - `pnpm --filter @ship/web type-check`
+  - editor access-revoked / conversion fallback flows now show durable toasts instead of blocking alerts
+  - admin workspace detail and workspace settings now surface key role-management errors via toasts instead of alerts
+- Notes:
+  - Category 5 now has a cleaner threshold-clearing story through explicit critical-path additions.
+  - Category 6 still has room for a more formal before/after evidence package, but the user-facing recovery behavior is materially better than the earlier baseline.
