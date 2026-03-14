@@ -123,10 +123,10 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"], // Admin credentials page uses inline scripts
-        styleSrc: ["'self'", "'unsafe-inline'"], // TipTap editor needs inline styles
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // TipTap editor needs inline styles
         imgSrc: ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "wss:", "ws:"], // WebSocket connections
-        fontSrc: ["'self'", "data:"],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         frameSrc: ["'none'"],
         baseUri: ["'self'"],
