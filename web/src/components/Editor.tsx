@@ -568,7 +568,7 @@ export function Editor({
       Link.configure({
         openOnClick: true,
         HTMLAttributes: {
-          class: 'text-accent hover:underline cursor-pointer',
+          class: 'text-accent-text hover:underline cursor-pointer',
         },
       }),
       ResizableImage,
