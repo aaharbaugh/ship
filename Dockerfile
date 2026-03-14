@@ -35,6 +35,7 @@ COPY api/package.json ./api/
 COPY web/package.json ./web/
 COPY shared/package.json ./shared/
 COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/api/node_modules ./api/node_modules
 COPY --from=build /app/api/dist ./api/dist
 COPY --from=build /app/shared/dist ./shared/dist
 COPY --from=build /app/web/dist ./web/dist
