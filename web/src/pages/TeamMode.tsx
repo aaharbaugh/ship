@@ -583,6 +583,7 @@ export function TeamModePage() {
             {nameFilter && (
               <button
                 onClick={() => setNameFilter('')}
+                aria-label="Clear name filter"
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-foreground"
               >
                 <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -957,4 +958,3 @@ function ViewAsIcon({ className }: { className?: string }) {
     </svg>
   );
 }
-

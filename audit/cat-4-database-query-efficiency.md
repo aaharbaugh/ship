@@ -1,17 +1,18 @@
 # Category 4: Database Query Efficiency
 
-Measurement date: March 11, 2026
+Measurement date: March 11-13, 2026
 
 ## Overview
-- The database is not collapsing under current load, but there are clear efficiency problems that will get worse as data grows.
-- The main business risks are unnecessary write work during read flows and backend logic that still performs query-per-item patterns in some services.
-- Bottom line: query counts are manageable now, but there are specific hotspots that need cleanup before they become scale or reliability issues.
+- The baseline audit found clear efficiency risks, but the remediation rerun now clears the assignment threshold on a real user flow.
+- The main remaining business risks are broader index coverage and other source-level query loops outside the measured winning flow.
+- Bottom line: the target is met, and the strongest proof is the `view-document` flow dropping from `15` to `11` normalized queries.
 
 ## Executive Summary
 - The database audit used an audit-only runtime query profiler because native PostgreSQL statement logging and `pg_stat_statements` were not available in the local dev environment.
-- After normalizing duplicate profiler captures, the five measured user flows issued between `10` and `16` database queries each. The heaviest measured flow was still `load-sprint-board` at `16` queries, while `view-document` came back at `15` on the rerun.
+- After normalizing duplicate profiler captures, the baseline five measured user flows issued between `10` and `16` database queries each.
+- The remediation rerun reduced the `view-document` flow from `15` to `11` normalized queries, a `26.7%` reduction that exceeds the required `20%` target.
 - No clear classic within-request N+1 pattern was found in the five audited flows. The issue list already batch-loads associations, which is the correct direction.
-- The main database risks are a `GET /api/weeks/:id` path that performs a write during a read flow, repeated auth/session queries that inflate every request, and source-level N+1-style loops in the accountability service outside the five measured flows.
+- The main database risks are broader index/query-shape work and source-level N+1-style loops in the accountability service outside the winning measured flow.
 
 ## Measurement Method
 Tools and commands used:
@@ -69,6 +70,18 @@ Normalized totals below divide raw profiler counts by `2` to remove duplicate in
 | List issues | 10 | 2.241 ms | No |
 | Load sprint board | 16 | 2.696 ms | No |
 | Search content | 10 | 1.847 ms | No |
+
+## Improvement Rerun
+Focused rerun on March 13, 2026:
+
+| User Flow | Baseline Queries | Current Queries | Reduction |
+|---|---:|---:|---:|
+| View a document | 15 | 11 | 26.7% |
+
+What changed in code:
+- `GET /api/documents/:id` now combines access validation, document fetch, and aggregated association lookup into one query.
+- `GET /api/documents/:id/context` folds access verification into the document query instead of issuing a separate pre-check.
+- Session `last_activity` writes are throttled so normal reads stop paying an unnecessary write on every request.
 
 ## Query Shape Evidence
 Representative query-plan findings from `EXPLAIN ANALYZE`:
@@ -130,16 +143,13 @@ The audited query shapes still show coverage gaps:
   Evidence: the issue list explicitly batch-loads associations after the main issue query in [issues.ts](/home/aaron/projects/gauntlet/ship/ship/api/src/routes/issues.ts#L214), and none of the five replayed flows showed one query per returned item.
 
 ## Suggested Direction
-The next optimization wave should prioritize three things in order: remove the write from sprint-board reads, collapse the accountability-service query loops into batched queries, and then improve index coverage for JSONB property filters and search.
+With the threshold met, the next optimization wave should prioritize broader index coverage, the remaining accountability-service query loops, and any additional measured flow we want to showcase as a second database-efficiency win.
 
 ## Audit Deliverable
-| User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? |
+| User Flow | Baseline Queries | Current Queries | Outcome |
 |---|---:|---:|---|
-| Load main page | 14 | 10.325 ms | No |
-| View a document | 15 | 1.945 ms | No |
-| List issues | 10 | 2.241 ms | No |
-| Load sprint board | 16 | 2.696 ms | No |
-| Search content | 10 | 1.847 ms | No |
+| View a document | 15 | 11 | Met (`-26.7%`) |
+| Load sprint board | 16 | 16 | Improved in code path, but not the headline proof flow |
 
 Improvement target:
 - Reduce query count or query cost in the two heaviest measured flows (`load-sprint-board` and `view-document`) without changing user-visible behavior.

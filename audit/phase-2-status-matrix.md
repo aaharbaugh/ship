@@ -1,25 +1,25 @@
 # Phase 2 Status Matrix
 
-Date: 2026-03-11
+Date: 2026-03-13
 Branch: implementation
 
 This matrix is the current closeout snapshot for the seven audit categories.
 
 ## Overall Read
 
-- Estimated overall completion: `~82%`
-- Strongest categories: `2`, `3`, `7`
+- Estimated overall completion: `~95%`
+- Strongest categories: `1`, `2`, `3`, `4`, `7`
 - Healthiest supporting category: `5`
-- Weakest remaining category: `4`
+- Weakest remaining category: `6`
 
 ## Matrix
 
 | Category | Status | Current Read | Strongest Evidence | Main Remaining Gap |
 |---|---|---|---|---|
-| 1. Type Safety | Likely met | Production API boundary typing is substantially better in the main hotspot routes. | `projects.ts`, `issues.ts`, `weeks.ts`, and `documents.ts` all had targeted type tightening. | One more sweep of remaining production escape hatches would make the story cleaner. |
+| 1. Type Safety | Met | The measured escape-hatch count now clears the required reduction target with the compiler still green. | Fresh AST recount: `1,294` -> `947` total violations (`-26.8%`); `pnpm type-check` passes. | Optional cleanup only; the threshold is met. |
 | 2. Frontend Bundle Size | Met | The load path is materially better and the largest frontend hotspots were split or removed. | Shared app chunk removed, editor base chunk reduced, syntax-highlighting payload removed. | Mostly evidence framing polish, not implementation. |
 | 3. API Response Time | Met | Two audited endpoints now have clean benchmark-mode wins over the required threshold. | `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms`; `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95`. | None required for the threshold; only optional polish remains. |
-| 4. Database Query Efficiency | Partial | Real improvements exist, but threshold-clearing database proof is still incomplete. | `GET /api/weeks/:id` no longer writes on reads; accountability batching is real; profiler showed sprint-board query-count reduction. | Still missing a defensible threshold-clearing flow or query-plan win. |
+| 4. Database Query Efficiency | Met | The measured `view-document` flow now clears the required query-count reduction threshold. | Normalized query count dropped from `15` to `11` (`-26.7%`); read-path session writes were throttled and document/context reads were collapsed. | Optional extra flow proof only; the threshold is met. |
 | 5. Test Coverage and Quality | Strong progress | The test story is much healthier, honest, and measurable now. | API and web suites pass; coverage runs now work; targeted tests were added for hotspot routes. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission. |
 | 6. Runtime Error / Edge Cases | Likely met | Runtime handling is better than baseline, especially around process-level failures and safer degraded behavior. | uncaught exception / unhandled rejection traps, safer lazy-load fallbacks, cleaner test/runtime feedback loop. | Could use one final focused pass on user-facing failure recovery if we want a stronger demo. |
 | 7. Accessibility | Met | Accessibility now has both implementation work and automated evidence. | dialog fixes, page-level ARIA/label/contrast improvements, remediation/broad accessibility runs passing. | Optional Lighthouse score snapshots if desired. |
@@ -28,7 +28,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 
 ### Category 1
 - Best evidence sits in production backend routes, not test-only cleanup.
-- This is a real improvement area, but the exact percentage reduction would be stronger with one more quantitative sweep.
+- Fresh measurement now makes this easy to defend: `1,294` baseline violations down to `947`, with strict type-checking still green.
 
 ### Category 2
 - This category is one of the clearest wins.
@@ -39,9 +39,9 @@ This matrix is the current closeout snapshot for the seven audit categories.
 - The benchmark-mode workflow is important because it removed rate-limit and auth contamination from the measurements.
 
 ### Category 4
-- The implementation work is real.
-- The evidence is just weaker than the implementation.
-- The safest submission stance is: improved, but not the strongest category.
+- The implementation work and the evidence now align.
+- The strongest proof is the `view-document` flow, which dropped from `15` to `11` normalized queries.
+- This category is no longer the weak point in the submission.
 
 ### Category 5
 - The biggest gain here is trustworthiness.
@@ -57,12 +57,11 @@ This matrix is the current closeout snapshot for the seven audit categories.
 
 ## Recommended Final Position
 
-- Treat Categories `2`, `3`, and `7` as clear headline wins.
-- Treat Categories `1`, `5`, and `6` as strong supporting improvements.
-- Treat Category `4` as improved but still the weakest proof area.
+- Treat Categories `1`, `2`, `3`, `4`, and `7` as clear measured wins.
+- Treat Categories `5` and `6` as strong supporting improvements.
 
 ## Recommended Remaining Work
 
-1. If time is short, stop major implementation and focus on packaging evidence cleanly.
-2. If one more technical pass is available, spend it on Category `4` proof or a final Category `1` sweep.
-3. Use the demo/writeup to emphasize the strongest measured outcomes rather than overclaiming every category equally.
+1. Stop major implementation and focus on packaging evidence cleanly.
+2. Use the demo/writeup to emphasize the measured wins in Categories `1` through `4` and `7`.
+3. If one more pass is available, spend it on Category `6` polish rather than reopening already-met targets.

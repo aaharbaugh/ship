@@ -240,26 +240,21 @@ router.get('/:id/context', authMiddleware, async (req: Request, res: Response) =
     const userId = String(req.userId);
     const workspaceId = String(req.workspaceId);
 
-    // Check access
-    if (!(await canAccessDocument(id, userId, workspaceId))) {
-      return res.status(404).json({ error: 'Document not found' });
-    }
-
-    // Get the current document
-    // Programs are stored as documents with document_type = 'program', not a separate table
     const currentDoc = await pool.query(
       `SELECT d.id, d.title, d.document_type, d.ticket_number,
               prog_da.related_id as program_id,
               prog.title as program_name,
-              prog.properties->>'color' as program_color
+              prog.properties->>'color' as program_color,
+              (d.visibility = 'workspace' OR d.created_by = $2 OR
+               (SELECT role FROM workspace_memberships WHERE workspace_id = $3 AND user_id = $2) = 'admin') as can_access
        FROM documents d
        LEFT JOIN document_associations prog_da ON d.id = prog_da.document_id AND prog_da.relationship_type = 'program'
        LEFT JOIN documents prog ON prog_da.related_id = prog.id AND prog.document_type = 'program'
-       WHERE d.id = $1`,
-      [id]
+       WHERE d.id = $1 AND d.workspace_id = $3 AND d.deleted_at IS NULL`,
+      [id, userId, workspaceId]
     );
 
-    if (currentDoc.rows.length === 0) {
+    if (currentDoc.rows.length === 0 || !currentDoc.rows[0].can_access) {
       return res.status(404).json({ error: 'Document not found' });
     }
 

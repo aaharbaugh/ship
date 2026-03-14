@@ -263,15 +263,38 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const userId = String(req.userId);
     const workspaceId = String(req.workspaceId);
+    const result = await pool.query(
+      `SELECT d.*,
+              (d.visibility = 'workspace' OR d.created_by = $2 OR
+               (SELECT role FROM workspace_memberships WHERE workspace_id = $3 AND user_id = $2) = 'admin') as can_access,
+              assoc.belongs_to
+       FROM documents d
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(
+           json_agg(
+             json_build_object(
+               'id', da.related_id,
+               'type', da.relationship_type,
+               'title', related.title,
+               'color', related.properties->>'color'
+             )
+             ORDER BY da.relationship_type, da.created_at
+           ),
+           '[]'::json
+         ) as belongs_to
+         FROM document_associations da
+         LEFT JOIN documents related ON related.id = da.related_id
+         WHERE da.document_id = d.id
+       ) assoc ON true
+       WHERE d.id = $1 AND d.workspace_id = $3 AND d.deleted_at IS NULL`,
+      [id, userId, workspaceId]
+    );
 
-    const { canAccess, doc } = await canAccessDocument(id, userId, workspaceId);
+    const doc = result.rows[0] as (DocumentRow & {
+      belongs_to?: Array<{ id: string; type: string; title?: string; color?: string }>;
+    }) | undefined;
 
-    if (!doc) {
-      res.status(404).json({ error: 'Document not found' });
-      return;
-    }
-
-    if (!canAccess) {
+    if (!doc || !doc.can_access) {
       // Return 404 for private docs user can't access (to not reveal existence)
       res.status(404).json({ error: 'Document not found' });
       return;
@@ -344,23 +367,14 @@ router.get('/:id', authMiddleware, async (req: Request, res: Response) => {
     }
 
     // Get belongs_to associations from junction table (for issues, wikis, sprints, and projects)
-    let belongs_to: Array<{ id: string; type: string; title?: string; color?: string }> = [];
-    if (doc.document_type === 'issue' || doc.document_type === 'wiki' || doc.document_type === 'sprint' || doc.document_type === 'project') {
-      const assocResult = await pool.query(
-        `SELECT da.related_id as id, da.relationship_type as type,
-                d.title, (d.properties->>'color') as color
-         FROM document_associations da
-         LEFT JOIN documents d ON d.id = da.related_id
-         WHERE da.document_id = $1`,
-        [id]
-      );
-      belongs_to = assocResult.rows.map(row => ({
-        id: row.id,
-        type: row.type,
-        title: row.title || undefined,
-        color: row.color || undefined,
-      }));
-    }
+    const belongs_to = Array.isArray(doc.belongs_to)
+      ? doc.belongs_to.map((row) => ({
+          id: row.id,
+          type: row.type,
+          title: row.title || undefined,
+          color: row.color || undefined,
+        }))
+      : [];
 
     // Return with flattened properties for backwards compatibility
     res.json({

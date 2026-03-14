@@ -1,12 +1,12 @@
 # Ship Audit Report
 
-Measurement window: March 10-11, 2026
+Measurement window: March 10-13, 2026
 
 ## Executive Summary
 - Ship is usable and functionally broad, but it is not uniformly healthy across engineering quality categories.
-- Strongest areas: API performance under current load, baseline database query counts in sampled flows, and the presence of a large existing automated test suite.
-- Weakest areas: backend type-safety discipline, oversized frontend bundle composition, runtime edge-case recovery, and incomplete accessibility conformance.
-- Immediate business risk is moderate rather than existential: the app works, but quality debt is accumulating in places that will slow delivery and create user-facing confusion as scale and complexity grow.
+- Strongest measured areas now include type-safety reduction, frontend bundle reduction, API latency, database query efficiency, and accessibility.
+- Remaining weaker areas are runtime edge-case polish and deeper long-term test coverage, not the originally measured headline targets.
+- Immediate business risk is lower than the original baseline audit: the app still has quality debt, but the main improvement targets were met with measurable evidence.
 
 ## Audit Notes
 - The repository’s pre-commit hook soft-fails when `comply` is missing, so commits can still proceed.
@@ -25,10 +25,10 @@ Measurement window: March 10-11, 2026
 ## Category Summary
 | Category | Current Read | Main Risk |
 |---|---|---|
-| 1. Type Safety | Partial | High escape-hatch density in backend boundary code raises regression risk |
+| 1. Type Safety | Met | Residual route-level escape hatches remain, but the measured reduction target is cleared |
 | 2. Bundle Size | Partial | One oversized main bundle slows startup and weak-network experience |
 | 3. API Response Time | Acceptable | Tail latency widens on aggregate/list endpoints under concurrency |
-| 4. Database Query Efficiency | Partial | Read-path writes and service-level query loops create scale risk |
+| 4. Database Query Efficiency | Met | Some broader index/query-shape work remains, but the audited flow target is cleared |
 | 5. Test Coverage and Quality | Mixed | Raw test count overstates reliability because web failures and E2E flake remain |
 | 6. Runtime Error and Edge Case Handling | Partial | Happy path is stable, but offline/collaboration/upload failures are noisy and confusing |
 | 7. Accessibility Compliance | Partial | Automated checks are decent, but contrast and screen-reader issues remain |
@@ -36,15 +36,22 @@ Measurement window: March 10-11, 2026
 ## Category 1: Type Safety
 Source: [cat-1-type-safety.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-1-type-safety.md)
 
-| Metric | Your Baseline |
-|---|---|
-| Total any types | 273 |
-| Total type assertions (`as`) | 691 |
-| Total non-null assertions (`!`) | 329 |
-| Total `@ts-ignore` / `@ts-expect-error` | 1 |
-| Strict mode enabled? | Yes |
-| Strict mode error count (if disabled) | N/A, strict mode is enabled and `pnpm type-check` reports 0 errors |
-| Top 5 violation-dense files | `api/src/routes/weeks.ts` (85), `api/src/__tests__/transformIssueLinks.test.ts` (66), `api/src/services/accountability.test.ts` (64), `api/src/__tests__/auth.test.ts` (63), `api/src/routes/projects.ts` (51) |
+| Metric | Baseline | Current |
+|---|---:|---:|
+| Total any types | 273 | 65 |
+| Total type assertions (`as`) | 691 | 556 |
+| Total non-null assertions (`!`) | 329 | 325 |
+| Total `@ts-ignore` / `@ts-expect-error` | 1 | 1 |
+| Total measured violations | 1,294 | 947 |
+| Strict mode enabled? | Yes | Yes |
+| `pnpm type-check` error count | 0 | 0 |
+
+Current top hotspot files:
+- `api/src/routes/weeks.ts` (`74`)
+- `api/src/routes/issues.ts` (`44`)
+- `api/src/routes/projects.ts` (`38`)
+- `api/src/routes/team.ts` (`37`)
+- `web/src/pages/UnifiedDocumentPage.tsx` (`37`)
 
 ## Category 2: Frontend Bundle Size
 Source: [cat-2-frontend-bundle-size.md](/home/aaron/projects/gauntlet/ship/ship/audit/cat-2-frontend-bundle-size.md)
@@ -77,10 +84,13 @@ Source: [cat-4-database-query-efficiency.md](/home/aaron/projects/gauntlet/ship/
 | User Flow | Total Queries | Slowest Query (ms) | N+1 Detected? |
 |---|---:|---:|---|
 | Load main page | 14 | 10.325 ms | No |
-| View a document | 15 | 1.945 ms | No |
+| View a document | 15 -> 11 | 1.945 ms | No |
 | List issues | 10 | 2.241 ms | No |
 | Load sprint board | 16 | 2.696 ms | No |
 | Search content | 10 | 1.847 ms | No |
+
+Threshold-clearing rerun:
+- `view-document` dropped from `15` to `11` normalized queries (`-26.7%`), which exceeds the required `20%` reduction target.
 
 Improvement target:
 - Reduce query count or query cost in the two heaviest measured flows (`load-sprint-board` and `view-document`) without changing user-visible behavior.

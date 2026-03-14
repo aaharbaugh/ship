@@ -110,6 +110,42 @@ Prioritize production boundary typing in `api/` before broad cleanup. The highes
 ## Improvement Target
 The agreed target for this category is to eliminate 25% of measured type-safety violations without changing behavior. Against the current baseline of 1,294 measured violations, that implies removing or correctly replacing approximately 324 escape hatches.
 
+## Remediation Rerun
+Rerun date: March 13, 2026
+
+Fresh recount using the same AST-based method:
+
+| Metric | Baseline | Current |
+|---|---:|---:|
+| Explicit `any` types | 273 | 65 |
+| Type assertions (`as` / angle-bracket assertions) | 691 | 556 |
+| Non-null assertions (`!`) | 329 | 325 |
+| `@ts-ignore` / `@ts-expect-error` | 1 | 1 |
+| Total measured type-safety violations | 1,294 | 947 |
+
+Current package breakdown:
+
+| Package | Current violations |
+|---|---:|
+| `api/` | 506 |
+| `web/` | 439 |
+| `shared/` | 2 |
+
+Current top 5 violation-dense files:
+
+| File | Count |
+|---|---:|
+| `api/src/routes/weeks.ts` | 74 |
+| `api/src/routes/issues.ts` | 44 |
+| `api/src/routes/projects.ts` | 38 |
+| `api/src/routes/team.ts` | 37 |
+| `web/src/pages/UnifiedDocumentPage.tsx` | 37 |
+
+Outcome:
+- Reduction achieved: `1,294 -> 947`, a drop of `347` measured violations (`26.8%`).
+- `pnpm type-check` passes with `0` errors after the refactors.
+- This clears the category target of at least `25%` reduction.
+
 ## Audit Deliverable
 | Metric | Your Baseline |
 |---|---|

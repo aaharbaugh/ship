@@ -177,7 +177,10 @@ async function runDiagnostic() {
       JOIN workspaces w ON d.workspace_id = w.id
       WHERE d.document_type = 'project'
         AND d.deleted_at IS NULL
-        AND d.program_id IS NULL
+        AND NOT EXISTS (
+          SELECT 1 FROM document_associations da
+          WHERE da.document_id = d.id AND da.relationship_type = 'program'
+        )
       ORDER BY w.name, d.created_at DESC
     `);
 
@@ -210,7 +213,8 @@ async function runDiagnostic() {
     if (
       danglingResult.rows.length > 0 ||
       issuesWithoutProject.rows.length > 0 ||
-      sprintsWithoutProject.rows.length > 0
+      sprintsWithoutProject.rows.length > 0 ||
+      projectsWithoutProgram.rows.length > 0
     ) {
       console.log('Entity IDs for remediation:');
       console.log('---');
@@ -228,6 +232,11 @@ async function runDiagnostic() {
       if (sprintsWithoutProject.rows.length > 0) {
         console.log('\nSprint IDs without project:');
         sprintsWithoutProject.rows.forEach((r) => console.log(`  ${r.id}  # ${r.title}`));
+      }
+
+      if (projectsWithoutProgram.rows.length > 0) {
+        console.log('\nProject IDs without program:');
+        projectsWithoutProgram.rows.forEach((r) => console.log(`  ${r.id}  # ${r.title}`));
       }
 
       console.log('\nUse orphan-remediation.sql with these IDs to fix issues.');

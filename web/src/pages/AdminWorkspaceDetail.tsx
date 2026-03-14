@@ -223,6 +223,7 @@ export function AdminWorkspaceDetailPage() {
       <header className="flex h-14 items-center border-b border-border px-6 gap-4">
         <button
           onClick={() => navigate('/admin')}
+          aria-label="Back to admin dashboard"
           className="text-muted hover:text-foreground transition-colors"
         >
           <BackIcon />
@@ -364,6 +365,7 @@ export function AdminWorkspaceDetailPage() {
                       setSelectedUser(null);
                       setUserSearch('');
                     }}
+                    aria-label={`Clear selected user ${selectedUser.name}`}
                     className="ml-auto text-muted hover:text-foreground"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

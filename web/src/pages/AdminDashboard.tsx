@@ -120,6 +120,7 @@ export function AdminDashboardPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/docs')}
+            aria-label="Back to documents"
             className="text-muted hover:text-foreground transition-colors"
           >
             <BackIcon />

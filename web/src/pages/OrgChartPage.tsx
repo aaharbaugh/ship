@@ -577,6 +577,7 @@ export function OrgChartPage() {
               setToast(null);
               if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
             }}
+            aria-label="Dismiss notification"
             className="text-muted hover:text-foreground"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -678,6 +679,7 @@ function OrgChartRow({
       <button
         onClick={(e) => { e.stopPropagation(); onToggleExpand(node.personId); }}
         onPointerDown={(e) => e.stopPropagation()}
+        aria-label={isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-transform ${
           hasChildren ? 'text-muted hover:text-foreground' : 'invisible'
         }`}
