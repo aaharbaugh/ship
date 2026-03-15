@@ -20,6 +20,7 @@ Phase 2 materially improved Ship across all seven audit categories, and the curr
   - `caia-auth`
   - invite acceptance
 - Runtime handling now has explicit user-facing recovery for editor conversion/access loss, failed uploads, and autosave exhaustion.
+- A flaky third-party sidebar emoji picker was replaced with a native emoji grid rendered above the sidebar, fixing a broken off-screen UI state and removing that package from the web bundle.
 - Accessibility work now has both implementation changes and automated rerun evidence.
 
 ## Important Infrastructure Gains

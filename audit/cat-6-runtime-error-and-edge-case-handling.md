@@ -142,6 +142,7 @@ Focused verification:
 ```bash
 pnpm --filter @ship/web test FileAttachment.test.ts InviteAccept.test.tsx
 pnpm --filter @ship/web test useAutoSave.test.ts
+pnpm --filter @ship/web test EmojiPicker.test.tsx
 pnpm --filter @ship/web type-check
 ```
 
@@ -157,6 +158,9 @@ Concrete runtime gaps improved:
   - `useAutoSave.ts` now supports an explicit `onError` callback, and the active title-save paths in `PersonEditor.tsx` and `UnifiedEditor.tsx` surface exhausted retry failures as user-visible toasts
 - Admin/settings async recovery
   - key role-management failures in `AdminWorkspaceDetail.tsx` and `WorkspaceSettings.tsx` now use toasts instead of blocking alerts
+- Sidebar overlay recovery
+  - the project sidebar emoji picker no longer renders off-screen inside the sidebar rail
+  - the picker now opens in a portal above the app shell and uses a simpler native emoji grid instead of the flaky third-party picker package
 
 Updated read:
 
@@ -166,6 +170,7 @@ Updated read:
   - autosave exhaustion recovery
 - At least one of those fixes directly addresses a user-facing confusion/data-loss risk: failed uploads now remain visible in the editor and failed autosaves now surface after retries are exhausted.
 - The app has fewer console-only and alert-only failure paths in the highest-value user workflows than it did at the original audit baseline, and this category can now be framed as met.
+- The sidebar/icon-editing path is also more robust: a previously broken off-screen picker interaction was replaced with a bounded overlay that renders above the sidebar and closes cleanly.
 
 ## Audit Deliverable
 | Metric | Your Baseline |

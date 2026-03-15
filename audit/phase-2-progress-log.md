@@ -131,3 +131,17 @@ For the full chunk-by-chunk implementation history, use:
 - Notes:
   - Category 5 now has a cleaner threshold-clearing story through explicit critical-path additions.
   - Category 6 now has a stronger “met” story through three explicit runtime fixes and focused verification.
+
+- Date: 2026-03-14
+- Milestone: Sidebar emoji picker cleanup
+- Categories involved: Category 2, Category 6
+- Status: Completed
+- Evidence:
+  - project sidebar emoji selection no longer renders off-screen inside the rail
+  - the picker now renders in a portal above the app shell instead of inside the sidebar layout box
+  - the heavy `emoji-picker-react` dependency was removed from the web package manifest and lockfile
+  - targeted verification passed:
+    - `pnpm --filter @ship/web test EmojiPicker.test.tsx`
+    - `pnpm --filter @ship/web type-check`
+- Notes:
+  - This was a small but high-signal cleanup: it fixed a visible sidebar UI defect, removed a flaky third-party interaction surface, and slightly strengthened the bundle-size story.
