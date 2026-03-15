@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/cn';
 
 interface EmojiPickerPopoverProps {
@@ -41,11 +42,18 @@ const EMOJI_OPTIONS: EmojiOption[] = [
   { emoji: '📅', label: 'Calendar', keywords: ['calendar', 'schedule', 'plan'] },
 ];
 
+const POPOVER_WIDTH = 288;
+const POPOVER_GAP = 12;
+const VIEWPORT_PADDING = 16;
+
 export function EmojiPickerPopover({ value, onChange, children, className }: EmojiPickerPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [panelPosition, setPanelPosition] = useState({ top: 0, left: 0 });
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -62,10 +70,31 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
   useEffect(() => {
     if (!isOpen) return;
 
+    const updatePosition = () => {
+      const trigger = triggerRef.current;
+      if (!trigger) return;
+
+      const rect = trigger.getBoundingClientRect();
+      const fitsOnLeft = rect.left - POPOVER_WIDTH - POPOVER_GAP >= VIEWPORT_PADDING;
+      const left = fitsOnLeft
+        ? rect.left - POPOVER_WIDTH - POPOVER_GAP
+        : Math.min(rect.right + POPOVER_GAP, window.innerWidth - POPOVER_WIDTH - VIEWPORT_PADDING);
+      const top = Math.min(
+        Math.max(VIEWPORT_PADDING, rect.top),
+        window.innerHeight - 360 - VIEWPORT_PADDING
+      );
+
+      setPanelPosition({ top, left });
+    };
+
+    updatePosition();
     searchInputRef.current?.focus();
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedTrigger = triggerRef.current?.contains(target);
+      const clickedPanel = panelRef.current?.contains(target);
+      if (!clickedTrigger && !clickedPanel && containerRef.current && !containerRef.current.contains(target)) {
         setIsOpen(false);
       }
     };
@@ -78,10 +107,14 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
 
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
     };
   }, [isOpen]);
 
@@ -104,6 +137,7 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
   return (
     <div ref={containerRef} className={cn('relative w-fit max-w-full', className)}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={handleToggle}
         aria-expanded={isOpen}
@@ -113,8 +147,12 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
         {children}
       </button>
 
-      {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[18rem] max-w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-border bg-background shadow-lg">
+      {isOpen && createPortal(
+        <div
+          ref={panelRef}
+          className="fixed z-[100] w-[18rem] rounded-lg border border-border bg-background shadow-lg"
+          style={{ top: panelPosition.top, left: panelPosition.left }}
+        >
           <div className="border-b border-border p-3">
             <input
               ref={searchInputRef}
@@ -158,7 +196,8 @@ export function EmojiPickerPopover({ value, onChange, children, className }: Emo
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
