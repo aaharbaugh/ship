@@ -38,7 +38,8 @@ scripts/
 ├── deploy-infrastructure.sh - Deploy Terraform resources
 ├── deploy-api.sh            - Deploy API to Elastic Beanstalk
 ├── deploy-frontend.sh       - Deploy frontend to S3 + CloudFront
-└── init-database.sh         - Initialize database schema
+├── init-database.sh         - Initialize database schema for dev, shadow, or prod
+└── seed-deployment.sh       - Seed a deployed environment, defaulting to shadow for demos
 
 docs/
 ├── INFRASTRUCTURE.md        - Architecture overview
