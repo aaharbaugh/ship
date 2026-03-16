@@ -17,7 +17,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 | Category | Status | Current Read | Strongest Evidence | Main Remaining Gap |
 |---|---|---|---|---|
 | 1. Type Safety | Met | The measured escape-hatch count now clears the required reduction target with the compiler still green. | Fresh AST recount: `1,294` -> `947` total violations (`-26.8%`); `pnpm type-check` passes. | Optional cleanup only; the threshold is met. |
-| 2. Frontend Bundle Size | Met | The load path is materially better and the largest frontend hotspots were split or removed. | Shared app chunk removed, editor base chunk reduced, syntax-highlighting payload removed. | Mostly evidence framing polish, not implementation. |
+| 2. Frontend Bundle Size | Met | The load path is materially better and the total production bundle now also clears the assignment threshold. | Total bundle dropped from `2,262.65 KB` to `1,845.30 KB` (`-18.44%`); largest chunk dropped from `2,025.10 KB` to `346.37 KB`; the emoji-picker package was removed entirely. | Optional second-wave optimization only; the threshold is clearly met. |
 | 3. API Response Time | Met | Two audited endpoints now have clean benchmark-mode wins over the required threshold. | `GET /api/team/accountability-grid-v3`: `152 ms` -> `106 ms`; `GET /api/issues`: `155 ms` -> `96.33 ms` interpolated `p95`. | None required for the threshold; only optional polish remains. |
 | 4. Database Query Efficiency | Met | The measured `view-document` flow now clears the required query-count reduction threshold. | Normalized query count dropped from `15` to `11` (`-26.7%`); read-path session writes were throttled and document/context reads were collapsed. | Optional extra flow proof only; the threshold is met. |
 | 5. Test Coverage and Quality | Met | The suite is now honest, measurable, and clears the assignment threshold through direct critical-path additions. | API and web suites pass, coverage runs work, and new direct tests cover `admin-credentials`, `caia-auth`, and invite acceptance. | More targeted coverage in `team.ts` and key frontend pages would strengthen the submission, but the threshold is now satisfied. |
@@ -32,7 +32,7 @@ This matrix is the current closeout snapshot for the seven audit categories.
 
 ### Category 2
 - This category is one of the clearest wins.
-- The project now has a much better “initial load” story, which matters for demo quality and interviews.
+- The project now has both a much better “initial load” story and a total-size win that clears the assignment threshold.
 
 ### Category 3
 - This category started weak and is now one of the strongest.

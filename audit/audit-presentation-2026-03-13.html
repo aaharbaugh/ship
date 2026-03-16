@@ -282,8 +282,8 @@
           <tbody>
             <tr>
               <td><strong>Frontend load-path reduction</strong></td>
-              <td>Lazy-loaded route/editor surfaces, removed the oversized shared entry-chunk pattern, and deferred heavy collaboration payloads.</td>
-              <td>Cut the largest initial chunk from <span class="num">2,025.10 KB</span> to <span class="num">354.68 KB</span>.</td>
+              <td>Lazy-loaded route/editor surfaces, removed the oversized shared entry-chunk pattern, deferred heavy collaboration payloads, and replaced the third-party sidebar emoji picker with a native grid.</td>
+              <td>Cut the largest initial chunk from <span class="num">2,025.10 KB</span> to <span class="num">346.37 KB</span> and the total bundle from <span class="num">2,262.65 KB</span> to <span class="num">1,845.30 KB</span>.</td>
             </tr>
             <tr>
               <td><strong>Benchmark-backed API recovery</strong></td>
@@ -337,8 +337,8 @@
             <tr>
               <td><strong>2. Bundle Size</strong></td>
               <td>largest chunk `2,025.10 KB`; total bundle `2,262.65 KB`</td>
-              <td>largest chunk `354.68 KB`; total bundle `2,104.98 KB`</td>
-              <td class="delta good">-82.49% largest-chunk reduction; initial-load path fixed</td>
+              <td>largest chunk `346.37 KB`; total bundle `1,845.30 KB`</td>
+              <td class="delta good">-82.89% largest-chunk reduction; -18.44% total bundle reduction</td>
               <td><span class="pill success">Met</span></td>
             </tr>
             <tr>
@@ -404,14 +404,14 @@
                 <tr>
                   <td>Largest frontend chunk</td>
                   <td class="num">2,025.10 KB</td>
-                  <td class="num">354.68 KB</td>
-                  <td class="delta good">-82.49%</td>
+                  <td class="num">346.37 KB</td>
+                  <td class="delta good">-82.89%</td>
                 </tr>
                 <tr>
                   <td>Total production bundle</td>
                   <td class="num">2,262.65 KB</td>
-                  <td class="num">2,104.98 KB</td>
-                  <td class="delta good">-6.97%</td>
+                  <td class="num">1,845.30 KB</td>
+                  <td class="delta good">-18.44%</td>
                 </tr>
                 <tr>
                   <td><code>GET /api/issues</code> P95</td>

@@ -27,20 +27,20 @@ Measured from `web/dist/assets` after the current build:
 
 | Metric | After |
 |---|---:|
-| Total production bundle size | `2,104.98 KB` |
-| JavaScript bundle size | `2,040.70 KB` |
-| CSS bundle size | `64.28 KB` |
-| Largest chunk | `354.68 KB` |
-| Largest chunk file | `index-CbVK_HhT.js` |
+| Total production bundle size | `1,845.30 KB` |
+| JavaScript bundle size | `1,780.65 KB` |
+| CSS bundle size | `64.65 KB` |
+| Largest chunk | `346.37 KB` |
+| Largest chunk file | `index-Dmk9i3v8.js` |
 
 ## Delta
 
 | Metric | Change |
 |---|---:|
-| Total production bundle size | `-157.67 KB` (`-6.97%`) |
-| JavaScript bundle size | `-157.00 KB` (`-7.14%`) |
-| CSS bundle size | `-0.67 KB` (`-1.03%`) |
-| Largest chunk | `-1,670.42 KB` (`-82.49%`) |
+| Total production bundle size | `-417.35 KB` (`-18.44%`) |
+| JavaScript bundle size | `-417.05 KB` (`-18.98%`) |
+| CSS bundle size | `-0.30 KB` (`-0.47%`) |
+| Largest chunk | `-1,678.73 KB` (`-82.89%`) |
 
 ## Key Current Chunks
 
@@ -48,19 +48,19 @@ Largest emitted chunks in the current build:
 
 | Chunk | Size |
 |---|---:|
-| `index-CbVK_HhT.js` | `354.68 KB` |
-| `index-wgfuOQOS.js` | `293.95 KB` |
-| `emoji-picker-react.esm-CZLFrkCt.js` | `271.11 KB` |
-| `Editor-BKWov3M2.js` | `246.04 KB` |
-| `UnifiedDocumentPage-Ddd-Li7v.js` | `135.25 KB` |
-| `App-lX65Djfn.js` | `88.45 KB` |
+| `index-Dmk9i3v8.js` | `346.37 KB` |
+| `index-Ci8aPhrM.js` | `287.19 KB` |
+| `Editor-CtRZP0j-.js` | `240.92 KB` |
+| `UnifiedDocumentPage-D5lwwyb7.js` | `134.92 KB` |
+| `App-BojGjp0B.js` | `86.45 KB` |
+| `index-CQ-YUq_e.js` | `72.77 KB` |
 
 ## Interpretation
 
 - The old `2,025.10 KB` main entry chunk is gone.
-- The strongest measurable win is chunk architecture, not total byte reduction.
-- Total bundle size did not meet the assignment's `15%` total-size reduction target.
-- The evidence does support the code-splitting path of the assignment because the initial app load is no longer dominated by a single `~2 MB` main chunk.
+- Total bundle size now also clears the assignment's `15%` total-size reduction target.
+- The strongest measurable win is still chunk architecture, but the total-byte story is now also strong enough to stand on its own.
+- The old standalone `emoji-picker-react` chunk is gone after replacing that sidebar flow with a native emoji grid.
 
 ## Root Cause and Fixes Reflected Here
 
@@ -69,10 +69,10 @@ This build reflects the Category 2 refactors already completed:
 - lazy-loaded route pages
 - lazy-loaded editor entry points
 - deferred editor collaboration providers
-- lazy-loaded emoji picker
+- removed the third-party emoji picker package in favor of a native emoji grid
 - removed the syntax-highlighting payload
 - cleaned mixed static/dynamic imports in slash commands
 
 ## Follow-up
 
-- If we need to make the total-size case instead of the initial-load case, we need one more pass on the remaining large shared chunks and icon/runtime weight.
+- Remaining optimization work is now a second-wave pass on the large shared chunks and icon/runtime weight, not a threshold-rescue exercise.
