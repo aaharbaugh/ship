@@ -7,6 +7,45 @@ import { TEMPLATE_HEADINGS, extractText, hasContent } from '../utils/document-co
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+type TeamAccountabilityPersonRow = {
+  id: string;
+  name: string;
+};
+
+type ExplicitAssignmentRow = {
+  person_id: string | null;
+  sprint_number: number | null;
+  project_id: string | null;
+  plan_approval_state: string | null;
+  review_approval_state: string | null;
+  project_name: string | null;
+  project_color: string | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_color: string | null;
+};
+
+type InferredProjectCountRow = {
+  assignee_id: string | null;
+  sprint_number: number | null;
+  project_id: string | null;
+  issue_count: number | string;
+  project_name: string | null;
+  project_color: string | null;
+  program_id: string | null;
+  program_name: string | null;
+  program_color: string | null;
+};
+
+type AccountabilityDocumentRow = {
+  document_type: 'weekly_plan' | 'weekly_retro';
+  person_id: string | null;
+  project_id: string | null;
+  week_number: number | null;
+  id: string;
+  content: unknown;
+};
+
 // GET /api/team/grid - Get team grid data
 // Query params:
 //   fromSprint: number - start of range (default: current - 7)
@@ -1113,9 +1152,19 @@ router.get('/accountability-grid-v2', authMiddleware, async (req: Request, res: 
     const daysSinceStart = Math.floor((today.getTime() - sprintStartDate.getTime()) / (1000 * 60 * 60 * 24));
     const currentSprintNumber = Math.max(1, Math.floor(daysSinceStart / sprintDurationDays) + 1);
 
-    // Get sprint range (last 6 sprints + current + next 2)
-    const fromSprint = Math.max(1, currentSprintNumber - 6);
-    const toSprint = currentSprintNumber + 2;
+    // Default to the last 6 sprints plus current plus next 2, but honor explicit request ranges.
+    const requestedFromSprint = req.query.fromSprint
+      ? Math.max(1, parseInt(req.query.fromSprint as string, 10))
+      : null;
+    const requestedToSprint = req.query.toSprint
+      ? parseInt(req.query.toSprint as string, 10)
+      : null;
+    const defaultFromSprint = Math.max(1, currentSprintNumber - 6);
+    const defaultToSprint = currentSprintNumber + 2;
+    const fromSprint = requestedFromSprint ?? defaultFromSprint;
+    const toSprint = requestedToSprint && requestedToSprint >= fromSprint
+      ? requestedToSprint
+      : Math.max(fromSprint, defaultToSprint);
 
     // Generate weeks array
     const weeks: { number: number; name: string; startDate: string; endDate: string; isCurrent: boolean }[] = [];
@@ -1611,8 +1660,8 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     const workspaceId = req.workspaceId!;
     const showArchived = req.query.showArchived === 'true';
 
-    // Check if user is admin
-    const { isAdmin } = await getVisibilityContext(userId, workspaceId);
+    // Auth middleware already validated workspace membership; reuse the resolved role.
+    const isAdmin = req.isSuperAdmin || req.workspaceRole === 'admin';
     if (!isAdmin) {
       res.status(403).json({ error: 'Admin access required' });
       return;
@@ -1667,50 +1716,95 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       });
     }
 
-    // Get all workspace people
-    const peopleResult = await pool.query(
-      `SELECT id, title as name
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type = 'person'
-         AND ($2 OR archived_at IS NULL)
-       ORDER BY title`,
-      [workspaceId, showArchived]
-    );
-
-    // Get all programs
-    const programsResult = await pool.query(
-      `SELECT id, title as name, properties->>'color' as color
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type = 'program'
-         AND archived_at IS NULL
-       ORDER BY title`,
-      [workspaceId]
-    );
-
-    // Get explicit sprint assignments (person -> sprint -> project)
-    const explicitAssignmentsResult = await pool.query(
-      `SELECT
-         jsonb_array_elements_text(s.properties->'assignee_ids') as person_id,
-         (s.properties->>'sprint_number')::int as sprint_number,
-         s.properties->>'project_id' as project_id,
-         s.properties->'plan_approval'->>'state' as plan_approval_state,
-         s.properties->'review_approval'->>'state' as review_approval_state,
-         proj.title as project_name,
-         proj.properties->>'color' as project_color,
-         prog_da.related_id as program_id,
-         prog.title as program_name,
-         prog.properties->>'color' as program_color
-       FROM documents s
-       LEFT JOIN documents proj ON (s.properties->>'project_id')::uuid = proj.id
-       LEFT JOIN document_associations prog_da ON proj.id = prog_da.document_id AND prog_da.relationship_type = 'program'
-       LEFT JOIN documents prog ON prog_da.related_id = prog.id AND prog.document_type = 'program'
-       WHERE s.workspace_id = $1
-         AND s.document_type = 'sprint'
-         AND jsonb_array_length(COALESCE(s.properties->'assignee_ids', '[]'::jsonb)) > 0`,
-      [workspaceId]
-    );
+    const [
+      peopleResult,
+      explicitAssignmentsResult,
+      inferredProjectCountsResult,
+      accountabilityDocsResult,
+    ] = await Promise.all([
+      pool.query(
+        `SELECT id, title as name
+         FROM documents
+         WHERE workspace_id = $1
+           AND document_type = 'person'
+           AND ($2 OR archived_at IS NULL)
+         ORDER BY title`,
+        [workspaceId, showArchived]
+      ),
+      pool.query(
+        `SELECT
+           jsonb_array_elements_text(s.properties->'assignee_ids') as person_id,
+           (s.properties->>'sprint_number')::int as sprint_number,
+           s.properties->>'project_id' as project_id,
+           s.properties->'plan_approval'->>'state' as plan_approval_state,
+           s.properties->'review_approval'->>'state' as review_approval_state,
+           proj.title as project_name,
+           proj.properties->>'color' as project_color,
+           prog_da.related_id as program_id,
+           prog.title as program_name,
+           prog.properties->>'color' as program_color
+         FROM documents s
+         LEFT JOIN documents proj ON (s.properties->>'project_id')::uuid = proj.id
+         LEFT JOIN document_associations prog_da ON proj.id = prog_da.document_id AND prog_da.relationship_type = 'program'
+         LEFT JOIN documents prog ON prog_da.related_id = prog.id AND prog.document_type = 'program'
+         WHERE s.workspace_id = $1
+           AND s.document_type = 'sprint'
+           AND jsonb_array_length(COALESCE(s.properties->'assignee_ids', '[]'::jsonb)) > 0
+           AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3`,
+        [workspaceId, fromSprint, toSprint]
+      ),
+      pool.query(
+        `SELECT
+           i.properties->>'assignee_id' as assignee_id,
+           da_project.related_id as project_id,
+           COUNT(*)::int as issue_count,
+           proj.title as project_name,
+           proj.properties->>'color' as project_color,
+           proj_prog_da.related_id as program_id,
+           prog.title as program_name,
+           prog.properties->>'color' as program_color,
+           (s.properties->>'sprint_number')::int as sprint_number
+         FROM documents i
+         JOIN document_associations da_sprint ON da_sprint.document_id = i.id AND da_sprint.relationship_type = 'sprint'
+         JOIN documents s ON s.id = da_sprint.related_id
+         JOIN document_associations da_project ON da_project.document_id = i.id AND da_project.relationship_type = 'project'
+         JOIN documents proj ON proj.id = da_project.related_id
+         LEFT JOIN document_associations proj_prog_da ON proj.id = proj_prog_da.document_id AND proj_prog_da.relationship_type = 'program'
+         LEFT JOIN documents prog ON proj_prog_da.related_id = prog.id AND prog.document_type = 'program'
+         WHERE i.workspace_id = $1
+           AND i.document_type = 'issue'
+           AND i.properties->>'assignee_id' IS NOT NULL
+           AND i.deleted_at IS NULL
+           AND s.deleted_at IS NULL
+           AND s.archived_at IS NULL
+           AND (s.properties->>'sprint_number')::int BETWEEN $2 AND $3
+         GROUP BY
+           i.properties->>'assignee_id',
+           da_project.related_id,
+           proj.title,
+           proj.properties->>'color',
+           proj_prog_da.related_id,
+           prog.title,
+           prog.properties->>'color',
+           (s.properties->>'sprint_number')::int`,
+        [workspaceId, fromSprint, toSprint]
+      ),
+      pool.query(
+        `SELECT
+           document_type,
+           (properties->>'person_id') as person_id,
+           (properties->>'project_id') as project_id,
+           (properties->>'week_number')::int as week_number,
+           id,
+           content
+         FROM documents
+         WHERE workspace_id = $1
+           AND document_type IN ('weekly_plan', 'weekly_retro')
+           AND deleted_at IS NULL
+           AND (properties->>'week_number')::int BETWEEN $2 AND $3`,
+        [workspaceId, fromSprint, toSprint]
+      ),
+    ]);
 
     // Build assignments map: personId -> sprintNumber -> assignment
     const assignments: Record<string, Record<number, {
@@ -1724,7 +1818,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       reviewApprovalState: string | null;
     }>> = {};
 
-    for (const row of explicitAssignmentsResult.rows) {
+    for (const row of explicitAssignmentsResult.rows as ExplicitAssignmentRow[]) {
       const personId = row.person_id;
       const sprintNumber = row.sprint_number;
       if (!personId || !sprintNumber) continue;
@@ -1744,30 +1838,6 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       };
     }
 
-    // Infer assignments from issues (fallback for people without explicit assignments)
-    const issuesResult = await pool.query(
-      `SELECT
-         i.properties->>'assignee_id' as assignee_id,
-         da_project.related_id as project_id,
-         proj.title as project_name,
-         proj.properties->>'color' as project_color,
-         proj_prog_da.related_id as program_id,
-         prog.title as program_name,
-         prog.properties->>'color' as program_color,
-         s.properties->>'start_date' as sprint_start
-       FROM documents i
-       JOIN document_associations da_sprint ON da_sprint.document_id = i.id AND da_sprint.relationship_type = 'sprint'
-       JOIN documents s ON s.id = da_sprint.related_id
-       JOIN document_associations da_project ON da_project.document_id = i.id AND da_project.relationship_type = 'project'
-       JOIN documents proj ON proj.id = da_project.related_id
-       LEFT JOIN document_associations proj_prog_da ON proj.id = proj_prog_da.document_id AND proj_prog_da.relationship_type = 'program'
-       LEFT JOIN documents prog ON proj_prog_da.related_id = prog.id AND prog.document_type = 'program'
-       WHERE i.workspace_id = $1
-         AND i.document_type = 'issue'
-         AND i.properties->>'assignee_id' IS NOT NULL`,
-      [workspaceId]
-    );
-
     // Count issues per person+sprint+project to infer primary project
     const projectCounts: Record<string, Record<number, Record<string, {
       count: number;
@@ -1779,14 +1849,12 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       programColor: string | null;
     }>>> = {};
 
-    for (const issue of issuesResult.rows) {
+    for (const issue of inferredProjectCountsResult.rows as InferredProjectCountRow[]) {
       const personId = issue.assignee_id;
-      const sprintStart = new Date(issue.sprint_start + 'T00:00:00Z');
-      const daysSinceStart = Math.floor((sprintStart.getTime() - sprintStartDate.getTime()) / (1000 * 60 * 60 * 24));
-      const sprintNumber = Math.max(1, Math.floor(daysSinceStart / sprintDurationDays) + 1);
+      const sprintNumber = issue.sprint_number;
       const projectId = issue.project_id;
 
-      if (!personId || !projectId) continue;
+      if (!personId || sprintNumber === null || !projectId) continue;
       if (assignments[personId]?.[sprintNumber]) continue; // Skip if explicit assignment exists
 
       if (!projectCounts[personId]) projectCounts[personId] = {};
@@ -1795,14 +1863,14 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
         projectCounts[personId][sprintNumber][projectId] = {
           count: 0,
           projectId,
-          projectName: issue.project_name,
+          projectName: issue.project_name || 'Untitled project',
           projectColor: issue.project_color,
           programId: issue.program_id,
           programName: issue.program_name,
           programColor: issue.program_color,
         };
       }
-      projectCounts[personId][sprintNumber][projectId].count++;
+      projectCounts[personId][sprintNumber][projectId].count += Number(issue.issue_count) || 0;
     }
 
     // Add inferred assignments
@@ -1834,38 +1902,6 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
         }
       }
     }
-
-    // Get ALL weekly plans in the workspace for the week range
-    const plansResult = await pool.query(
-      `SELECT
-         (properties->>'person_id') as person_id,
-         (properties->>'project_id') as project_id,
-         (properties->>'week_number')::int as week_number,
-         id,
-         content
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type = 'weekly_plan'
-         AND deleted_at IS NULL
-         AND (properties->>'week_number')::int BETWEEN $2 AND $3`,
-      [workspaceId, fromSprint, toSprint]
-    );
-
-    // Get ALL weekly retros in the workspace for the week range
-    const retrosResult = await pool.query(
-      `SELECT
-         (properties->>'person_id') as person_id,
-         (properties->>'project_id') as project_id,
-         (properties->>'week_number')::int as week_number,
-         id,
-         content
-       FROM documents
-       WHERE workspace_id = $1
-         AND document_type = 'weekly_retro'
-         AND deleted_at IS NULL
-         AND (properties->>'week_number')::int BETWEEN $2 AND $3`,
-      [workspaceId, fromSprint, toSprint]
-    );
 
     const calculateStatus = (
       docId: string | null,
@@ -1905,13 +1941,15 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
 
     // Build plan/retro maps: `${projectId}_${personId}_${weekNumber}` -> { id, content }
     const plans = new Map<string, { id: string; content: unknown }>();
-    for (const row of plansResult.rows) {
-      plans.set(`${row.project_id}_${row.person_id}_${row.week_number}`, { id: row.id, content: row.content });
-    }
-
     const retros = new Map<string, { id: string; content: unknown }>();
-    for (const row of retrosResult.rows) {
-      retros.set(`${row.project_id}_${row.person_id}_${row.week_number}`, { id: row.id, content: row.content });
+    for (const row of accountabilityDocsResult.rows as AccountabilityDocumentRow[]) {
+      if (!row.person_id || !row.project_id || !row.week_number) continue;
+      const key = `${row.project_id}_${row.person_id}_${row.week_number}`;
+      if (row.document_type === 'weekly_plan') {
+        plans.set(key, { id: row.id, content: row.content });
+      } else if (row.document_type === 'weekly_retro') {
+        retros.set(key, { id: row.id, content: row.content });
+      }
     }
 
     // Build person data: for each week, get their allocation and corresponding plan/retro status
@@ -1952,16 +1990,6 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
       people: Array<{ id: string; name: string; weeks: Record<number, unknown> }>;
     }>();
 
-    // Initialize all programs
-    for (const prog of programsResult.rows) {
-      programGroups.set(prog.id, {
-        id: prog.id,
-        name: prog.name,
-        color: prog.color || '#6b7280',
-        people: [],
-      });
-    }
-
     // Add "No Program" group
     programGroups.set('unassigned', {
       id: 'unassigned',
@@ -1971,7 +1999,7 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
     });
 
     // Assign each person to a program based on current week's allocation
-    for (const person of peopleResult.rows) {
+    for (const person of peopleResult.rows as TeamAccountabilityPersonRow[]) {
       const currentAllocation = assignments[person.id]?.[currentSprintNumber];
       const programId = currentAllocation?.programId || 'unassigned';
 
@@ -1980,6 +2008,17 @@ router.get('/accountability-grid-v3', authMiddleware, async (req: Request, res: 
         name: person.name,
         weeks: buildPersonWeeks(person.id),
       };
+
+      if (programId !== 'unassigned' && currentAllocation?.programName) {
+        if (!programGroups.has(programId)) {
+          programGroups.set(programId, {
+            id: programId,
+            name: currentAllocation.programName,
+            color: currentAllocation.programColor || '#6b7280',
+            people: [],
+          });
+        }
+      }
 
       if (programGroups.has(programId)) {
         programGroups.get(programId)!.people.push(personData);

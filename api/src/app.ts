@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { csrfSync } from 'csrf-sync';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.js';
@@ -42,6 +45,8 @@ if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
 }
 
 const sessionSecret = process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // CSRF protection setup
 const { csrfSynchronisedProtection, generateToken } = csrfSync({
@@ -65,6 +70,7 @@ const conditionalCsrf = (req: Request, res: Response, next: NextFunction) => {
 // Production limits: login=5/15min (failed only), api=100/min
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.E2E_TEST === '1';
 const isDevEnv = process.env.NODE_ENV !== 'production';
+const isBenchmarkEnv = process.env.BENCHMARK_MODE === '1';
 
 // Strict rate limit for login (5 failed attempts / 15 min) - brute force protection
 // skipSuccessfulRequests: true means only failed attempts count toward the limit
@@ -75,6 +81,7 @@ const loginLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many login attempts. Try again in 15 minutes.' },
   skipSuccessfulRequests: true, // Only count failed login attempts
+  skip: () => isBenchmarkEnv,
 });
 
 // General API rate limit (100 req/min in prod, 1000 in dev)
@@ -84,6 +91,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many requests. Please slow down.' },
+  skip: () => isBenchmarkEnv,
 });
 
 
@@ -115,10 +123,10 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
       directives: {
         defaultSrc: ["'self'"],
         scriptSrc: ["'self'", "'unsafe-inline'"], // Admin credentials page uses inline scripts
-        styleSrc: ["'self'", "'unsafe-inline'"], // TipTap editor needs inline styles
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"], // TipTap editor needs inline styles
         imgSrc: ["'self'", "data:", "blob:", "https:"],
         connectSrc: ["'self'", "wss:", "ws:"], // WebSocket connections
-        fontSrc: ["'self'", "data:"],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
         objectSrc: ["'none'"],
         frameSrc: ["'none'"],
         baseUri: ["'self'"],
@@ -240,6 +248,17 @@ export function createApp(corsOrigin: string = 'http://localhost:5173'): express
   initializeCAIA().catch((err) => {
     console.warn('CAIA initialization failed:', err);
   });
+
+  const webDistPath = path.resolve(__dirname, '../../web/dist');
+  if (fs.existsSync(webDistPath)) {
+    app.use(express.static(webDistPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api/') || req.path.startsWith('/collaboration/')) {
+        return next();
+      }
+      return res.sendFile(path.join(webDistPath, 'index.html'));
+    });
+  }
 
   return app;
 }

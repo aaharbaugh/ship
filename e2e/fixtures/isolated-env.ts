@@ -34,7 +34,7 @@ import os from 'os';
  * - Worker 1: 50100-50199
  * - etc.
  */
-async function getWorkerPort(workerIndex: number): Promise<number> {
+async function getWorkerPort(workerIndex: number, serviceOffset = 0): Promise<number> {
   const BASE_PORT = 10000;
   const MAX_PORT = 65535;
   const PORTS_PER_WORKER = 100;
@@ -43,7 +43,7 @@ async function getWorkerPort(workerIndex: number): Promise<number> {
 
   // Wrap worker index to stay within valid port range
   const wrappedIndex = workerIndex % MAX_WORKERS;
-  const startPort = BASE_PORT + wrappedIndex * PORTS_PER_WORKER;
+  const startPort = BASE_PORT + wrappedIndex * PORTS_PER_WORKER + serviceOffset;
   const endPort = Math.min(startPort + PORTS_PER_WORKER - 1, MAX_PORT);
 
   return getPort({ port: portNumbers(startPort, endPort) });
@@ -155,7 +155,7 @@ export const test = base.extend<
       const workerTag = `[Worker ${workerInfo.workerIndex}]`;
       const debug = process.env.DEBUG === '1';
       // Use worker-specific port range to avoid collisions between parallel workers
-      const port = await getWorkerPort(workerInfo.workerIndex);
+      const port = await getWorkerPort(workerInfo.workerIndex, 0);
       const dbUrl = dbContainer.getConnectionUri();
 
       if (debug) console.log(`${workerTag} Starting API server on port ${port}...`);
@@ -210,7 +210,7 @@ export const test = base.extend<
       const workerTag = `[Worker ${workerInfo.workerIndex}]`;
       const debug = process.env.DEBUG === '1';
       // Use worker-specific port range (separate from API port)
-      const port = await getWorkerPort(workerInfo.workerIndex);
+      const port = await getWorkerPort(workerInfo.workerIndex, 50);
 
       // Extract API port from URL
       const apiPort = new URL(apiServer.url).port;

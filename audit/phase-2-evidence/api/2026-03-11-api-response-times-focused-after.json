@@ -1,0 +1,83 @@
+{
+  "generatedAt": "2026-03-11T21:30:23.873Z",
+  "results": [
+    {
+      "endpoint": "GET /api/issues",
+      "path": "/api/issues",
+      "runs": [
+        {
+          "connections": 10,
+          "p50": 12,
+          "p95": 47.33,
+          "p99": 81,
+          "p90": 28,
+          "p97_5": 57,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "p50": 25,
+          "p95": 62.33,
+          "p99": 75,
+          "p90": 51,
+          "p97_5": 68,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "p50": 62,
+          "p95": 154.33,
+          "p99": 190,
+          "p90": 127,
+          "p97_5": 168,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "GET /api/team/accountability-grid-v3",
+      "path": "/api/team/accountability-grid-v3?fromSprint=1&toSprint=10",
+      "runs": [
+        {
+          "connections": 10,
+          "p50": 11,
+          "p95": 118,
+          "p99": 153,
+          "p90": 74,
+          "p97_5": 140,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "p50": 28,
+          "p95": 74.33,
+          "p99": 91,
+          "p90": 61,
+          "p97_5": 81,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "p50": 63,
+          "p95": 162.33,
+          "p99": 191,
+          "p90": 133,
+          "p97_5": 177,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    }
+  ]
+}

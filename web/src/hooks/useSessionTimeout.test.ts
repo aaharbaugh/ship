@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSessionTimeout } from './useSessionTimeout';
 
+vi.mock('@/lib/api', () => ({
+  apiPost: vi.fn(),
+}));
+
+import { apiPost } from '@/lib/api';
+
 /**
  * Unit Tests for useSessionTimeout Hook
  *
@@ -19,12 +25,22 @@ const ACTIVITY_THROTTLE_MS = 30 * 1000; // 30 seconds
 
 // Mock fetch globally
 const mockFetch = vi.fn();
+const mockApiPost = vi.mocked(apiPost);
+
+async function renderSessionTimeoutHook(onTimeout = vi.fn()) {
+  const hook = renderHook(() => useSessionTimeout(onTimeout));
+  await act(async () => {
+    await Promise.resolve();
+  });
+  return hook;
+}
 
 describe('useSessionTimeout', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     // Reset fetch mock
     mockFetch.mockReset();
+    mockApiPost.mockReset();
     // Default: return successful session info
     mockFetch.mockResolvedValue({
       ok: true,
@@ -38,6 +54,7 @@ describe('useSessionTimeout', () => {
       }),
     });
     global.fetch = mockFetch;
+    mockApiPost.mockResolvedValue({ ok: true } as Response);
     // Mock document event listeners
     vi.spyOn(document, 'addEventListener');
     vi.spyOn(document, 'removeEventListener');
@@ -49,24 +66,24 @@ describe('useSessionTimeout', () => {
   });
 
   describe('Initial State', () => {
-    it('starts with showWarning = false', () => {
+    it('starts with showWarning = false', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       expect(result.current.showWarning).toBe(false);
     });
 
-    it('starts with timeRemaining = null when not warning', () => {
+    it('starts with timeRemaining = null when not warning', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       expect(result.current.timeRemaining).toBeNull();
     });
 
-    it('starts tracking from current time on mount', () => {
+    it('starts tracking from current time on mount', async () => {
       const now = Date.now();
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // lastActivity should be within a small margin of now
       expect(result.current.lastActivity).toBeGreaterThanOrEqual(now);
@@ -77,7 +94,7 @@ describe('useSessionTimeout', () => {
   describe('Inactivity Timer', () => {
     it('shows warning after 14 minutes of inactivity', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance 14 minutes (time until warning)
       await act(async () => {
@@ -90,7 +107,7 @@ describe('useSessionTimeout', () => {
 
     it('does NOT show warning before 14 minutes', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance 13 minutes 59 seconds
       await act(async () => {
@@ -102,7 +119,7 @@ describe('useSessionTimeout', () => {
 
     it('sets timeRemaining to 60 when warning appears', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       await act(async () => {
         vi.advanceTimersByTime(TIME_UNTIL_WARNING);
@@ -114,7 +131,7 @@ describe('useSessionTimeout', () => {
 
     it('decrements timeRemaining every second during warning', async () => {
       const onTimeout = vi.fn();
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance to warning
       await act(async () => {
@@ -133,7 +150,7 @@ describe('useSessionTimeout', () => {
 
     it('calls onTimeout when timeRemaining reaches 0', async () => {
       const onTimeout = vi.fn();
-      renderHook(() => useSessionTimeout(onTimeout));
+      await renderSessionTimeoutHook(onTimeout);
 
       // Advance to warning (14 min) + full countdown (60 sec)
       await act(async () => {
@@ -145,10 +162,9 @@ describe('useSessionTimeout', () => {
 
     it('does NOT call onTimeout if dismissed before 0', async () => {
       const onTimeout = vi.fn();
-      // Mock successful extend-session response
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockApiPost.mockResolvedValue({ ok: true } as Response);
 
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance to warning
       await act(async () => {
@@ -174,9 +190,9 @@ describe('useSessionTimeout', () => {
   describe('Activity Reset', () => {
     it('resetTimer() hides warning modal', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockApiPost.mockResolvedValue({ ok: true } as Response);
 
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance to show warning
       await act(async () => {
@@ -195,9 +211,9 @@ describe('useSessionTimeout', () => {
 
     it('resetTimer() resets lastActivity to now', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockApiPost.mockResolvedValue({ ok: true } as Response);
 
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
       const initialActivity = result.current.lastActivity;
 
       // Advance some time
@@ -215,9 +231,9 @@ describe('useSessionTimeout', () => {
 
     it('after resetTimer(), warning appears 14 min later (not sooner)', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockApiPost.mockResolvedValue({ ok: true } as Response);
 
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance 10 minutes
       await act(async () => {
@@ -249,9 +265,9 @@ describe('useSessionTimeout', () => {
 
     it('resetTimer() clears countdown interval', async () => {
       const onTimeout = vi.fn();
-      mockFetch.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+      mockApiPost.mockResolvedValue({ ok: true } as Response);
 
-      const { result } = renderHook(() => useSessionTimeout(onTimeout));
+      const { result } = await renderSessionTimeoutHook(onTimeout);
 
       // Advance to show warning
       await act(async () => {
@@ -497,9 +513,9 @@ describe('useSessionTimeout', () => {
   });
 
   describe('Event Listeners', () => {
-    it('registers activity listeners on mount', () => {
+    it('registers activity listeners on mount', async () => {
       const onTimeout = vi.fn();
-      renderHook(() => useSessionTimeout(onTimeout));
+      await renderSessionTimeoutHook(onTimeout);
 
       // Check that addEventListener was called for activity events
       expect(document.addEventListener).toHaveBeenCalledWith(

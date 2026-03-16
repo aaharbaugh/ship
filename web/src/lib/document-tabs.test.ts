@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   getTabsForDocumentType,
+  getTabsForDocument,
   documentTypeHasTabs,
   resolveTabLabels,
   documentTabConfigs,
@@ -20,9 +21,10 @@ describe('getTabsForDocumentType', () => {
   it('returns tabs for project documents', () => {
     const tabs = getTabsForDocumentType('project');
     expect(tabs.length).toBeGreaterThan(0);
-    expect(tabs.map(t => t.id)).toContain('details');
     expect(tabs.map(t => t.id)).toContain('issues');
-    expect(tabs.map(t => t.id)).toContain('sprints');
+    expect(tabs.map(t => t.id)).toContain('details');
+    expect(tabs.map(t => t.id)).toContain('weeks');
+    expect(tabs.map(t => t.id)).toContain('retro');
   });
 
   it('returns tabs for program documents', () => {
@@ -31,7 +33,7 @@ describe('getTabsForDocumentType', () => {
     expect(tabs.map(t => t.id)).toContain('overview');
     expect(tabs.map(t => t.id)).toContain('issues');
     expect(tabs.map(t => t.id)).toContain('projects');
-    expect(tabs.map(t => t.id)).toContain('sprints');
+    expect(tabs.map(t => t.id)).toContain('weeks');
   });
 
   it('returns empty array for wiki documents (no tabs)', () => {
@@ -44,9 +46,9 @@ describe('getTabsForDocumentType', () => {
     expect(tabs).toEqual([]);
   });
 
-  it('returns empty array for sprint documents (no tabs)', () => {
+  it('returns default tabs for sprint documents', () => {
     const tabs = getTabsForDocumentType('sprint');
-    expect(tabs).toEqual([]);
+    expect(tabs.map(t => t.id)).toEqual(['overview', 'plan', 'review', 'standups']);
   });
 
   it('returns empty array for unknown document types', () => {
@@ -72,8 +74,8 @@ describe('documentTypeHasTabs', () => {
     expect(documentTypeHasTabs('issue')).toBe(false);
   });
 
-  it('returns false for sprint documents', () => {
-    expect(documentTypeHasTabs('sprint')).toBe(false);
+  it('returns true for sprint documents', () => {
+    expect(documentTypeHasTabs('sprint')).toBe(true);
   });
 
   it('returns false for unknown document types', () => {
@@ -92,9 +94,9 @@ describe('tab ID validation for URL deep linking', () => {
     const validTabIds = tabs.map(t => t.id);
 
     // Valid tab IDs
-    expect(validTabIds.includes('details')).toBe(true);
     expect(validTabIds.includes('issues')).toBe(true);
-    expect(validTabIds.includes('sprints')).toBe(true);
+    expect(validTabIds.includes('details')).toBe(true);
+    expect(validTabIds.includes('weeks')).toBe(true);
     expect(validTabIds.includes('retro')).toBe(true);
 
     // Invalid tab IDs (should trigger redirect in UnifiedDocumentPage)
@@ -111,7 +113,7 @@ describe('tab ID validation for URL deep linking', () => {
     expect(validTabIds.includes('overview')).toBe(true);
     expect(validTabIds.includes('issues')).toBe(true);
     expect(validTabIds.includes('projects')).toBe(true);
-    expect(validTabIds.includes('sprints')).toBe(true);
+    expect(validTabIds.includes('weeks')).toBe(true);
 
     // Invalid tab IDs
     expect(validTabIds.includes('details')).toBe(false); // details is for projects
@@ -121,14 +123,37 @@ describe('tab ID validation for URL deep linking', () => {
   it('returns first tab as default for URL without tab', () => {
     // This tests the pattern: tabConfig[0]?.id || ''
     const projectTabs = getTabsForDocumentType('project');
-    expect(projectTabs[0]?.id).toBe('details');
+    expect(projectTabs[0]?.id).toBe('issues');
 
     const programTabs = getTabsForDocumentType('program');
     expect(programTabs[0]?.id).toBe('overview');
 
-    // Documents without tabs should have empty first tab
-    const wikiTabs = getTabsForDocumentType('wiki');
-    expect(wikiTabs[0]?.id).toBeUndefined();
+    const sprintTabs = getTabsForDocumentType('sprint');
+    expect(sprintTabs[0]?.id).toBe('overview');
+  });
+});
+
+describe('getTabsForDocument', () => {
+  it('returns planning sprint tabs when status is planning', () => {
+    const tabs = getTabsForDocument({
+      id: 'sprint-1',
+      title: 'Sprint 1',
+      document_type: 'sprint',
+      properties: { status: 'planning' },
+    });
+
+    expect(tabs.map(t => t.id)).toEqual(['overview', 'plan']);
+  });
+
+  it('returns active sprint tabs when status is active', () => {
+    const tabs = getTabsForDocument({
+      id: 'sprint-2',
+      title: 'Sprint 2',
+      document_type: 'sprint',
+      properties: { status: 'active' },
+    });
+
+    expect(tabs.map(t => t.id)).toEqual(['overview', 'issues', 'review', 'standups']);
   });
 });
 
@@ -157,8 +182,8 @@ describe('resolveTabLabels', () => {
     const issuesTab = resolved.find(t => t.id === 'issues');
     expect(issuesTab?.label).toBe('Issues (5)');
 
-    const sprintsTab = resolved.find(t => t.id === 'sprints');
-    expect(sprintsTab?.label).toBe('Weeks (3)');
+    const weeksTab = resolved.find(t => t.id === 'weeks');
+    expect(weeksTab?.label).toBe('Weeks');
   });
 
   it('resolves dynamic labels without counts', () => {
@@ -168,8 +193,8 @@ describe('resolveTabLabels', () => {
     const issuesTab = resolved.find(t => t.id === 'issues');
     expect(issuesTab?.label).toBe('Issues');
 
-    const sprintsTab = resolved.find(t => t.id === 'sprints');
-    expect(sprintsTab?.label).toBe('Weeks');
+    const weeksTab = resolved.find(t => t.id === 'weeks');
+    expect(weeksTab?.label).toBe('Weeks');
   });
 
   it('resolves dynamic labels with zero counts', () => {

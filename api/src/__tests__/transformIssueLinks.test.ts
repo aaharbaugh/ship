@@ -1,14 +1,79 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+type MockQueryResult = { rows: unknown[]; rowCount?: number };
+
+const { mockQuery } = vi.hoisted(() => ({
+  mockQuery: vi.fn<(...args: unknown[]) => Promise<MockQueryResult>>().mockResolvedValue({ rows: [] }),
+}));
 
 // Mock pool before importing the module
 vi.mock('../db/client.js', () => ({
   pool: {
-    query: vi.fn(),
+    query: mockQuery,
   },
 }));
 
 import { transformIssueLinks } from '../utils/transformIssueLinks.js';
 import { pool } from '../db/client.js';
+
+interface QueryRowsResult<T> {
+  rows: T[];
+}
+
+interface TipTapMark {
+  type: string;
+  attrs?: Record<string, unknown>;
+}
+
+interface TipTapNode {
+  type: string;
+  text?: string;
+  marks?: TipTapMark[];
+  content?: TipTapNode[];
+}
+
+interface TipTapDoc {
+  type: 'doc';
+  content: TipTapNode[];
+}
+
+const rowsResult = <T>(rows: T[]): QueryRowsResult<T> => ({ rows });
+
+function toTipTapDoc(value: unknown): TipTapDoc {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Expected TipTap document');
+  }
+
+  const doc = value as TipTapDoc;
+  if (doc.type !== 'doc' || !Array.isArray(doc.content)) {
+    throw new Error('Expected TipTap doc with content');
+  }
+
+  return doc;
+}
+
+function isTextNode(node: TipTapNode | undefined): node is TipTapNode & { text: string } {
+  return Boolean(node && node.type === 'text' && typeof node.text === 'string');
+}
+
+function hasLinkedText(nodes: TipTapNode[], text: string): boolean {
+  return nodes.some((node) => isTextNode(node) && node.text === text && Boolean(node.marks?.length));
+}
+
+function findTextNode(nodes: TipTapNode[], text: string): (TipTapNode & { text: string }) | undefined {
+  return nodes.find((node): node is TipTapNode & { text: string } => isTextNode(node) && node.text === text);
+}
+
+function childNodes(node: TipTapNode | undefined): TipTapNode[] {
+  if (!node?.content) {
+    throw new Error('Expected node content');
+  }
+
+  return node.content;
+}
+
+function rootNodes(doc: TipTapDoc): TipTapNode[] {
+  return childNodes(doc.content[0]);
+}
 
 describe('transformIssueLinks', () => {
   const workspaceId = 'test-workspace-id';
@@ -30,15 +95,14 @@ describe('transformIssueLinks', () => {
       };
 
       // Mock issue lookup
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-42', ticket_number: 42 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-42', ticket_number: 42 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      expect(result.content[0].content).toHaveLength(3);
-      expect(result.content[0].content[0]).toEqual({ type: 'text', text: 'See ' });
-      expect(result.content[0].content[1]).toEqual({
+      const nodes = rootNodes(result);
+      expect(nodes).toHaveLength(3);
+      expect(nodes[0]).toEqual({ type: 'text', text: 'See ' });
+      expect(nodes[1]).toEqual({
         type: 'text',
         text: '#42',
         marks: [
@@ -51,7 +115,7 @@ describe('transformIssueLinks', () => {
           },
         ],
       });
-      expect(result.content[0].content[2]).toEqual({ type: 'text', text: ' for details' });
+      expect(nodes[2]).toEqual({ type: 'text', text: ' for details' });
     });
 
     it('transforms "issue #123" pattern to clickable link', async () => {
@@ -65,13 +129,11 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-100', ticket_number: 100 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-100', ticket_number: 100 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      expect(result.content[0].content[1]).toEqual({
+      expect(rootNodes(result)[1]).toEqual({
         type: 'text',
         text: 'issue #100',
         marks: [
@@ -97,13 +159,11 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-500', ticket_number: 500 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-500', ticket_number: 500 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      expect(result.content[0].content[1]).toEqual({
+      expect(rootNodes(result)[1]).toEqual({
         type: 'text',
         text: 'ISS-500',
         marks: [
@@ -129,21 +189,19 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [
+      mockQuery.mockResolvedValueOnce(rowsResult([
           { id: 'issue-uuid-10', ticket_number: 10 },
           { id: 'issue-uuid-20', ticket_number: 20 },
           { id: 'issue-uuid-30', ticket_number: 30 },
-        ],
-      } as any);
+        ],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // Should split into multiple text nodes with links
-      const nodes = result.content[0].content;
-      expect(nodes.some((n: any) => n.text === '#10' && n.marks)).toBe(true);
-      expect(nodes.some((n: any) => n.text === '#20' && n.marks)).toBe(true);
-      expect(nodes.some((n: any) => n.text === 'issue #30' && n.marks)).toBe(true);
+      const nodes = rootNodes(result);
+      expect(hasLinkedText(nodes, '#10')).toBe(true);
+      expect(hasLinkedText(nodes, '#20')).toBe(true);
+      expect(hasLinkedText(nodes, 'issue #30')).toBe(true);
     });
 
     it('queries database for all unique ticket numbers', async () => {
@@ -157,9 +215,7 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
       await transformIssueLinks(content, workspaceId);
 
@@ -180,13 +236,14 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
       await transformIssueLinks(content, workspaceId);
 
-      const queryArgs = vi.mocked(pool.query).mock.calls[0]![1] as any[];
+      const queryArgs = mockQuery.mock.calls[0]?.[1];
+      if (!Array.isArray(queryArgs)) {
+        throw new Error('Expected query args array');
+      }
       const ticketNumbers = queryArgs[1];
 
       // Should only query for #5 once despite appearing multiple times
@@ -213,14 +270,12 @@ describe('transformIssueLinks', () => {
       };
 
       // Mock database lookup (implementation still queries even for marked text)
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-99', ticket_number: 99 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-99', ticket_number: 99 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // Should not transform already marked text
-      expect(result.content[0].content[0]).toEqual({
+      expect(rootNodes(result)[0]).toEqual({
         type: 'text',
         text: '#99 is already a link',
         marks: [{ type: 'link', attrs: { href: '/somewhere' } }],
@@ -243,17 +298,15 @@ describe('transformIssueLinks', () => {
       };
 
       // No matching issues found
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // When no issues are found, content is returned unchanged
       // (implementation optimization - doesn't transform if issueMap is empty)
       expect(result).toEqual(content);
-      expect(result.content[0].content[0].text).toBe('Non-existent #999');
-      expect(result.content[0].content[0].marks).toBeUndefined();
+      expect(rootNodes(result)[0]?.text).toBe('Non-existent #999');
+      expect(rootNodes(result)[0]?.marks).toBeUndefined();
     });
 
     it('transforms existing issues but not non-existent ones', async () => {
@@ -268,20 +321,18 @@ describe('transformIssueLinks', () => {
       };
 
       // Only #50 exists
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-50', ticket_number: 50 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-50', ticket_number: 50 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      const nodes = result.content[0].content;
+      const nodes = rootNodes(result);
 
       // #50 should have link mark
-      const link50 = nodes.find((n: any) => n.text === '#50');
+      const link50 = findTextNode(nodes, '#50');
       expect(link50?.marks).toBeDefined();
 
       // #999 should be plain text (no marks)
-      const text999 = nodes.find((n: any) => n.text === '#999');
+      const text999 = findTextNode(nodes, '#999');
       expect(text999?.marks).toBeUndefined();
     });
 
@@ -296,7 +347,7 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      const result = await transformIssueLinks(content, workspaceId);
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // Should not query database
       expect(pool.query).not.toHaveBeenCalled();
@@ -357,16 +408,14 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-25', ticket_number: 25 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-25', ticket_number: 25 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      const paragraph = result.content[0].content[0].content[0];
-      const link = paragraph.content.find((n: any) => n.text === '#25');
+      const paragraph = childNodes(childNodes(result.content[0])[0])[0];
+      const link = findTextNode(childNodes(paragraph), '#25');
       expect(link?.marks).toBeDefined();
-      expect(link?.marks[0].attrs.href).toBe('/issues/issue-uuid-25');
+      expect(link?.marks?.[0]?.attrs?.href).toBe('/issues/issue-uuid-25');
     });
 
     it('transforms issue links in blockquotes', async () => {
@@ -385,14 +434,12 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [{ id: 'issue-uuid-77', ticket_number: 77 }],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([{ id: 'issue-uuid-77', ticket_number: 77 }],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      const paragraph = result.content[0].content[0];
-      const link = paragraph.content.find((n: any) => n.text === 'issue #77');
+      const paragraph = childNodes(result.content[0])[0];
+      const link = findTextNode(childNodes(paragraph), 'issue #77');
       expect(link?.marks).toBeDefined();
     });
 
@@ -421,14 +468,12 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [
+      mockQuery.mockResolvedValueOnce(rowsResult([
           { id: 'issue-uuid-1', ticket_number: 1 },
           { id: 'issue-uuid-2', ticket_number: 2 },
-        ],
-      } as any);
+        ],));
 
-      await transformIssueLinks(content, workspaceId);
+      toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // Should find both #1 and #2
       expect(pool.query).toHaveBeenCalledWith(
@@ -450,9 +495,7 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
       await transformIssueLinks(content, workspaceId);
 
@@ -474,15 +517,13 @@ describe('transformIssueLinks', () => {
       };
 
       // Issue exists but in different workspace
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
       // Should remain plain text
-      const textNode = result.content[0].content[0];
-      expect(textNode.marks).toBeUndefined();
+      const textNode = rootNodes(result)[0];
+      expect(textNode?.marks).toBeUndefined();
     });
   });
 
@@ -498,20 +539,18 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [
+      mockQuery.mockResolvedValueOnce(rowsResult([
           { id: 'issue-uuid-5', ticket_number: 5 },
           { id: 'issue-uuid-6', ticket_number: 6 },
-        ],
-      } as any);
+        ],));
 
-      const result = await transformIssueLinks(content, workspaceId) as any;
+      const result = toTipTapDoc(await transformIssueLinks(content, workspaceId));
 
-      const nodes = result.content[0].content;
+      const nodes = rootNodes(result);
 
       // Both should be transformed
-      expect(nodes.some((n: any) => n.text === 'Issue #5' && n.marks)).toBe(true);
-      expect(nodes.some((n: any) => n.text === 'ISSUE #6' && n.marks)).toBe(true);
+      expect(hasLinkedText(nodes, 'Issue #5')).toBe(true);
+      expect(hasLinkedText(nodes, 'ISSUE #6')).toBe(true);
     });
   });
 
@@ -547,9 +586,7 @@ describe('transformIssueLinks', () => {
         ],
       };
 
-      vi.mocked(pool.query).mockResolvedValueOnce({
-        rows: [],
-      } as any);
+      mockQuery.mockResolvedValueOnce(rowsResult([],));
 
       await transformIssueLinks(content, workspaceId);
 

@@ -11,7 +11,8 @@ Quick reference for deploying Ship to AWS.
 - [ ] Deploy infrastructure: `./scripts/deploy-infrastructure.sh` (10-15 min)
 - [ ] Initialize Elastic Beanstalk: `cd api && eb init`
 - [ ] Create EB environment: See DEPLOYMENT.md for full `eb create` command (10-15 min)
-- [ ] Initialize database: `./scripts/init-database.sh` (2-3 min)
+- [ ] Initialize database: `./scripts/init-database.sh dev` (2-3 min)
+- [ ] Seed public demo deployment when needed: `./scripts/seed-deployment.sh`
 - [ ] Deploy API: `./scripts/deploy-api.sh` (3-5 min)
 - [ ] Deploy frontend: `./scripts/deploy-frontend.sh` (2-3 min)
 

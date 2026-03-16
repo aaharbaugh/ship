@@ -133,6 +133,11 @@ describe('Issues API', () => {
       const testIssue = res.body.find((i: { id: string }) => i.id === testIssueId)
       expect(testIssue).toBeDefined()
       expect(testIssue.title).toBe('Test Issue for List')
+      expect(testIssue.belongs_to).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: testProjectId, type: 'project' }),
+        ])
+      )
     })
 
     it('should filter issues by sprint_id', async () => {

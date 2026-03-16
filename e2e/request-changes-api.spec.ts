@@ -33,13 +33,35 @@ async function loginAsAdmin(page: import('@playwright/test').Page, apiUrl: strin
 // Helper to login as non-admin member
 async function loginAsMember(page: import('@playwright/test').Page, apiUrl: string) {
   await page.goto('/login');
-  await page.locator('#email').fill('bob.martinez@ship.local');
+  await page.locator('#email').fill('dev@ship.local');
   await page.locator('#password').fill('admin123');
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await expect(page).not.toHaveURL('/login', { timeout: 5000 });
 
   const csrfToken = await getCsrfToken(page, apiUrl);
-  return { csrfToken };
+  const workspaceResponse = await page.request.get(`${apiUrl}/api/workspaces/current`);
+  expect(workspaceResponse.ok()).toBe(true);
+  const workspaceData = await workspaceResponse.json();
+  const workspaceId = workspaceData.data.workspace.id as string;
+
+  const email = `request-changes-member-${Date.now()}@ship.local`;
+  const inviteResponse = await page.request.post(`${apiUrl}/api/workspaces/${workspaceId}/invites`, {
+    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    data: { email, role: 'member' },
+  });
+  expect(inviteResponse.ok()).toBe(true);
+  const inviteData = await inviteResponse.json();
+  const token = inviteData.data.invite.token as string;
+
+  await page.context().clearCookies();
+  await page.goto(`/invite/${token}`);
+  await expect(page.getByText("You're Invited!")).toBeVisible({ timeout: 10000 });
+  await page.locator('#name').fill('Request Changes Member');
+  await page.locator('#password').fill('admin123');
+  await page.getByRole('button', { name: 'Create Account & Accept' }).click();
+  await expect(page).toHaveURL(/\/docs/, { timeout: 10000 });
+
+  return { csrfToken: await getCsrfToken(page, apiUrl) };
 }
 
 // Helper to get a sprint ID from the active weeks

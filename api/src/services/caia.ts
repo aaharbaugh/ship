@@ -14,6 +14,8 @@ import {
   type CAIACredentials,
 } from './secrets-manager.js';
 
+let hasLoggedUnconfiguredSkip = false;
+
 /**
  * User information extracted from CAIA ID token
  */
@@ -97,7 +99,10 @@ export async function isCAIAConfigured(): Promise<boolean> {
 export async function initializeCAIA(): Promise<void> {
   const configured = await isCAIAConfigured();
   if (!configured) {
-    console.log('CAIA not configured, skipping initialization');
+    if (process.env.NODE_ENV !== 'test' && !hasLoggedUnconfiguredSkip) {
+      console.log('CAIA not configured, skipping initialization');
+      hasLoggedUnconfiguredSkip = true;
+    }
     return;
   }
 

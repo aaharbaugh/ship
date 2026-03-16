@@ -8,8 +8,6 @@ import Placeholder from '@tiptap/extension-placeholder';
 import Link from '@tiptap/extension-link';
 import { ResizableImage } from './editor/ResizableImage';
 import Dropcursor from '@tiptap/extension-dropcursor';
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { common, createLowlight } from 'lowlight';
 import Table from '@tiptap/extension-table';
 import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
@@ -17,9 +15,7 @@ import TableHeader from '@tiptap/extension-table-header';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
-import { IndexeddbPersistence } from 'y-indexeddb';
 import { cn } from '@/lib/cn';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { ScrollFade } from '@/components/ui/ScrollFade';
@@ -40,10 +36,8 @@ import { AIScoringDisplayExtension } from './editor/AIScoringDisplay';
 import { PlanReferenceBlockExtension } from './editor/PlanReferenceBlock';
 import { useCommentsQuery, useCreateComment, useUpdateComment } from '@/hooks/useCommentsQuery';
 import { BubbleMenu } from '@tiptap/react';
+import { useToast } from '@/components/ui/Toast';
 import 'tippy.js/dist/tippy.css';
-
-// Create lowlight instance with common languages
-const lowlight = createLowlight(common);
 
 interface EditorProps {
   documentId: string;
@@ -91,6 +85,8 @@ interface EditorProps {
 }
 
 type SyncStatus = 'connecting' | 'cached' | 'synced' | 'disconnected';
+type CollaborationProvider = import('y-websocket').WebsocketProvider;
+type PersistenceProvider = import('y-indexeddb').IndexeddbPersistence;
 
 // Generate a consistent color from a string
 function stringToColor(str: string): string {
@@ -225,7 +221,7 @@ export function Editor({
       el.style.height = `${el.scrollHeight}px`;
     }
   }, [title]);
-  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
+  const [provider, setProvider] = useState<CollaborationProvider | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [isBrowserOnline, setIsBrowserOnline] = useState(navigator.onLine);
   const [connectedUsers, setConnectedUsers] = useState<{ name: string; color: string }[]>([]);
@@ -262,6 +258,7 @@ export function Editor({
   }, []);
 
   const color = userColor || stringToColor(userName);
+  const { showToast } = useToast();
 
   // Auto-focus and select title if "Untitled" (new document)
   // Uses double requestAnimationFrame to run AFTER useFocusOnNavigate's
@@ -284,45 +281,57 @@ export function Editor({
 
   // Setup IndexedDB persistence and WebSocket provider
   useEffect(() => {
-    let wsProvider: WebsocketProvider | null = null;
+    let wsProvider: CollaborationProvider | null = null;
+    let indexeddbProvider: PersistenceProvider | null = null;
     let hasCachedContent = false;
     let cancelled = false;
     // Store the updateUsers callback so we can properly remove it on cleanup
     let updateUsersCallback: (() => void) | null = null;
+    setSyncStatus('connecting');
 
-    // Create IndexedDB persistence for content caching
-    // This loads cached content BEFORE WebSocket connects for instant navigation
-    const indexeddbProvider = new IndexeddbPersistence(`ship-${roomPrefix}-${documentId}`, ydoc);
+    const initializeProviders = async () => {
+      const [{ WebsocketProvider }, { IndexeddbPersistence }] = await Promise.all([
+        import('y-websocket'),
+        import('y-indexeddb'),
+      ]);
 
-    // Wait for IndexedDB to load cached content (with timeout)
-    // This ensures cached content shows instantly before WebSocket syncs
-    const waitForCache = new Promise<void>((resolve) => {
-      // Resolve immediately if already synced
-      if (indexeddbProvider.synced) {
-        hasCachedContent = true;
-        setSyncStatus('cached');
-        resolve();
-        return;
-      }
+      if (cancelled) return;
 
-      // Wait for sync event
-      const onSynced = () => {
-        hasCachedContent = true;
-        setSyncStatus((prev) => prev === 'connecting' ? 'cached' : prev);
-        console.log(`[Editor] IndexedDB synced for ${roomPrefix}:${documentId}`);
-        resolve();
-      };
-      indexeddbProvider.on('synced', onSynced);
+      // Create IndexedDB persistence for content caching
+      // This loads cached content BEFORE WebSocket connects for instant navigation
+      indexeddbProvider = new IndexeddbPersistence(`ship-${roomPrefix}-${documentId}`, ydoc);
 
-      // Timeout after 300ms - don't block forever if no cache exists
-      setTimeout(() => {
-        indexeddbProvider.off('synced', onSynced);
-        resolve();
-      }, 300);
-    });
+      // Wait for IndexedDB to load cached content (with timeout)
+      // This ensures cached content shows instantly before WebSocket syncs
+      await new Promise<void>((resolve) => {
+        if (!indexeddbProvider) {
+          resolve();
+          return;
+        }
 
-    // Connect WebSocket AFTER cache loads (or timeout)
-    waitForCache.then(() => {
+        // Resolve immediately if already synced
+        if (indexeddbProvider.synced) {
+          hasCachedContent = true;
+          setSyncStatus('cached');
+          resolve();
+          return;
+        }
+
+        const onSynced = () => {
+          hasCachedContent = true;
+          setSyncStatus((prev) => prev === 'connecting' ? 'cached' : prev);
+          console.log(`[Editor] IndexedDB synced for ${roomPrefix}:${documentId}`);
+          resolve();
+        };
+        indexeddbProvider.on('synced', onSynced);
+
+        // Timeout after 300ms - don't block forever if no cache exists
+        setTimeout(() => {
+          indexeddbProvider?.off('synced', onSynced);
+          resolve();
+        }, 300);
+      });
+
       if (cancelled) return;
 
       // In production, use current host with wss:// (through CloudFront)
@@ -351,7 +360,9 @@ export function Editor({
               }
             });
             // Also clear IndexedDB for future visits
-            indexeddbProvider.clearData().then(() => {
+            const persistence = indexeddbProvider;
+            if (!persistence) return;
+            persistence.clearData().then(() => {
               console.log(`[Editor] IndexedDB cache cleared for ${documentId} (fresh from JSON)`);
               hasCachedContent = false;
             }).catch((err) => {
@@ -400,8 +411,7 @@ export function Editor({
           console.log(`[Editor] Access revoked for document ${documentId}`);
           // Disable auto-reconnect since access was revoked
           wsProvider!.shouldConnect = false;
-          // Show user-friendly message
-          alert('Access to this document has been revoked. The document is now private.');
+          showToast('Access to this document was revoked. Returning to the previous view.', 'error', 5000);
           // Navigate back if possible
           onBack?.();
         } else if (event?.code === 4100) {
@@ -415,19 +425,21 @@ export function Editor({
               onDocumentConverted(conversionInfo.newDocId, conversionInfo.newDocType);
             } else {
               // Fallback if callback not provided or info missing
-              alert('This document was converted. Please refresh to view the new document.');
+              showToast('This document was converted. Refresh to open the new document.', 'info', 5000);
               onBack?.();
             }
           } catch {
             console.error('[Editor] Failed to parse conversion info:', event.reason);
-            alert('This document was converted. Please refresh to view the new document.');
+            showToast('This document was converted. Refresh to open the new document.', 'info', 5000);
             onBack?.();
           }
         } else if (event?.code === 4101) {
           // Content updated via API - clear IndexedDB cache to prevent stale content merge
           console.log(`[Editor] Content updated via API for ${documentId}, clearing IndexedDB cache`);
           // Clear the IndexedDB cache so stale content doesn't merge with new content
-          indexeddbProvider.clearData().then(() => {
+          const persistence = indexeddbProvider;
+          if (!persistence) return;
+          persistence.clearData().then(() => {
             console.log(`[Editor] IndexedDB cache cleared for ${documentId}`);
             hasCachedContent = false;
           }).catch((err) => {
@@ -473,6 +485,13 @@ export function Editor({
       if (!cancelled) {
         setProvider(wsProvider);
       }
+    };
+
+    void initializeProviders().catch((error: unknown) => {
+      console.error(`[Editor] Failed to initialize collaboration providers for ${documentId}:`, error);
+      if (!cancelled) {
+        setSyncStatus(hasCachedContent ? 'cached' : 'disconnected');
+      }
     });
 
     return () => {
@@ -495,12 +514,12 @@ export function Editor({
         wsProvider.destroy();
       }
       // Destroy IndexedDB persistence
-      indexeddbProvider.destroy();
+      indexeddbProvider?.destroy();
       // Clear provider state
       setProvider(null);
       setConnectedUsers([]);
     };
-  }, [documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted]);
+  }, [documentId, userName, color, ydoc, roomPrefix, onBack, onDocumentConverted, showToast]);
 
   // Create slash commands extension (memoized to avoid recreation)
   // documentId is in deps to ensure fresh AbortSignal when switching documents
@@ -539,73 +558,70 @@ export function Editor({
   }, []);
 
   // Build extensions - only include CollaborationCursor when provider is ready
-  const baseExtensions = [
-    StarterKit.configure({
-      history: false,
-      dropcursor: false,
-      codeBlock: false, // Disable default code block to use CodeBlockLowlight
-    }),
-    CodeBlockLowlight.configure({
-      lowlight,
-      HTMLAttributes: {
-        class: 'code-block-lowlight',
-      },
-    }),
-    Placeholder.configure({ placeholder }),
-    Collaboration.configure({ document: ydoc }),
-    Link.configure({
-      openOnClick: true,
-      HTMLAttributes: {
-        class: 'text-accent hover:underline cursor-pointer',
-      },
-    }),
-    ResizableImage,
-    Dropcursor.configure({
-      color: '#3b82f6',
-      width: 2,
-    }),
-    Table.configure({
-      resizable: true,
-      HTMLAttributes: {
-        class: 'tiptap-table',
-      },
-    }),
-    TableRow,
-    TableCell,
-    TableHeader,
-    TaskList.configure({
-      HTMLAttributes: {
-        class: 'task-list',
-      },
-    }),
-    TaskItem.configure({
-      nested: true,
-      HTMLAttributes: {
-        class: 'task-item',
-      },
-    }),
-    ImageUploadExtension.configure({
-      onUploadStart: () => {},
-      onUploadComplete: () => {},
-      onUploadError: (error) => console.error('Upload error:', error),
-      abortController: imageUploadAbortRef.current,
-    }),
-    FileAttachmentExtension,
-    DocumentEmbed,
-    DragHandleExtension,
-    DetailsExtension,
-    DetailsSummary,
-    DetailsContent,
-    mentionExtension,
-    EmojiExtension,
-    TableOfContentsExtension,
-    HypothesisBlockExtension,
-    CommentMark.configure({ onAddComment: handleAddComment }),
-    CommentDisplayExtension,
-    AIScoringDisplayExtension,
-    PlanReferenceBlockExtension,
-    slashCommandsExtension,
-  ];
+  const baseExtensions = useMemo(() => {
+    return [
+      StarterKit.configure({
+        history: false,
+        dropcursor: false,
+      }),
+      Placeholder.configure({ placeholder }),
+      Collaboration.configure({ document: ydoc }),
+      Link.configure({
+        openOnClick: true,
+        HTMLAttributes: {
+          class: 'text-accent-text hover:underline cursor-pointer',
+        },
+      }),
+      ResizableImage,
+      Dropcursor.configure({
+        color: '#3b82f6',
+        width: 2,
+      }),
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'tiptap-table',
+        },
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'task-list',
+        },
+      }),
+      TaskItem.configure({
+        nested: true,
+        HTMLAttributes: {
+          class: 'task-item',
+        },
+      }),
+      ImageUploadExtension.configure({
+        onUploadStart: () => {},
+        onUploadComplete: () => {},
+        onUploadError: (error: Error) => showToast(`Image upload failed: ${error.message}`, 'error', 5000),
+        abortController: imageUploadAbortRef.current,
+      }),
+      FileAttachmentExtension.configure({
+        onUploadError: (error: Error) => showToast(`File upload failed: ${error.message}`, 'error', 5000),
+      }),
+      DocumentEmbed,
+      DragHandleExtension,
+      DetailsExtension,
+      DetailsSummary,
+      DetailsContent,
+      mentionExtension,
+      EmojiExtension,
+      TableOfContentsExtension,
+      HypothesisBlockExtension,
+      CommentMark.configure({ onAddComment: handleAddComment }),
+      CommentDisplayExtension,
+      AIScoringDisplayExtension,
+      PlanReferenceBlockExtension,
+      slashCommandsExtension,
+    ];
+  }, [placeholder, ydoc, mentionExtension, handleAddComment, slashCommandsExtension, showToast]);
 
   const extensions = provider
     ? [

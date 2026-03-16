@@ -17,7 +17,7 @@ interface InviteInfo {
 export function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshSession } = useAuth();
   const [status, setStatus] = useState<InviteStatus>('loading');
   const [inviteInfo, setInviteInfo] = useState<InviteInfo | null>(null);
   const [accepting, setAccepting] = useState(false);
@@ -71,6 +71,7 @@ export function InviteAcceptPage() {
       : undefined;
     const res = await api.invites.accept(token, data);
     if (res.success) {
+      await refreshSession();
       // Redirect to docs - user is now a member of the workspace
       navigate('/docs', { replace: true });
     } else {
@@ -194,7 +195,7 @@ export function InviteAcceptPage() {
         <div className="rounded-lg border border-border bg-surface p-8">
           <div className="text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent/10">
-              <InviteIcon className="h-6 w-6 text-accent" />
+              <InviteIcon className="h-6 w-6 text-accent-text" />
             </div>
             <h1 className="text-xl font-semibold text-foreground">You're Invited!</h1>
             <p className="mt-2 text-sm text-muted">

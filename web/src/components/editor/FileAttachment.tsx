@@ -12,6 +12,10 @@ import { useState } from 'react';
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
 
+export interface FileAttachmentOptions {
+  onUploadError?: (error: Error) => void;
+}
+
 // File type icons mapping
 const FILE_ICONS: Record<string, string> = {
   'application/pdf': '📄',
@@ -44,7 +48,7 @@ function formatFileSize(bytes: number): string {
 
 // React component for rendering file attachment
 function FileAttachmentComponent({ node }: { node: any }) {
-  const { filename, url, size, mimeType, uploading } = node.attrs;
+  const { filename, url, size, mimeType, uploading, error } = node.attrs;
   const [uploadProgress, setUploadProgress] = useState(uploading ? 0 : 100);
 
   const fileIcon = getFileIcon(mimeType);
@@ -58,6 +62,11 @@ function FileAttachmentComponent({ node }: { node: any }) {
           <div className="file-attachment-name">{filename}</div>
           {formattedSize && (
             <div className="file-attachment-meta">{formattedSize}</div>
+          )}
+          {!uploading && error && (
+            <div className="file-attachment-meta text-red-500" role="alert">
+              Upload failed: {error}
+            </div>
           )}
           {uploading && (
             <div className="file-attachment-progress">
@@ -87,6 +96,12 @@ function FileAttachmentComponent({ node }: { node: any }) {
 export const FileAttachmentExtension = Node.create({
   name: 'fileAttachment',
 
+  addOptions() {
+    return {
+      onUploadError: undefined,
+    } as FileAttachmentOptions;
+  },
+
   group: 'block',
 
   atom: true,
@@ -107,6 +122,9 @@ export const FileAttachmentExtension = Node.create({
       },
       uploading: {
         default: false,
+      },
+      error: {
+        default: null,
       },
     };
   },
@@ -134,7 +152,10 @@ export const FileAttachmentExtension = Node.create({
         ({ commands }: any) =>
           commands.insertContent({
             type: this.name,
-            attrs: options,
+            attrs: {
+              ...options,
+              error: null,
+            },
           }),
     } as any;
   },
@@ -159,7 +180,7 @@ export const FileAttachmentExtension = Node.create({
 
             // Upload all dropped non-image files
             nonImageFiles.forEach((file) => {
-              handleFileUpload(extensionThis.editor, file);
+              handleFileUpload(extensionThis.editor, file, undefined, extensionThis.options as FileAttachmentOptions);
             });
 
             return true;
@@ -181,7 +202,7 @@ export const FileAttachmentExtension = Node.create({
             fileItems.forEach((item) => {
               const file = item.getAsFile();
               if (file) {
-                handleFileUpload(extensionThis.editor, file);
+                handleFileUpload(extensionThis.editor, file, undefined, extensionThis.options as FileAttachmentOptions);
               }
             });
 
@@ -200,7 +221,7 @@ export const FileAttachmentExtension = Node.create({
  * @param file - File to upload
  * @param signal - Optional AbortSignal for cancelling uploads on navigation/cleanup
  */
-async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
+async function handleFileUpload(editor: any, file: File, signal?: AbortSignal, options?: FileAttachmentOptions) {
   // Check if already aborted
   if (signal?.aborted) {
     return;
@@ -208,16 +229,18 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
 
   // Check file size before uploading
   if (file.size > MAX_FILE_SIZE) {
+    const error = new Error(`File "${file.name}" is too large. Maximum file size is ${MAX_FILE_SIZE_DISPLAY}.`);
     console.error('File too large:', { name: file.name, size: file.size, maxSize: MAX_FILE_SIZE });
-    alert(`File "${file.name}" is too large.\n\nMaximum file size is ${MAX_FILE_SIZE_DISPLAY}.`);
+    options?.onUploadError?.(error);
     return;
   }
 
   // Check if file type is blocked (executables/scripts are blocked for security)
   if (!isAllowedFileType(file.type, file.name)) {
     const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const error = new Error(`Cannot upload "${ext}" files. Executable files and scripts are blocked for security reasons.`);
     console.error('File type blocked:', { name: file.name, type: file.type, extension: ext });
-    alert(`Cannot upload "${ext}" files.\n\nExecutable files and scripts are blocked for security reasons.`);
+    options?.onUploadError?.(error);
     return;
   }
 
@@ -282,6 +305,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
         size: file.size,
         mimeType: effectiveMimeType,
         uploading: false,
+        error: null,
       });
       view.dispatch(transaction);
     }
@@ -300,9 +324,8 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
 
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('File upload failed:', { filename: file.name, error: errorMessage, fullError: error });
-    alert(`Upload failed: ${errorMessage}\n\nPlease try again.`);
+    options?.onUploadError?.(error instanceof Error ? error : new Error(`Upload failed: ${errorMessage}`));
 
-    // Remove the failed upload node
     const { state, view } = editor;
     let attachmentPos: number | null = null;
 
@@ -319,7 +342,14 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
     });
 
     if (attachmentPos !== null) {
-      const transaction = state.tr.delete(attachmentPos, attachmentPos + 1);
+      const transaction = state.tr.setNodeMarkup(attachmentPos, undefined, {
+        filename: file.name,
+        url: '',
+        size: file.size,
+        mimeType: effectiveMimeType,
+        uploading: false,
+        error: errorMessage,
+      });
       view.dispatch(transaction);
     }
   }
@@ -330,7 +360,7 @@ async function handleFileUpload(editor: any, file: File, signal?: AbortSignal) {
  * @param editor - TipTap editor instance
  * @param signal - Optional AbortSignal for cancelling uploads on navigation/cleanup
  */
-export function triggerFileUpload(editor: any, signal?: AbortSignal) {
+export function triggerFileUpload(editor: any, signal?: AbortSignal, options?: FileAttachmentOptions) {
   // Check if already aborted
   if (signal?.aborted) {
     return;
@@ -350,7 +380,7 @@ export function triggerFileUpload(editor: any, signal?: AbortSignal) {
     const file = input.files?.[0];
     if (!file) return;
 
-    await handleFileUpload(editor, file, signal);
+    await handleFileUpload(editor, file, signal, options);
   };
 
   input.click();

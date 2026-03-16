@@ -150,7 +150,7 @@ test.describe('Workspace Settings', () => {
     await page.goto('/settings')
 
     // Members tab should be active by default
-    await expect(page.getByRole('button', { name: 'Members' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Members' })).toBeVisible()
 
     // Should show member table
     await expect(page.locator('th').getByText('Name')).toBeVisible()
@@ -162,7 +162,7 @@ test.describe('Workspace Settings', () => {
     await page.goto('/settings')
 
     // Click Pending Invites tab
-    await page.getByRole('button', { name: 'Pending Invites' }).click()
+    await page.getByRole('tab', { name: 'Pending Invites' }).click()
 
     // Should show invite form
     await expect(page.locator('input[placeholder="Email address"]')).toBeVisible()
@@ -173,7 +173,7 @@ test.describe('Workspace Settings', () => {
     await page.goto('/settings')
 
     // Go to Pending Invites tab
-    await page.getByRole('button', { name: 'Pending Invites' }).click()
+    await page.getByRole('tab', { name: 'Pending Invites' }).click()
 
     // Fill in invite form
     const testEmail = `test-${Date.now()}@example.com`
@@ -188,7 +188,7 @@ test.describe('Workspace Settings', () => {
     await page.goto('/settings')
 
     // Click Audit Logs tab
-    await page.getByRole('button', { name: 'Audit Logs' }).click()
+    await page.getByRole('tab', { name: 'Audit Logs' }).click()
 
     // Should show audit log table
     await expect(page.locator('th').getByText('Time')).toBeVisible()

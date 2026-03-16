@@ -16,6 +16,41 @@ import { broadcastToUser } from '../collaboration/index.js';
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 
+interface IssueProperties {
+  state?: string;
+  priority?: string;
+  assignee_id?: string | null;
+  estimate?: number | null;
+  source?: string;
+  rejection_reason?: string | null;
+  due_date?: string | null;
+  is_system_generated?: boolean;
+  accountability_target_id?: string | null;
+  accountability_type?: string | null;
+  claude_metadata?: Record<string, unknown>;
+  carryover_from_sprint_id?: string | null;
+}
+
+interface IssueRow {
+  id: string;
+  title: string;
+  properties: IssueProperties | null;
+  ticket_number: number | string | null;
+  content?: unknown;
+  created_at?: string | Date | null;
+  updated_at?: string | Date | null;
+  created_by?: string | null;
+  started_at?: string | Date | null;
+  completed_at?: string | Date | null;
+  cancelled_at?: string | Date | null;
+  reopened_at?: string | Date | null;
+  converted_from_id?: string | null;
+  assignee_name?: string | null;
+  assignee_archived?: boolean | null;
+  created_by_name?: string | null;
+  belongs_to?: BelongsToEntry[] | null;
+}
+
 // BelongsTo entry schema for associations
 const belongsToEntrySchema = z.object({
   id: z.string().uuid(),
@@ -79,7 +114,7 @@ const rejectIssueSchema = z.object({
 });
 
 // Helper to extract issue properties from row (without belongs_to - added separately)
-function extractIssueFromRow(row: any) {
+function extractIssueFromRow(row: IssueRow) {
   const props = row.properties || {};
   return {
     id: row.id,
@@ -137,7 +172,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       WHERE d.workspace_id = $1 AND d.document_type = 'issue'
         AND ${VISIBILITY_FILTER_SQL('d', '$2', '$3')}
     `;
-    const params: (string | boolean | null)[] = [workspaceId, userId, isAdmin];
+    const params: Array<string | boolean | null | string[]> = [workspaceId, userId, isAdmin];
 
     // Exclude archived and deleted issues by default
     query += ` AND d.archived_at IS NULL AND d.deleted_at IS NULL`;
@@ -152,7 +187,7 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
     if (state) {
       const states = (state as string).split(',');
       query += ` AND d.properties->>'state' = ANY($${params.length + 1})`;
-      params.push(states as any);
+      params.push(states);
     }
 
     if (priority) {
@@ -221,10 +256,9 @@ router.get('/', authMiddleware, async (req: Request, res: Response) => {
       d.updated_at DESC`;
 
     const result = await pool.query(query, params);
-
-    // Extract issues and batch-fetch associations to avoid N+1 queries
-    const issueIds = result.rows.map(row => row.id);
-    const associationsMap = await getBelongsToAssociationsBatch(issueIds);
+    const associationsMap = await getBelongsToAssociationsBatch(
+      result.rows.map((row) => row.id)
+    );
 
     const issues = result.rows.map(row => {
       const issue = extractIssueFromRow(row);
@@ -703,9 +737,9 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     }
 
     const existingIssue = existing.rows[0];
-    const currentProps = existingIssue.properties || {};
+    const currentProps: IssueProperties = existingIssue.properties || {};
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: unknown[] = [];
     let paramIndex = 1;
 
     const data = parsed.data;
@@ -1207,7 +1241,7 @@ router.post('/bulk', authMiddleware, async (req: Request, res: Response) => {
         }
 
         const setClauses: string[] = ['updated_at = NOW()'];
-        const values: any[] = [validIds, workspaceId];
+        const values: unknown[] = [validIds, workspaceId];
         let paramIdx = 3;
 
         if (updates.state !== undefined) {

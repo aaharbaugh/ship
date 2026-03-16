@@ -134,6 +134,7 @@ export function WeekDetailView({
         <div className="flex items-center gap-3 mb-3">
           <button
             onClick={onBack}
+            aria-label="Back to week timeline"
             className="text-muted hover:text-foreground transition-colors"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

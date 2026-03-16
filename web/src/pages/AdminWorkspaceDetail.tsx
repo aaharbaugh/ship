@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/cn';
 import { formatDate } from '@/lib/date-utils';
+import { useToast } from '@/components/ui/Toast';
 
 interface Member {
   userId: string;
@@ -34,6 +35,7 @@ export function AdminWorkspaceDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { isSuperAdmin } = useAuth();
+  const { showToast } = useToast();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -148,7 +150,7 @@ export function AdminWorkspaceDetailPage() {
     if (res.success) {
       setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role: newRole } : m));
     } else if (res.error?.message) {
-      alert(res.error.message);
+      showToast(res.error.message, 'error');
     }
   }
 
@@ -160,7 +162,7 @@ export function AdminWorkspaceDetailPage() {
     if (res.success) {
       setMembers(prev => prev.filter(m => m.userId !== userId));
     } else if (res.error?.message) {
-      alert(res.error.message);
+      showToast(res.error.message, 'error');
     }
   }
 
@@ -209,7 +211,7 @@ export function AdminWorkspaceDetailPage() {
         <div className="text-red-500">{error || 'Workspace not found'}</div>
         <button
           onClick={() => navigate('/admin')}
-          className="text-accent hover:underline"
+          className="text-accent-text hover:underline"
         >
           Back to Admin Dashboard
         </button>
@@ -223,6 +225,7 @@ export function AdminWorkspaceDetailPage() {
       <header className="flex h-14 items-center border-b border-border px-6 gap-4">
         <button
           onClick={() => navigate('/admin')}
+          aria-label="Back to admin dashboard"
           className="text-muted hover:text-foreground transition-colors"
         >
           <BackIcon />
@@ -330,7 +333,7 @@ export function AdminWorkspaceDetailPage() {
                             "text-sm transition-colors",
                             copiedId === invite.id
                               ? "text-green-500"
-                              : "text-accent hover:text-accent/80"
+                              : "text-accent-text hover:text-accent-text/80"
                           )}
                         >
                           {copiedId === invite.id ? 'Copied!' : 'Copy Link'}
@@ -364,6 +367,7 @@ export function AdminWorkspaceDetailPage() {
                       setSelectedUser(null);
                       setUserSearch('');
                     }}
+                    aria-label={`Clear selected user ${selectedUser.name}`}
                     className="ml-auto text-muted hover:text-foreground"
                   >
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

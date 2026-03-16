@@ -144,13 +144,19 @@ describe('Sprints API', () => {
 
   describe('GET /api/weeks/:id', () => {
     let testSprintId: string
+    let testIssueId: string
 
     beforeAll(async () => {
+      await pool.query(
+        `UPDATE workspaces SET sprint_start_date = $1 WHERE id = $2`,
+        ['2000-01-03', testWorkspaceId]
+      )
+
       const sprintResult = await pool.query(
-        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by)
-         VALUES ($1, 'sprint', 'Test Sprint for Get', 'workspace', $2)
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+         VALUES ($1, 'sprint', 'Test Sprint for Get', 'workspace', $2, $3)
          RETURNING id`,
-        [testWorkspaceId, testUserId]
+        [testWorkspaceId, testUserId, JSON.stringify({ sprint_number: 1 })]
       )
       testSprintId = sprintResult.rows[0].id
       // Create program association
@@ -158,6 +164,20 @@ describe('Sprints API', () => {
         `INSERT INTO document_associations (document_id, related_id, relationship_type)
          VALUES ($1, $2, 'program')`,
         [testSprintId, testProgramId]
+      )
+
+      const issueResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, visibility, created_by, properties)
+         VALUES ($1, 'issue', 'Test Issue for Snapshot', 'workspace', $2, $3)
+         RETURNING id`,
+        [testWorkspaceId, testUserId, JSON.stringify({ state: 'todo' })]
+      )
+      testIssueId = issueResult.rows[0].id
+
+      await pool.query(
+        `INSERT INTO document_associations (document_id, related_id, relationship_type)
+         VALUES ($1, $2, 'sprint')`,
+        [testIssueId, testSprintId]
       )
     })
 
@@ -178,6 +198,24 @@ describe('Sprints API', () => {
         .set('Cookie', sessionCookie)
 
       expect(res.status).toBe(404)
+    })
+
+    it('should not persist planned_issue_ids during GET when hydrating active sprint snapshot', async () => {
+      const res = await request(app)
+        .get(`/api/weeks/${testSprintId}`)
+        .set('Cookie', sessionCookie)
+
+      expect(res.status).toBe(200)
+      expect(res.body.planned_issue_ids).toContain(testIssueId)
+      expect(res.body.snapshot_taken_at).toBeNull()
+
+      const dbResult = await pool.query(
+        `SELECT properties FROM documents WHERE id = $1`,
+        [testSprintId]
+      )
+
+      expect(dbResult.rows[0].properties.planned_issue_ids).toBeUndefined()
+      expect(dbResult.rows[0].properties.snapshot_taken_at).toBeUndefined()
     })
   })
 

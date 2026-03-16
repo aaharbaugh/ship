@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useId, useRef } from 'react';
 import { useIssuesQuery, useUpdateIssue, getSprintId, getProjectId, getProgramId } from '@/hooks/useIssuesQuery';
 import { Issue } from '@/contexts/IssuesContext';
 import { cn } from '@/lib/cn';
@@ -32,6 +32,11 @@ export interface BacklogPickerModalProps {
  * - "Add to {context}" button patches all selected issues
  */
 export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: BacklogPickerModalProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const searchId = useId();
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isAdding, setIsAdding] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -125,6 +130,17 @@ export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: 
     }
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    lastFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeButtonRef.current?.focus();
+
+    return () => {
+      lastFocusedRef.current?.focus();
+    };
+  }, [isOpen]);
+
   const toggleSelection = useCallback((id: string) => {
     setSelectedIds(prev => {
       const newSet = new Set(prev);
@@ -204,9 +220,34 @@ export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: 
   }, [selectedIds, availableIssues, context, contextName, onClose, onIssuesAdded, showToast]);
 
   // Handle click outside dialog
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget && !isAdding) {
       onClose();
+    }
+  };
+
+  const handleDialogKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Tab') return;
+
+    const container = e.currentTarget;
+    const focusable = Array.from(
+      container.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+      )
+    );
+
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+
+    if (e.shiftKey && active === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && active === last) {
+      e.preventDefault();
+      first.focus();
     }
   };
 
@@ -217,16 +258,20 @@ export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
       onClick={handleBackdropClick}
+      onKeyDown={handleDialogKeyDown}
     >
       <div className="w-full max-w-3xl h-[80vh] flex flex-col rounded-lg bg-background shadow-lg">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Add to {contextName}</h2>
-            <p className="text-sm text-muted">Select issues from the backlog to add to this {contextType}</p>
+            <h2 id={titleId} className="text-lg font-semibold text-foreground">Add to {contextName}</h2>
+            <p id={descriptionId} className="text-sm text-muted">Select issues from the backlog to add to this {contextType}</p>
           </div>
           <button
+            ref={closeButtonRef}
             onClick={onClose}
             disabled={isAdding}
             className="text-muted hover:text-foreground transition-colors disabled:opacity-50"
@@ -241,7 +286,9 @@ export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: 
         {/* Search and actions */}
         <div className="flex items-center gap-4 border-b border-border px-6 py-3">
           <div className="flex-1">
+            <label htmlFor={searchId} className="sr-only">Search issues</label>
             <input
+              id={searchId}
               type="text"
               placeholder="Search issues..."
               value={searchQuery}
@@ -301,7 +348,7 @@ export function BacklogPickerModal({ isOpen, onClose, context, onIssuesAdded }: 
                       disabled={isInContext}
                       onChange={() => toggleSelection(issue.id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 rounded border-border text-accent focus:ring-accent disabled:opacity-50"
+                      className="h-4 w-4 rounded border-border text-accent-text focus:ring-accent disabled:opacity-50"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">

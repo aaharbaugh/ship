@@ -567,7 +567,7 @@ export function OrgChartPage() {
                 setToast(null);
                 if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
               }}
-              className="font-medium text-accent hover:underline"
+              className="font-medium text-accent-text hover:underline"
             >
               Undo
             </button>
@@ -577,6 +577,7 @@ export function OrgChartPage() {
               setToast(null);
               if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
             }}
+            aria-label="Dismiss notification"
             className="text-muted hover:text-foreground"
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -601,7 +602,7 @@ function NoSupervisorDropZone() {
       ref={setNodeRef}
       className={`mb-2 flex items-center justify-center rounded-md border-2 border-dashed px-4 py-2 text-xs transition-colors ${
         isOver
-          ? 'border-accent bg-accent/10 text-accent'
+          ? 'border-accent bg-accent/10 text-accent-text'
           : 'border-border/50 text-muted'
       }`}
     >
@@ -678,6 +679,7 @@ function OrgChartRow({
       <button
         onClick={(e) => { e.stopPropagation(); onToggleExpand(node.personId); }}
         onPointerDown={(e) => e.stopPropagation()}
+        aria-label={isExpanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded transition-transform ${
           hasChildren ? 'text-muted hover:text-foreground' : 'invisible'
         }`}
@@ -705,7 +707,7 @@ function OrgChartRow({
           <button
             onClick={() => onNavigate(`/team/${node.personId}`)}
             onPointerDown={(e) => e.stopPropagation()}
-            className="truncate font-medium text-foreground hover:text-accent hover:underline"
+            className="truncate font-medium text-foreground hover:text-accent-text hover:underline"
             tabIndex={-1}
           >
             {searchMatches && debouncedQuery ? (

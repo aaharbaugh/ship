@@ -159,7 +159,7 @@ export function ProgramsPage() {
       <button
         onClick={handleCreateProgram}
         disabled={creating}
-        className="mt-2 text-sm text-accent hover:underline disabled:opacity-50"
+        className="mt-2 text-sm font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 disabled:opacity-50"
       >
         Create your first program
       </button>

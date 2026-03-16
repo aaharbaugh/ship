@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Editor } from '@/components/Editor';
 import { useAuth } from '@/hooks/useAuth';
 import { useDocuments } from '@/contexts/DocumentsContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -9,6 +8,12 @@ import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { PersonCombobox, type Person } from '@/components/PersonCombobox';
 import { PropertyRow } from '@/components/ui/PropertyRow';
 import { apiGet, apiPatch, apiDelete } from '@/lib/api';
+import { useToast } from '@/components/ui/Toast';
+
+const Editor = lazy(async () => {
+  const module = await import('@/components/Editor');
+  return { default: module.Editor };
+});
 
 interface PersonDocument {
   id: string;
@@ -46,6 +51,7 @@ export function PersonEditorPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const { createDocument } = useDocuments();
   const { isWorkspaceAdmin } = useWorkspace();
   const { data: teamMembers } = useAssignableMembersQuery();
@@ -123,6 +129,9 @@ export function PersonEditorPage() {
       const title = newTitle || 'Untitled';
       await apiPatch(`/api/documents/${id}`, { title });
     },
+    onError: (error) => {
+      showToast(`Auto-save failed: ${error.message}`, 'error', 5000);
+    },
   });
 
   const handleDelete = useCallback(async () => {
@@ -151,32 +160,40 @@ export function PersonEditorPage() {
   }
 
   return (
-    <Editor
-      documentId={id}
-      userName={user?.name || 'Anonymous'}
-      initialTitle={person.title}
-      onTitleChange={throttledTitleSave}
-      onBack={() => navigate('/team/directory')}
-      backLabel="Team Directory"
-      roomPrefix="person"
-      placeholder="Add bio, contact info, skills..."
-      onDelete={handleDelete}
-      onCreateSubDocument={handleCreateSubDocument}
-      onNavigateToDocument={handleNavigateToDocument}
-      sidebar={
-        <PersonSidebar
-          person={person}
-          people={teamMembers || []}
-          isAdmin={isWorkspaceAdmin}
-          onUpdateProperties={async (updates) => {
-            await apiPatch(`/api/documents/${id}`, { properties: updates });
-            setPerson(prev => prev ? { ...prev, properties: { ...prev.properties, ...updates } } : prev);
-          }}
-          metricsVisible={metricsVisible}
-          sprintMetrics={sprintMetrics}
-        />
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <div className="text-muted">Loading editor...</div>
+        </div>
       }
-    />
+    >
+      <Editor
+        documentId={id}
+        userName={user?.name || 'Anonymous'}
+        initialTitle={person.title}
+        onTitleChange={throttledTitleSave}
+        onBack={() => navigate('/team/directory')}
+        backLabel="Team Directory"
+        roomPrefix="person"
+        placeholder="Add bio, contact info, skills..."
+        onDelete={handleDelete}
+        onCreateSubDocument={handleCreateSubDocument}
+        onNavigateToDocument={handleNavigateToDocument}
+        sidebar={
+          <PersonSidebar
+            person={person}
+            people={teamMembers || []}
+            isAdmin={isWorkspaceAdmin}
+            onUpdateProperties={async (updates) => {
+              await apiPatch(`/api/documents/${id}`, { properties: updates });
+              setPerson(prev => prev ? { ...prev, properties: { ...prev.properties, ...updates } } : prev);
+            }}
+            metricsVisible={metricsVisible}
+            sprintMetrics={sprintMetrics}
+          />
+        }
+      />
+    </Suspense>
   );
 }
 

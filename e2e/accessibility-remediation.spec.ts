@@ -42,6 +42,85 @@ async function login(page: import('@playwright/test').Page) {
   await expect(page).not.toHaveURL('/login', { timeout: 5000 })
 }
 
+async function openDocument(page: import('@playwright/test').Page) {
+  await page.goto('/docs')
+  await page.waitForLoadState('networkidle')
+
+  const sidebarDocLink = page.locator('[aria-label="Document list"] a[href*="/documents/"]').first()
+  if (await sidebarDocLink.isVisible().catch(() => false)) {
+    await sidebarDocLink.click()
+  } else {
+    const newDocButton = page.getByRole('button', { name: 'New Document', exact: true })
+    if (await newDocButton.isVisible().catch(() => false)) {
+      await newDocButton.click()
+    } else {
+      await page.locator('button[aria-label="New document"]').click()
+    }
+  }
+
+  await expect(page).toHaveURL(/\/documents\//, { timeout: 10000 })
+  await page.waitForLoadState('networkidle')
+}
+
+async function openIssue(page: import('@playwright/test').Page) {
+  await page.goto('/issues')
+  await page.waitForLoadState('networkidle')
+
+  const firstIssueRow = page.locator('table[role="grid"] tbody tr').first()
+  if (await firstIssueRow.isVisible().catch(() => false)) {
+    await firstIssueRow.click()
+  } else {
+    const newIssueButton = page.getByRole('button', { name: 'New Issue', exact: true })
+    if (await newIssueButton.isVisible().catch(() => false)) {
+      await newIssueButton.click()
+    } else {
+      await page.getByRole('button', { name: 'Create an issue', exact: true }).click()
+    }
+  }
+
+  await expect(page).toHaveURL(/\/documents\//, { timeout: 10000 })
+  await page.waitForLoadState('networkidle')
+}
+
+async function ensureIssuesListHasContent(page: import('@playwright/test').Page) {
+  await page.goto('/issues')
+  await page.waitForLoadState('networkidle')
+
+  const statusIndicators = page.locator('[data-status-indicator]')
+  if (await statusIndicators.first().isVisible().catch(() => false)) {
+    return
+  }
+
+  await openIssue(page)
+  await page.goto('/issues')
+  await page.waitForLoadState('networkidle')
+}
+
+async function getCsrfToken(page: import('@playwright/test').Page): Promise<string> {
+  const response = await page.request.get('/api/csrf-token')
+  expect(response.ok()).toBe(true)
+  const data = await response.json()
+  return data.token
+}
+
+async function createWikiDocument(
+  page: import('@playwright/test').Page,
+  options: { title: string; parent_id?: string | null }
+) {
+  const csrfToken = await getCsrfToken(page)
+  const response = await page.request.post('/api/documents', {
+    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    data: {
+      title: options.title,
+      document_type: 'wiki',
+      parent_id: options.parent_id ?? null,
+    },
+  })
+
+  expect(response.ok()).toBe(true)
+  return response.json()
+}
+
 // =============================================================================
 // PHASE 1: CRITICAL VIOLATIONS (12 tests)
 // =============================================================================
@@ -50,8 +129,7 @@ test.describe('Phase 1: Critical Violations', () => {
   test.describe('1.1 Color-Only State Indicators (WCAG 1.4.1)', () => {
     test('status indicators have icons not just colors', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
+      await ensureIssuesListHasContent(page)
 
       // MUST have status indicators - this test requires them to exist
       const statusIndicators = page.locator('[data-status-indicator]')
@@ -70,8 +148,7 @@ test.describe('Phase 1: Critical Violations', () => {
 
     test('screen readers can identify issue state without color', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
+      await ensureIssuesListHasContent(page)
 
       // MUST have status indicators
       const statusIndicators = page.locator('[data-status-indicator]')
@@ -115,14 +192,7 @@ test.describe('Phase 1: Critical Violations', () => {
   test.describe('1.3 Status Messages Announced (WCAG 4.1.3)', () => {
     test('sync status has aria-live region', async ({ page }) => {
       await login(page)
-      await page.goto('/docs')
-      await page.waitForLoadState('networkidle')
-
-      // Open a document to see sync status
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      await expect(docLink).toBeVisible({ timeout: 5000 })
-      await docLink.click()
-      await page.waitForLoadState('networkidle')
+      await openDocument(page)
 
       // Editor sync status MUST have role="status" and aria-live="polite"
       // Note: Multiple status regions exist (sync status, pending count, etc.), so we target specifically
@@ -144,14 +214,7 @@ test.describe('Phase 1: Critical Violations', () => {
   test.describe('1.4 Combobox ARIA Attributes (WCAG 4.1.2)', () => {
     test('combobox has required ARIA attributes', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
-
-      // Open an issue to see comboboxes in properties sidebar
-      const issueLink = page.locator('a[href*="/documents/"]').first()
-      await expect(issueLink).toBeVisible({ timeout: 5000 })
-      await issueLink.click()
-      await page.waitForLoadState('networkidle')
+      await openIssue(page)
 
       // MUST have at least one combobox (status, assignee, etc.)
       const combobox = page.locator('[aria-haspopup="listbox"], [role="combobox"]').first()
@@ -671,14 +734,7 @@ test.describe('Phase 2: Serious Violations', () => {
   test.describe('2.7 Auto-save Notification (WCAG 3.2.2)', () => {
     test('auto-save has status announcement', async ({ page }) => {
       await login(page)
-      await page.goto('/docs')
-      await page.waitForLoadState('networkidle')
-
-      // Open a document to see auto-save
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      await expect(docLink).toBeVisible({ timeout: 5000 })
-      await docLink.click()
-      await page.waitForLoadState('networkidle')
+      await openDocument(page)
 
       // Status region MUST exist for auto-save announcements
       // Use specific testid since there are multiple status elements (sync-status, pending-sync-count)
@@ -694,14 +750,7 @@ test.describe('Phase 2: Serious Violations', () => {
   test.describe('2.8 Keyboard Escape from Resize (WCAG 2.1.2)', () => {
     test('Escape key deselects image in editor', async ({ page }) => {
       await login(page)
-      await page.goto('/docs')
-      await page.waitForLoadState('networkidle')
-
-      // Open a document with content
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      await expect(docLink).toBeVisible({ timeout: 5000 })
-      await docLink.click()
-      await page.waitForLoadState('networkidle')
+      await openDocument(page)
 
       // Find an image in the editor
       const image = page.locator('.ProseMirror img, [data-type="image"]').first()
@@ -794,13 +843,9 @@ test.describe('Phase 2: Serious Violations', () => {
       // Properties Sidebar: aside with aria-label="Document properties"
       // Note: Properties sidebar only appears when editing a document (4-panel editor layout)
       // Navigate to a document first to get the full 4-panel layout
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      if (await docLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await docLink.click()
-        await page.waitForLoadState('networkidle')
-        const propertiesAside = page.locator('aside[aria-label="Document properties"], #properties-panel')
-        await expect(propertiesAside).toHaveCount(1)
-      }
+      await openDocument(page)
+      const propertiesAside = page.locator('aside[aria-label="Document properties"], #properties-panel, #properties-portal')
+      await expect(propertiesAside.first()).toBeVisible()
     })
 
     test('landmarks appear in correct DOM order for screen readers', async ({ page }) => {
@@ -808,11 +853,7 @@ test.describe('Phase 2: Serious Violations', () => {
       await page.waitForLoadState('networkidle')
 
       // Navigate to a document to get the full 4-panel layout with properties sidebar
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      if (await docLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await docLink.click()
-        await page.waitForLoadState('networkidle')
-      }
+      await openDocument(page)
 
       // Get all landmarks in DOM order
       const landmarks = await page.evaluate(() => {
@@ -845,14 +886,7 @@ test.describe('Phase 2: Serious Violations', () => {
   test.describe('2.12 Properties Sidebar Audit', () => {
     test('properties sidebar forms have proper labels', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
-
-      // Issue link MUST exist
-      const issueLink = page.locator('a[href*="/documents/"]').first()
-      await expect(issueLink).toBeVisible({ timeout: 5000 })
-      await issueLink.click()
-      await page.waitForLoadState('networkidle')
+      await openIssue(page)
 
       // Properties panel MUST exist (it's part of the 4-panel layout)
       const propertiesPanel = page.locator('#properties-panel, aside[aria-label="Document properties"]').first()
@@ -888,13 +922,7 @@ test.describe('Phase 2: Serious Violations', () => {
 
     test('properties sidebar works with keyboard only', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
-
-      const issueLink = page.locator('a[href*="/documents/"]').first()
-      await expect(issueLink).toBeVisible({ timeout: 5000 })
-      await issueLink.click()
-      await page.waitForLoadState('networkidle')
+      await openIssue(page)
 
       // Tab into the properties panel
       // Keep tabbing until we reach a form control in the properties panel
@@ -921,6 +949,14 @@ test.describe('Phase 2: Serious Violations', () => {
   test.describe('2.13 Auto-Expand Tree to Current Document', () => {
     test('navigating to nested document auto-expands tree ancestors', async ({ page }) => {
       await login(page)
+
+      const uniqueSuffix = Date.now().toString(36)
+      const parentDoc = await createWikiDocument(page, { title: `Tree Parent ${uniqueSuffix}` })
+      const childDoc = await createWikiDocument(page, {
+        title: `Tree Child ${uniqueSuffix}`,
+        parent_id: parentDoc.id,
+      })
+
       await page.goto('/docs')
       await page.waitForLoadState('networkidle')
 
@@ -928,42 +964,23 @@ test.describe('Phase 2: Serious Violations', () => {
       const sidebar = page.locator('#sidebar-content, aside[aria-label="Document list"]')
       await expect(sidebar).toBeVisible({ timeout: 5000 })
 
-      // Find a document that has children (indicated by aria-expanded attribute)
-      const expandableItem = page.locator('[aria-expanded]').first()
-      const hasExpandable = await expandableItem.count() > 0
+      const sidebarTree = sidebar.locator('[role="tree"][aria-label*="documents"]').first()
+      await expect(sidebarTree).toBeVisible({ timeout: 5000 })
 
-      // Seed data must provide nested documents for this test
-      expect(hasExpandable, 'Seed data should provide nested documents. Run: pnpm db:seed').toBe(true)
-
-      // Expand to find a nested document
-      const isExpanded = await expandableItem.getAttribute('aria-expanded')
-      if (isExpanded === 'false') {
-        const expander = expandableItem.locator('button, [role="button"]').first()
-        await expect(expander).toBeVisible()
-        await expander.click()
-        await page.waitForTimeout(300)
-      }
-
-      // Find a child document link (must be in nested ul, not the parent's own link)
-      const childDoc = expandableItem.locator('ul a[href*="/documents/"]').first()
-      await expect(childDoc).toBeVisible({ timeout: 3000 })
-
-      const childHref = await childDoc.getAttribute('href')
-      expect(childHref).toBeTruthy()
+      const childHref = `/documents/${childDoc.id}`
 
       // Navigate directly to this URL (simulating deep link / refresh)
-      await page.goto(childHref!)
+      await page.goto(childHref)
       await page.waitForLoadState('networkidle')
 
       // CRITICAL: Tree MUST auto-expand to show this document
-      // Use the sidebar tree specifically to avoid conflicts with main content tree
-      const sidebarTree = page.locator('[role="tree"][aria-label*="documents"]').first()
       const currentDocInTree = sidebarTree.locator(`a[href="${childHref}"]`)
       await expect(currentDocInTree).toBeVisible({ timeout: 3000 })
 
-      // Parent MUST be expanded (aria-expanded="true")
-      const expandedParent = page.locator('[aria-expanded="true"]')
-      expect(await expandedParent.count()).toBeGreaterThan(0)
+      const parentTreeItem = sidebarTree.locator('[role="treeitem"]').filter({
+        has: page.locator(`a[href="/documents/${parentDoc.id}"]`)
+      }).first()
+      await expect(parentTreeItem).toHaveAttribute('aria-expanded', 'true')
     })
 
     test('current document is visually highlighted in tree', async ({ page }) => {
@@ -1075,14 +1092,7 @@ test.describe('Phase 2: Serious Violations', () => {
 
     test('related form fields are grouped with fieldset', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
-
-      // Open a document with properties sidebar
-      const docLink = page.locator('a[href*="/documents/"]').first()
-      await expect(docLink).toBeVisible({ timeout: 5000 })
-      await docLink.click()
-      await page.waitForLoadState('networkidle')
+      await openIssue(page)
 
       // Properties sidebar MUST have proper grouping for related fields
       const propertiesSidebar = page.locator('[data-properties], aside:has(select)')
@@ -1476,14 +1486,7 @@ test.describe('Phase 4: Minor Violations', () => {
 
     test('form fields have contextual help where needed', async ({ page }) => {
       await login(page)
-      await page.goto('/issues')
-      await page.waitForLoadState('networkidle')
-
-      // Open an issue with properties sidebar
-      const issueLink = page.locator('a[href*="/documents/"]').first()
-      await expect(issueLink).toBeVisible({ timeout: 5000 })
-      await issueLink.click()
-      await page.waitForLoadState('networkidle')
+      await openIssue(page)
 
       // Form inputs that might need contextual help
       const inputs = page.locator('input[type="number"], input[type="date"], input:not([type="hidden"])')

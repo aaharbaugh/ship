@@ -37,6 +37,20 @@ async function setDocumentTitle(page: Page, title: string) {
   await page.waitForTimeout(500)
 }
 
+// Mention picker options now include document-type labels and can duplicate
+// accessible names during filtering. Pick the first visible exact title match.
+async function selectMentionOption(page: Page, title: string) {
+  const mentionPopup = page.locator('[role="listbox"]')
+  await expect(mentionPopup).toBeVisible({ timeout: 10000 })
+
+  const option = page
+    .getByRole('option', { name: new RegExp(`^${title}(\\s|$)`) })
+    .first()
+
+  await expect(option).toBeVisible({ timeout: 5000 })
+  await option.click()
+}
+
 test.describe('Backlinks', () => {
   test.beforeEach(async ({ page }) => {
     await login(page)
@@ -74,9 +88,7 @@ test.describe('Backlinks', () => {
     await page.waitForTimeout(500)
 
     // Select Document A from list
-    const docAOption = page.locator('[role="option"]').filter({ hasText: 'Document A' })
-    await expect(docAOption).toBeVisible({ timeout: 5000 })
-    await docAOption.click()
+    await selectMentionOption(page, 'Document A')
     await page.waitForTimeout(1000)
 
     // Navigate to Document A
@@ -122,9 +134,7 @@ test.describe('Backlinks', () => {
     await page.keyboard.type('Doc to Mention')
     await page.waitForTimeout(500)
 
-    const docOption = page.locator('[role="option"]').filter({ hasText: 'Doc to Mention' })
-    await expect(docOption).toBeVisible({ timeout: 5000 })
-    await docOption.click()
+    await selectMentionOption(page, 'Doc to Mention')
     await page.waitForTimeout(1000)
 
     // Delete the mention by selecting all content and deleting it
@@ -136,7 +146,7 @@ test.describe('Backlinks', () => {
 
     // Focus the editor and select all content
     await editor.click()
-    await page.keyboard.press('Meta+a') // Select all (Cmd+A on Mac)
+    await page.keyboard.press('ControlOrMeta+a')
     await page.keyboard.press('Backspace') // Delete selected content
 
     // Wait for editor update to propagate (debounce is 500ms)
@@ -194,9 +204,7 @@ test.describe('Backlinks', () => {
     await page.keyboard.type('Target Document')
     await page.waitForTimeout(500)
 
-    const docOption = page.locator('[role="option"]').filter({ hasText: 'Target Document' })
-    await expect(docOption).toBeVisible({ timeout: 5000 })
-    await docOption.click()
+    await selectMentionOption(page, 'Target Document')
     await page.waitForTimeout(1000)
 
     // Navigate to Target Document
@@ -249,9 +257,7 @@ test.describe('Backlinks', () => {
     await page.keyboard.type('Mentioned Doc')
     await page.waitForTimeout(500)
 
-    const docOption = page.locator('[role="option"]').filter({ hasText: 'Mentioned Doc' })
-    await expect(docOption).toBeVisible({ timeout: 5000 })
-    await docOption.click()
+    await selectMentionOption(page, 'Mentioned Doc')
 
     // Wait for the link sync POST request (debounced 500ms)
     await page.waitForResponse(
@@ -331,9 +337,7 @@ test.describe('Backlinks', () => {
     await page2.waitForTimeout(500)
 
     // Select the document option
-    const docOption = page2.locator('[role="option"]').filter({ hasText: 'Real-time Doc' })
-    await expect(docOption).toBeVisible({ timeout: 5000 })
-    await docOption.click()
+    await selectMentionOption(page2, 'Real-time Doc')
 
     // Wait for sync to complete in page2
     await page2.waitForResponse(
@@ -449,11 +453,7 @@ test.describe('Backlinks', () => {
       await page.waitForTimeout(500)
 
       // Wait for our document to appear in results and select it
-      const docOption = page.locator('[role="option"]').filter({ hasText: 'Popular Doc' })
-      await expect(docOption).toBeVisible({ timeout: 3000 })
-
-      // Press Enter to select
-      await page.keyboard.press('Enter')
+      await selectMentionOption(page, 'Popular Doc')
 
       // Wait for mention to be inserted
       await expect(editor.locator('[data-type="mention"], .mention')).toBeVisible({ timeout: 3000 })

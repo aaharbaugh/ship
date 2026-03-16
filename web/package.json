@@ -12,6 +12,7 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "generate:icon-types": "tsx scripts/generate-icon-types.ts"
   },
   "dependencies": {
@@ -48,7 +49,6 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "diff-match-patch": "^1.0.5",
-    "emoji-picker-react": "^4.16.1",
     "idb-keyval": "^6.2.2",
     "lowlight": "^3.3.0",
     "react": "^18.3.1",
@@ -71,6 +71,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.17",
     "autoprefixer": "^10.4.20",
     "jsdom": "^27.4.0",
     "postcss": "^8.4.49",

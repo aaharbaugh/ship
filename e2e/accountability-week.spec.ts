@@ -20,27 +20,70 @@ async function getCsrfToken(page: import('@playwright/test').Page, apiUrl: strin
   return token;
 }
 
+async function loginAsSuperAdmin(page: import('@playwright/test').Page): Promise<void> {
+  await page.goto('/login');
+  await page.locator('#email').fill('dev@ship.local');
+  await page.locator('#password').fill('admin123');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).not.toHaveURL('/login', { timeout: 5000 });
+}
+
+async function getCurrentWeekContext(
+  page: import('@playwright/test').Page,
+  apiUrl: string
+): Promise<{ userId: string; personId: string; currentWeekNumber: number }> {
+  const meResponse = await page.request.get(`${apiUrl}/api/auth/me`);
+  expect(meResponse.ok()).toBe(true);
+  const meData = await meResponse.json();
+  const userId = meData.data.user.id as string;
+
+  const myWeekResponse = await page.request.get(`${apiUrl}/api/dashboard/my-week`);
+  expect(myWeekResponse.ok()).toBe(true);
+  const myWeekData = await myWeekResponse.json();
+
+  return {
+    userId,
+    personId: myWeekData.person_id as string,
+    currentWeekNumber: myWeekData.week.current_week_number as number,
+  };
+}
+
+async function createFreshMemberSession(
+  page: import('@playwright/test').Page,
+  apiUrl: string
+): Promise<{ userId: string; personId: string; currentWeekNumber: number }> {
+  await loginAsSuperAdmin(page);
+
+  const csrfToken = await getCsrfToken(page, apiUrl);
+  const workspaceResponse = await page.request.get(`${apiUrl}/api/workspaces/current`);
+  expect(workspaceResponse.ok()).toBe(true);
+  const workspaceData = await workspaceResponse.json();
+  const workspaceId = workspaceData.data.workspace.id as string;
+
+  const email = `accountability-week-${Date.now()}@ship.local`;
+  const inviteResponse = await page.request.post(`${apiUrl}/api/workspaces/${workspaceId}/invites`, {
+    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    data: { email, role: 'member' },
+  });
+  expect(inviteResponse.ok()).toBe(true);
+  const inviteData = await inviteResponse.json();
+  const token = inviteData.data.invite.token as string;
+
+  await page.context().clearCookies();
+  await page.goto(`/invite/${token}`);
+  await expect(page.getByText("You're Invited!")).toBeVisible({ timeout: 10000 });
+  await page.locator('#name').fill('Accountability Member');
+  await page.locator('#password').fill('admin123');
+  await page.getByRole('button', { name: 'Create Account & Accept' }).click();
+  await expect(page).toHaveURL(/\/docs/, { timeout: 10000 });
+
+  return getCurrentWeekContext(page, apiUrl);
+}
+
 test.describe('Week Accountability Flow', () => {
   test('allocated person without weekly_plan shows action item, creating plan removes it', async ({ page, apiServer }) => {
-    // Login to get auth cookies
-    await page.goto('/login');
-    await page.locator('#email').fill('dev@ship.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).not.toHaveURL('/login', { timeout: 5000 });
-
+    const { userId, personId, currentWeekNumber } = await createFreshMemberSession(page, apiServer.url);
     const csrfToken = await getCsrfToken(page, apiServer.url);
-
-    // Get user and person IDs
-    const meResponse = await page.request.get(`${apiServer.url}/api/auth/me`);
-    expect(meResponse.ok()).toBe(true);
-    const meData = await meResponse.json();
-    const userId = meData.data.user.id;
-
-    const personResponse = await page.request.get(`${apiServer.url}/api/weeks/lookup-person?user_id=${userId}`);
-    expect(personResponse.ok()).toBe(true);
-    const person = await personResponse.json();
-    const personId = person.id;
 
     // Create program + project
     const programResponse = await page.request.post(`${apiServer.url}/api/documents`, {
@@ -61,14 +104,22 @@ test.describe('Week Accountability Flow', () => {
     expect(projectResponse.ok()).toBe(true);
     const project = await projectResponse.json();
 
-    // Create sprint with the person allocated (sprint_number: 1 is in the past, so plan is due)
+    // Create a sprint in the current week with the member explicitly allocated.
+    // weekly_plan accountability is person+week based, so using a fresh member
+    // avoids collisions with any seeded plans for the default admin user.
     const sprintResponse = await page.request.post(`${apiServer.url}/api/documents`, {
       headers: { 'x-csrf-token': csrfToken },
       data: {
         title: 'Plan Test Sprint',
         document_type: 'sprint',
         belongs_to: [{ id: program.id, type: 'program' }, { id: project.id, type: 'project' }],
-        properties: { sprint_number: 1, owner_id: personId, assignee_ids: [personId], status: 'active' },
+        properties: {
+          sprint_number: currentWeekNumber,
+          owner_id: userId,
+          assignee_ids: [personId],
+          project_id: project.id,
+          status: 'active',
+        },
       },
     });
     expect(sprintResponse.ok()).toBe(true);
@@ -86,7 +137,7 @@ test.describe('Week Accountability Flow', () => {
     // Step 2: Create a weekly_plan document with content (the new way)
     const planResponse = await page.request.post(`${apiServer.url}/api/weekly-plans`, {
       headers: { 'x-csrf-token': csrfToken },
-      data: { person_id: personId, project_id: project.id, week_number: 1 },
+      data: { person_id: personId, project_id: project.id, week_number: currentWeekNumber },
     });
     expect(planResponse.ok()).toBe(true);
     const plan = await planResponse.json();
@@ -120,21 +171,10 @@ test.describe('Week Accountability Flow', () => {
   });
 
   test('sprint not started shows action item, starting sprint removes it', async ({ page, apiServer }) => {
-    // Login to get auth cookies
-    await page.goto('/login');
-    await page.locator('#email').fill('dev@ship.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).not.toHaveURL('/login', { timeout: 5000 });
-
-    // Get CSRF token for API calls
+    await loginAsSuperAdmin(page);
     const csrfToken = await getCsrfToken(page, apiServer.url);
 
-    // Get user ID
-    const meResponse = await page.request.get(`${apiServer.url}/api/auth/me`);
-    expect(meResponse.ok()).toBe(true);
-    const meData = await meResponse.json();
-    const userId = meData.data.user.id;
+    const { userId, currentWeekNumber } = await getCurrentWeekContext(page, apiServer.url);
 
     // Create a program
     const programResponse = await page.request.post(`${apiServer.url}/api/documents`, {
@@ -148,14 +188,14 @@ test.describe('Week Accountability Flow', () => {
     const program = await programResponse.json();
     const programId = program.id;
 
-    // Create a sprint in planning status (default)
-    // Sprint 1 has started per workspace dates, so it should show week_start action
+    // Create a sprint in the current week in planning status so it should
+    // immediately require a week_start action.
     const sprintResponse = await page.request.post(`${apiServer.url}/api/weeks`, {
       headers: { 'x-csrf-token': csrfToken },
       data: {
         title: 'Test Sprint Not Started',
         program_id: programId,
-        sprint_number: 1,
+        sprint_number: currentWeekNumber,
         owner_id: userId,
       },
     });
@@ -198,21 +238,10 @@ test.describe('Week Accountability Flow', () => {
   });
 
   test('sprint without issues shows action item, adding issue removes it', async ({ page, apiServer }) => {
-    // Login to get auth cookies
-    await page.goto('/login');
-    await page.locator('#email').fill('dev@ship.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).not.toHaveURL('/login', { timeout: 5000 });
-
-    // Get CSRF token for API calls
+    await loginAsSuperAdmin(page);
     const csrfToken = await getCsrfToken(page, apiServer.url);
 
-    // Get user ID
-    const meResponse = await page.request.get(`${apiServer.url}/api/auth/me`);
-    expect(meResponse.ok()).toBe(true);
-    const meData = await meResponse.json();
-    const userId = meData.data.user.id;
+    const { userId, currentWeekNumber } = await getCurrentWeekContext(page, apiServer.url);
 
     // Create a program
     const programResponse = await page.request.post(`${apiServer.url}/api/documents`, {
@@ -226,13 +255,13 @@ test.describe('Week Accountability Flow', () => {
     const program = await programResponse.json();
     const programId = program.id;
 
-    // Create a sprint (sprint 1 has started)
+    // Create a sprint in the current week so the missing-issues rule is active.
     const sprintResponse = await page.request.post(`${apiServer.url}/api/weeks`, {
       headers: { 'x-csrf-token': csrfToken },
       data: {
         title: 'Test Sprint Without Issues',
         program_id: programId,
-        sprint_number: 1,
+        sprint_number: currentWeekNumber,
         owner_id: userId,
       },
     });
@@ -278,21 +307,10 @@ test.describe('Week Accountability Flow', () => {
   });
 
   test('sprint in future does not show action items', async ({ page, apiServer }) => {
-    // Login to get auth cookies
-    await page.goto('/login');
-    await page.locator('#email').fill('dev@ship.local');
-    await page.locator('#password').fill('admin123');
-    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
-    await expect(page).not.toHaveURL('/login', { timeout: 5000 });
-
-    // Get CSRF token for API calls
+    await loginAsSuperAdmin(page);
     const csrfToken = await getCsrfToken(page, apiServer.url);
 
-    // Get user ID
-    const meResponse = await page.request.get(`${apiServer.url}/api/auth/me`);
-    expect(meResponse.ok()).toBe(true);
-    const meData = await meResponse.json();
-    const userId = meData.data.user.id;
+    const { userId } = await getCurrentWeekContext(page, apiServer.url);
 
     // Create a program
     const programResponse = await page.request.post(`${apiServer.url}/api/documents`, {

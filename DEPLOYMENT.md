@@ -88,18 +88,28 @@ The script automatically:
 **First deployment:** 5-10 minutes
 **Subsequent deployments:** 3-5 minutes
 
-### 3. Initialize Database (One-time)
+### 3. Initialize Database (One-time per environment)
 
 Apply database schema and optionally seed with test data:
 
 ```bash
-./scripts/init-database.sh
+./scripts/init-database.sh dev
 ```
 
 This script:
 - Fetches the DATABASE_URL from SSM Parameter Store
 - Applies the schema from `api/src/db/schema.sql`
 - Optionally seeds test data
+
+For the public demo deployment, seed the `shadow` environment explicitly:
+
+```bash
+./scripts/seed-deployment.sh
+# or
+./scripts/init-database.sh shadow --seed --yes
+```
+
+This keeps demo seeding intentional instead of reseeding every deploy automatically.
 
 ### 4. Deploy Frontend (Frequent)
 

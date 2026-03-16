@@ -40,6 +40,17 @@ export async function loadProductionSecrets(): Promise<void> {
     return; // Use .env files for local dev
   }
 
+  // Allow non-AWS production environments like Railway to provide env vars directly.
+  if (process.env.SKIP_SSM === '1') {
+    console.log('Skipping SSM secret loading because SKIP_SSM=1');
+    return;
+  }
+
+  if (process.env.DATABASE_URL && process.env.SESSION_SECRET) {
+    console.log('Skipping SSM secret loading because required env vars are already present');
+    return;
+  }
+
   const environment = process.env.ENVIRONMENT || 'prod';
   const basePath = `/ship/${environment}`;
 

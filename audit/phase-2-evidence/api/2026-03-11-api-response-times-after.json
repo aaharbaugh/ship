@@ -1,0 +1,225 @@
+{
+  "generatedAt": "2026-03-11T21:14:52.087Z",
+  "tool": "autocannon 8.0.0",
+  "port": 3002,
+  "mode": "overallRate=80 req/sec, duration=5s",
+  "p95Method": "Interpolated between p90 and p97_5 from autocannon latency histogram",
+  "dataset": {
+    "documents": 572,
+    "issues": 104,
+    "users": 22,
+    "sprints": 35
+  },
+  "results": [
+    {
+      "endpoint": "GET /api/dashboard/my-week",
+      "path": "/api/dashboard/my-week",
+      "runs": [
+        {
+          "connections": 10,
+          "requestsAverage": 80,
+          "p50": 9,
+          "p95": 37.67,
+          "p99": 53,
+          "p90": 25,
+          "p97_5": 44,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "requestsAverage": 80,
+          "p50": 24,
+          "p95": 67.67,
+          "p99": 82,
+          "p90": 55,
+          "p97_5": 74,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "requestsAverage": 80,
+          "p50": 52,
+          "p95": 137.33,
+          "p99": 160,
+          "p90": 114,
+          "p97_5": 149,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "GET /api/issues",
+      "path": "/api/issues",
+      "runs": [
+        {
+          "connections": 10,
+          "requestsAverage": 80,
+          "p50": 12,
+          "p95": 91,
+          "p99": 129,
+          "p90": 47,
+          "p97_5": 113,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "requestsAverage": 80,
+          "p50": 29,
+          "p95": 75.33,
+          "p99": 95,
+          "p90": 62,
+          "p97_5": 82,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "requestsAverage": 80,
+          "p50": 66,
+          "p95": 175.67,
+          "p99": 214,
+          "p90": 139,
+          "p97_5": 194,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "GET /api/projects",
+      "path": "/api/projects",
+      "runs": [
+        {
+          "connections": 10,
+          "requestsAverage": 80,
+          "p50": 12,
+          "p95": 126,
+          "p99": 157,
+          "p90": 88,
+          "p97_5": 145,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "requestsAverage": 80,
+          "p50": 21,
+          "p95": 53,
+          "p99": 64,
+          "p90": 45,
+          "p97_5": 57,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "requestsAverage": 80,
+          "p50": 43,
+          "p95": 108.33,
+          "p99": 127,
+          "p90": 91,
+          "p97_5": 117,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "GET /api/documents/:id",
+      "path": "/api/documents/e21ef3ea-d7b5-43f7-9e71-ece401f8c57e",
+      "runs": [
+        {
+          "connections": 10,
+          "requestsAverage": 80,
+          "p50": 10,
+          "p95": 83,
+          "p99": 109,
+          "p90": 51,
+          "p97_5": 99,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "requestsAverage": 80,
+          "p50": 21,
+          "p95": 51.67,
+          "p99": 60,
+          "p90": 45,
+          "p97_5": 55,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "requestsAverage": 80,
+          "p50": 44,
+          "p95": 107.67,
+          "p99": 121,
+          "p90": 95,
+          "p97_5": 114,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    },
+    {
+      "endpoint": "GET /api/team/accountability-grid-v3",
+      "path": "/api/team/accountability-grid-v3?fromSprint=1&toSprint=10",
+      "runs": [
+        {
+          "connections": 10,
+          "requestsAverage": 80,
+          "p50": 10,
+          "p95": 87.33,
+          "p99": 117,
+          "p90": 50,
+          "p97_5": 106,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 25,
+          "requestsAverage": 80,
+          "p50": 27,
+          "p95": 72.33,
+          "p99": 87,
+          "p90": 59,
+          "p97_5": 79,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        },
+        {
+          "connections": 50,
+          "requestsAverage": 80,
+          "p50": 62,
+          "p95": 176,
+          "p99": 212,
+          "p90": 138,
+          "p97_5": 195,
+          "errors": 0,
+          "timeouts": 0,
+          "non2xx": 0
+        }
+      ]
+    }
+  ]
+}

@@ -11,6 +11,73 @@ import { test, expect } from './fixtures/isolated-env'
  * - Activity/change history
  */
 
+async function getCsrfToken(page: import('@playwright/test').Page, apiUrl: string): Promise<string> {
+  const response = await page.request.get(`${apiUrl}/api/csrf-token`)
+  expect(response.ok()).toBe(true)
+  const { token } = await response.json()
+  return token
+}
+
+async function createProgramWithSprint(
+  page: import('@playwright/test').Page,
+): Promise<{ programId: string; programTitle: string; sprintId: string; sprintName: string }> {
+  const apiUrl = new URL(page.url()).origin
+  const csrfToken = await getCsrfToken(page, apiUrl)
+
+  const meResponse = await page.request.get(`${apiUrl}/api/auth/me`)
+  expect(meResponse.ok()).toBe(true)
+  const meData = await meResponse.json()
+  const userId = meData.data.user.id
+
+  const suffix = Date.now().toString()
+  const programTitle = `Estimate Program ${suffix}`
+  const sprintNumber = 900 + Number(suffix.slice(-2))
+
+  const programResponse = await page.request.post(`${apiUrl}/api/documents`, {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      title: programTitle,
+      document_type: 'program',
+    },
+  })
+  expect(programResponse.ok()).toBe(true)
+  const program = await programResponse.json()
+
+  const sprintResponse = await page.request.post(`${apiUrl}/api/weeks`, {
+    headers: { 'x-csrf-token': csrfToken },
+    data: {
+      title: `Estimate Sprint ${suffix}`,
+      program_id: program.id,
+      sprint_number: sprintNumber,
+      owner_id: userId,
+    },
+  })
+  expect(sprintResponse.ok()).toBe(true)
+  const sprint = await sprintResponse.json()
+
+  return {
+    programId: program.id,
+    programTitle,
+    sprintId: sprint.id,
+    sprintName: `Week ${sprintNumber}`,
+  }
+}
+
+async function updateIssue(
+  page: import('@playwright/test').Page,
+  issueId: string,
+  data: Record<string, unknown>
+) {
+  const apiUrl = new URL(page.url()).origin
+  const csrfToken = await getCsrfToken(page, apiUrl)
+
+  const response = await page.request.patch(`${apiUrl}/api/issues/${issueId}`, {
+    headers: { 'x-csrf-token': csrfToken },
+    data,
+  })
+  return response
+}
+
 test.describe('Issue Estimates', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login')
@@ -98,39 +165,19 @@ test.describe('Issue Estimates', () => {
       // Set title and program
       await page.getByPlaceholder('Untitled').fill('Sprint Issue Needs Estimate')
       await page.waitForResponse(resp => resp.url().includes('/api/documents/'))
+      const issueId = page.url().match(/\/documents\/([a-f0-9-]+)/)?.[1]
+      expect(issueId).toBeTruthy()
+      const { programId, sprintId } = await createProgramWithSprint(page)
+      const response = await updateIssue(page, issueId!, {
+        belongs_to: [
+          { id: programId, type: 'program' },
+          { id: sprintId, type: 'sprint' },
+        ],
+      })
 
-      // Select a program first - wait for program selector to appear
-      const addProgram = page.getByText('Add program...')
-      await expect(addProgram).toBeVisible({ timeout: 5000 })
-      await addProgram.click()
-      await page.waitForTimeout(500)
-
-      // Click on API Platform in the dropdown
-      const apiPlatform = page.getByText('API Platform', { exact: true })
-      await expect(apiPlatform).toBeVisible({ timeout: 5000 })
-      await apiPlatform.click()
-
-      // Wait for sprints to load (the Week selector appears after program is selected)
-      await page.waitForTimeout(1000)
-
-      // Try to assign to sprint without estimate - the Week selector should now be visible
-      const weekSelector = page.getByRole('combobox', { name: 'Week' })
-      if (await weekSelector.isVisible({ timeout: 5000 }).catch(() => false)) {
-        await weekSelector.click()
-        await page.waitForTimeout(500)
-
-        const sprintOption = page.locator('[cmdk-item]').filter({ hasText: /Week \d+/ }).first()
-
-        // Either sprint options are disabled, or clicking shows validation error
-        if (await sprintOption.isVisible({ timeout: 3000 }).catch(() => false)) {
-          const isDisabled = await sprintOption.isDisabled().catch(() => false)
-          if (!isDisabled) {
-            await sprintOption.click()
-            // Should show validation message
-            await expect(page.getByText(/add an estimate before assigning/i)).toBeVisible({ timeout: 3000 })
-          }
-        }
-      }
+      expect(response.status()).toBe(400)
+      const error = await response.json()
+      expect(error.error).toMatch(/estimate is required before assigning to a week/i)
     })
 
     test('allows sprint assignment after estimate is set', async ({ page }) => {
@@ -147,35 +194,28 @@ test.describe('Issue Estimates', () => {
       await expect(estimateInput.first()).toBeVisible({ timeout: 5000 })
       await estimateInput.first().fill('4')
       await page.waitForTimeout(500)
+      const issueId = page.url().match(/\/documents\/([a-f0-9-]+)/)?.[1]
+      expect(issueId).toBeTruthy()
+      const { programId, sprintId } = await createProgramWithSprint(page)
+      const response = await updateIssue(page, issueId!, {
+        estimate: 4,
+        belongs_to: [
+          { id: programId, type: 'program' },
+          { id: sprintId, type: 'sprint' },
+        ],
+      })
 
-      // Select program
-      const addProgram = page.getByText('Add program...')
-      await expect(addProgram).toBeVisible({ timeout: 5000 })
-      await addProgram.click()
-      await page.waitForTimeout(500)
+      expect(response.ok()).toBe(true)
 
-      const apiPlatform = page.getByText('API Platform', { exact: true })
-      await expect(apiPlatform).toBeVisible({ timeout: 5000 })
-      await apiPlatform.click()
-
-      // Wait for Week selector to appear (it appears after program is selected)
-      await page.waitForTimeout(1000)
-
-      const weekSelector = page.getByRole('combobox', { name: 'Week' })
-      await expect(weekSelector).toBeVisible({ timeout: 5000 })
-      await weekSelector.click()
-      await page.waitForTimeout(500)
-
-      // Wait for sprint options to appear (InlineWeekSelector uses role="option" buttons)
-      const sprintOption = page.locator('[role="option"]').filter({ hasText: /Week \d+/ }).first()
-      await expect(sprintOption).toBeVisible({ timeout: 5000 })
-      await sprintOption.click()
-
-      // Wait for the update to complete
-      await page.waitForTimeout(1000)
-
-      // Should show sprint selected - the Week combobox should now show a week name
-      await expect(page.getByRole('combobox', { name: 'Week' })).toContainText(/Week \d+/, { timeout: 5000 })
+      const refreshedIssue = await page.request.get(`${new URL(page.url()).origin}/api/issues/${issueId}`)
+      expect(refreshedIssue.ok()).toBe(true)
+      const issue = await refreshedIssue.json()
+      expect(issue.belongs_to).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: programId, type: 'program' }),
+          expect.objectContaining({ id: sprintId, type: 'sprint' }),
+        ])
+      )
     })
   })
 

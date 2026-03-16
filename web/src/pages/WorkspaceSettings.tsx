@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { api, WorkspaceMember, WorkspaceInvite, AuditLog, ApiToken, ApiTokenCreateResponse } from '@/lib/api';
 import { archivedPersonsKey } from '@/contexts/ArchivedPersonsContext';
 import { cn } from '@/lib/cn';
+import { useToast } from '@/components/ui/Toast';
 
 type Tab = 'members' | 'invites' | 'tokens' | 'audit';
 
@@ -15,6 +16,7 @@ export function WorkspaceSettingsPage() {
   const { currentWorkspace, isWorkspaceAdmin } = useWorkspace();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { showToast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Derive active tab from URL query params
@@ -93,7 +95,7 @@ export function WorkspaceSettingsPage() {
     // Check if this is the last admin
     const admins = members.filter(m => m.role === 'admin');
     if (admins.length === 1 && admins[0].userId === userId && newRole === 'member') {
-      alert('Cannot demote the last admin. Promote another member first.');
+      showToast('Cannot demote the last admin. Promote another member first.', 'error');
       return;
     }
 
@@ -110,7 +112,7 @@ export function WorkspaceSettingsPage() {
     const admins = members.filter(m => m.role === 'admin');
     const member = members.find(m => m.userId === userId);
     if (member?.role === 'admin' && admins.length === 1) {
-      alert('Cannot archive the last admin. Promote another member first.');
+      showToast('Cannot archive the last admin. Promote another member first.', 'error');
       return;
     }
 
@@ -164,17 +166,17 @@ export function WorkspaceSettingsPage() {
 
       {/* Tabs */}
       <div className="border-b border-border">
-        <nav className="flex px-6">
-          <TabButton active={activeTab === 'members'} onClick={() => handleTabChange('members')}>
+        <nav className="flex px-6" aria-label="Workspace settings sections">
+          <TabButton active={activeTab === 'members'} onClick={() => handleTabChange('members')} id="workspace-tab-members" controlsId="workspace-panel-members">
             Members
           </TabButton>
-          <TabButton active={activeTab === 'invites'} onClick={() => handleTabChange('invites')}>
+          <TabButton active={activeTab === 'invites'} onClick={() => handleTabChange('invites')} id="workspace-tab-invites" controlsId="workspace-panel-invites">
             Pending Invites
           </TabButton>
-          <TabButton active={activeTab === 'tokens'} onClick={() => handleTabChange('tokens')}>
+          <TabButton active={activeTab === 'tokens'} onClick={() => handleTabChange('tokens')} id="workspace-tab-tokens" controlsId="workspace-panel-tokens">
             API Tokens
           </TabButton>
-          <TabButton active={activeTab === 'audit'} onClick={() => handleTabChange('audit')}>
+          <TabButton active={activeTab === 'audit'} onClick={() => handleTabChange('audit')} id="workspace-tab-audit" controlsId="workspace-panel-audit">
             Audit Logs
           </TabButton>
           <Link
@@ -190,7 +192,12 @@ export function WorkspaceSettingsPage() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 overflow-auto p-6 pb-20">
+      <main
+        className="flex-1 overflow-auto p-6 pb-20"
+        id={`workspace-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`workspace-tab-${activeTab}`}
+      >
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <div className="text-muted">Loading...</div>
@@ -241,10 +248,27 @@ export function WorkspaceSettingsPage() {
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+  id,
+  controlsId,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  id: string;
+  controlsId: string;
+}) {
   return (
     <button
+      id={id}
       onClick={onClick}
+      role="tab"
+      aria-selected={active}
+      aria-controls={controlsId}
+      tabIndex={active ? 0 : -1}
       className={cn(
         'px-4 py-3 text-sm font-medium border-b-2 transition-colors',
         active
@@ -286,7 +310,7 @@ function MembersTab({
             type="checkbox"
             checked={showArchived}
             onChange={(e) => onShowArchivedChange(e.target.checked)}
-            className="h-3.5 w-3.5 rounded border-border text-accent focus:ring-accent/50"
+            className="h-3.5 w-3.5 rounded border-border text-accent-text focus:ring-accent/50"
           />
           <span className="text-xs text-muted">Show archived</span>
         </label>
@@ -343,7 +367,7 @@ function MembersTab({
                     {isArchived ? (
                       <button
                         onClick={() => onRestoreMember(member.userId)}
-                        className="text-sm text-accent hover:text-accent/80 transition-colors"
+                        className="text-sm text-accent-text hover:text-accent-text/80 transition-colors"
                       >
                         Restore
                       </button>
@@ -409,7 +433,9 @@ function InvitesTab({
       {/* Invite form */}
       <form onSubmit={onInvite} className="space-y-3">
         <div className="flex gap-3">
+          <label htmlFor="workspace-invite-email" className="sr-only">Invite email address</label>
           <input
+            id="workspace-invite-email"
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
@@ -417,7 +443,9 @@ function InvitesTab({
             className="flex-1 max-w-md px-3 py-2 bg-background border border-border rounded-md text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent"
             required
           />
+          <label htmlFor="workspace-invite-role" className="sr-only">Invite role</label>
           <select
+            id="workspace-invite-role"
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as 'admin' | 'member')}
             className="px-3 py-2 bg-background border border-border rounded-md text-foreground"
@@ -445,7 +473,9 @@ function InvitesTab({
           </button>
           {showPivField && (
             <div className="mt-2">
+              <label htmlFor="workspace-invite-piv-subject" className="sr-only">PIV certificate subject</label>
               <input
+                id="workspace-invite-piv-subject"
                 type="text"
                 value={inviteSubjectDn}
                 onChange={(e) => setInviteSubjectDn(e.target.value)}
@@ -498,8 +528,9 @@ function InvitesTab({
                         "text-sm transition-colors",
                         copiedId === invite.id
                           ? "text-green-500"
-                          : "text-accent hover:text-accent/80"
+                          : "text-accent-text hover:text-accent-text/80"
                       )}
+                      aria-label={copiedId === invite.id ? `Invite link copied for ${invite.email}` : `Copy invite link for ${invite.email}`}
                     >
                       {copiedId === invite.id ? 'Copied!' : 'Copy Link'}
                     </button>
@@ -586,8 +617,9 @@ function ApiTokensTab({
 
         <form onSubmit={handleCreate} className="flex gap-3 items-end">
           <div className="flex-1 max-w-xs">
-            <label className="block text-xs text-muted mb-1">Token Name</label>
+            <label htmlFor="workspace-token-name" className="block text-xs text-muted mb-1">Token Name</label>
             <input
+              id="workspace-token-name"
               type="text"
               value={tokenName}
               onChange={(e) => setTokenName(e.target.value)}
@@ -597,8 +629,9 @@ function ApiTokensTab({
             />
           </div>
           <div className="w-32">
-            <label className="block text-xs text-muted mb-1">Expires</label>
+            <label htmlFor="workspace-token-expiry" className="block text-xs text-muted mb-1">Expires</label>
             <select
+              id="workspace-token-expiry"
               value={expiresInDays}
               onChange={(e) => setExpiresInDays(e.target.value)}
               className="w-full px-3 py-2 bg-background border border-border rounded-md text-foreground"
@@ -678,12 +711,12 @@ function ApiTokensTab({
                   <td className="px-4 py-3 text-sm text-foreground font-medium">{token.name}</td>
                   <td className="px-4 py-3 text-sm text-muted font-mono">{token.token_prefix}...</td>
                   <td className="px-4 py-3 text-sm">
-                    {token.is_active ? (
-                      <span className="text-green-500">Active</span>
+                  {token.is_active ? (
+                      <span className="text-green-600 font-medium">Active</span>
                     ) : token.revoked_at ? (
-                      <span className="text-red-500">Revoked</span>
+                      <span className="text-red-600 font-medium">Revoked</span>
                     ) : (
-                      <span className="text-yellow-500">Expired</span>
+                      <span className="text-foreground font-medium">Expired</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm text-muted">

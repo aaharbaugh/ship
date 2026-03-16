@@ -301,7 +301,7 @@ export function AppLayout() {
           <div className="relative mb-4">
             <button
               onClick={() => setWorkspaceSwitcherOpen(!workspaceSwitcherOpen)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/20 text-accent hover:bg-accent/30 transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/20 text-accent-text hover:bg-accent/30 transition-colors"
               title={currentWorkspace?.name || 'Select workspace'}
             >
               {currentWorkspace?.name?.charAt(0).toUpperCase() || 'W'}
@@ -323,7 +323,7 @@ export function AppLayout() {
                         className={cn(
                           'flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors',
                           ws.id === currentWorkspace?.id
-                            ? 'bg-accent/10 text-accent'
+                            ? 'bg-accent/10 text-accent-text'
                             : 'text-foreground hover:bg-border/30'
                         )}
                       >
@@ -649,7 +649,7 @@ function DocumentsTree({ documents, activeId, onSelect }: { documents: WikiDocum
             <li className="px-2 py-1 text-sm text-muted">No workspace documents</li>
           )}
           {workspaceHiddenCount > 0 && (
-            <li>
+            <li role="treeitem" aria-level={1}>
               <Link
                 to="/docs?filter=workspace"
                 className="block px-2 py-1.5 text-sm text-muted hover:text-foreground hover:bg-border/30 rounded-md transition-colors"
@@ -678,7 +678,7 @@ function DocumentsTree({ documents, activeId, onSelect }: { documents: WikiDocum
               />
             ))}
             {privateHiddenCount > 0 && (
-              <li>
+              <li role="treeitem" aria-level={1}>
                 <Link
                   to="/docs?filter=private"
                   className="block px-2 py-1.5 text-sm text-muted hover:text-foreground hover:bg-border/30 rounded-md transition-colors"

@@ -17,16 +17,9 @@ describe('SelectionPersistenceContext', () => {
       // Suppress console.error for this test
       const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // renderHook doesn't allow checking throws directly, so we catch the error
-      let thrownError: Error | null = null;
-      try {
-        renderHook(() => useSelectionPersistence());
-      } catch (error) {
-        thrownError = error as Error;
-      }
-
-      expect(thrownError).not.toBeNull();
-      expect(thrownError?.message).toContain('useSelectionPersistence must be used within a SelectionPersistenceProvider');
+      expect(() => renderHook(() => useSelectionPersistence())).toThrow(
+        'useSelectionPersistence must be used within a SelectionPersistenceProvider'
+      );
 
       spy.mockRestore();
     });

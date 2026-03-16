@@ -26,9 +26,43 @@ async function loginAsSuperAdmin(page: Page) {
   await login(page, 'dev@ship.local', 'admin123')
 }
 
+async function getCsrfToken(page: Page): Promise<string> {
+  const response = await page.request.get('/api/csrf-token')
+  expect(response.ok()).toBe(true)
+  const data = await response.json()
+  return data.token
+}
+
+async function createMemberSession(page: Page) {
+  await loginAsSuperAdmin(page)
+
+  const csrfToken = await getCsrfToken(page)
+  const workspaceResponse = await page.request.get('/api/workspaces/current')
+  expect(workspaceResponse.ok()).toBe(true)
+  const workspaceData = await workspaceResponse.json()
+  const workspaceId = workspaceData.data.workspace.id as string
+
+  const email = `authorization-member-${Date.now()}@ship.local`
+  const inviteResponse = await page.request.post(`/api/workspaces/${workspaceId}/invites`, {
+    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    data: { email, role: 'member' },
+  })
+  expect(inviteResponse.ok()).toBe(true)
+  const inviteData = await inviteResponse.json()
+  const token = inviteData.data.invite.token as string
+
+  await page.context().clearCookies()
+  await page.goto(`/invite/${token}`)
+  await expect(page.getByText("You're Invited!")).toBeVisible({ timeout: 10000 })
+  await page.locator('#name').fill('Authorization Member')
+  await page.locator('#password').fill('admin123')
+  await page.getByRole('button', { name: 'Create Account & Accept' }).click()
+  await expect(page).toHaveURL(/\/docs/, { timeout: 10000 })
+}
+
 // Helper to login as regular member (non-admin)
 async function loginAsMember(page: Page) {
-  await login(page, 'bob.martinez@ship.local')
+  await createMemberSession(page)
 }
 
 // Helper to get a document ID from the current workspace

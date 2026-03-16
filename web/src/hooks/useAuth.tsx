@@ -62,6 +62,7 @@ interface AuthContextType {
   loading: boolean;
   isSuperAdmin: boolean;
   impersonating: { userId: string; userName: string } | null;
+  refreshSession: () => Promise<boolean>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   endImpersonation: () => Promise<void>;
@@ -78,6 +79,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isSuperAdmin = user?.isSuperAdmin ?? false;
 
+  const refreshSession = useCallback(async (): Promise<boolean> => {
+    try {
+      const response = await api.auth.me();
+      if (response.success && response.data) {
+        setUser(response.data.user);
+        setCurrentWorkspace(response.data.currentWorkspace);
+        setWorkspaces(response.data.workspaces);
+        setImpersonating(response.data.impersonating ?? null);
+        cacheAuthData({
+          user: response.data.user,
+          currentWorkspace: response.data.currentWorkspace,
+          workspaces: response.data.workspaces,
+          impersonating: response.data.impersonating,
+          timestamp: Date.now(),
+        });
+        return true;
+      }
+    } catch (error) {
+      console.error('[Auth] Session refresh failed:', error);
+    }
+    return false;
+  }, [setCurrentWorkspace, setWorkspaces]);
+
   // Check session on mount
   useEffect(() => {
     // React StrictMode runs effects twice in development; ensure one session check per mount.
@@ -86,23 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkSession = async () => {
       try {
-        const response = await api.auth.me();
-        if (response.success && response.data) {
-          setUser(response.data.user);
-          setCurrentWorkspace(response.data.currentWorkspace);
-          setWorkspaces(response.data.workspaces);
-          if (response.data.impersonating) {
-            setImpersonating(response.data.impersonating);
-          }
-          // Cache auth data for offline use
-          cacheAuthData({
-            user: response.data.user,
-            currentWorkspace: response.data.currentWorkspace,
-            workspaces: response.data.workspaces,
-            impersonating: response.data.impersonating,
-            timestamp: Date.now(),
-          });
-        } else {
+        const refreshed = await refreshSession();
+        if (!refreshed) {
           // Session check failed - clear cache if online (session expired)
           if (navigator.onLine) {
             clearCachedAuthData();
@@ -130,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     checkSession();
-  }, [setCurrentWorkspace, setWorkspaces]);
+  }, [refreshSession, setCurrentWorkspace, setWorkspaces]);
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await api.auth.login(email, password);
@@ -184,7 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setCurrentWorkspace, setWorkspaces]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isSuperAdmin, impersonating, login, logout, endImpersonation }}>
+    <AuthContext.Provider value={{ user, loading, isSuperAdmin, impersonating, refreshSession, login, logout, endImpersonation }}>
       {children}
     </AuthContext.Provider>
   );
