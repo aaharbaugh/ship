@@ -112,6 +112,35 @@ export interface FleetGraphQueueStatus {
   }>;
 }
 
+export interface FleetGraphReadinessStatus {
+  ready: boolean;
+  deployment: {
+    nodeEnv: string;
+    publicBaseUrl: string | null;
+    internalApiUrl: string | null;
+    publiclyAccessible: boolean;
+  };
+  runtime: {
+    shipApiTokenConfigured: boolean;
+    openAiConfigured: boolean;
+    langSmithEnabled: boolean;
+    langSmithProject: string | null;
+    queueIntervalMs: number;
+    maxDocumentsPerFlush: number;
+    collaborationIdleMs: number;
+    maxGraphDepth: number;
+    maxGraphDocuments: number;
+  };
+  routes: {
+    insights: string;
+    reports: string;
+    reviewSession: string;
+    nightlyScanApi: string;
+    nightlyScanScript: string;
+  };
+  missing: string[];
+}
+
 async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
   const response = await apiGet('/api/fleetgraph/reports');
   if (!response.ok) {
@@ -151,6 +180,15 @@ async function fetchFleetGraphReviewSession(): Promise<FleetGraphReviewSession> 
   return payload.session;
 }
 
+async function fetchFleetGraphReadiness(): Promise<FleetGraphReadinessStatus> {
+  const response = await apiGet('/api/fleetgraph/readiness');
+  if (!response.ok) {
+    throw new Error('Failed to fetch FleetGraph readiness');
+  }
+
+  return response.json() as Promise<FleetGraphReadinessStatus>;
+}
+
 export function useFleetGraphReportsQuery() {
   return useQuery({
     queryKey: ['fleetgraph-reports'],
@@ -173,6 +211,15 @@ export function useFleetGraphReviewSessionQuery() {
     queryKey: ['fleetgraph-review-session'],
     queryFn: fetchFleetGraphReviewSession,
     staleTime: 30_000,
+  });
+}
+
+export function useFleetGraphReadinessQuery() {
+  return useQuery({
+    queryKey: ['fleetgraph-readiness'],
+    queryFn: fetchFleetGraphReadiness,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 

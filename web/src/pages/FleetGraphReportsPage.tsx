@@ -6,6 +6,7 @@ import {
   useFleetGraphDirectorFeedbackMutation,
   useFleetGraphPublishReportMutation,
   useFleetGraphQueueStatusQuery,
+  useFleetGraphReadinessQuery,
   useFleetGraphReportsQuery,
   useFleetGraphWorkspaceScanMutation,
 } from '@/hooks/useFleetGraphReportsQuery';
@@ -19,6 +20,7 @@ const STATUS_STYLES: Record<'green' | 'yellow' | 'red', string> = {
 export function FleetGraphReportsPage() {
   const reportsQuery = useFleetGraphReportsQuery();
   const queueStatusQuery = useFleetGraphQueueStatusQuery();
+  const readinessQuery = useFleetGraphReadinessQuery();
   const publishMutation = useFleetGraphPublishReportMutation();
   const directorFeedbackMutation = useFleetGraphDirectorFeedbackMutation();
   const bulkPublishMutation = useFleetGraphBulkPublishReportsMutation();
@@ -163,6 +165,75 @@ export function FleetGraphReportsPage() {
           <SummaryCard label="Yellow Reports" value={grouped.yellow} tone="yellow" />
           <SummaryCard label="Published" value={reports.filter((report) => report.state === 'published').length} tone="green" />
         </div>
+
+        {readinessQuery.data && (
+          <div
+            className={cn(
+              'rounded-2xl border p-4 shadow-sm shadow-black/30',
+              readinessQuery.data.ready
+                ? 'border-emerald-900/60 bg-emerald-950/30'
+                : 'border-amber-900/60 bg-amber-950/30'
+            )}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">FleetGraph MVP Readiness</div>
+                <div className="mt-1 text-xs text-slate-300">
+                  {readinessQuery.data.ready
+                    ? 'Runtime config looks complete for a public FleetGraph deployment.'
+                    : 'FleetGraph is working, but public MVP rollout still has missing runtime pieces.'}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ReadinessChip
+                  label={readinessQuery.data.runtime.langSmithEnabled ? 'LangSmith on' : 'LangSmith missing'}
+                  tone={readinessQuery.data.runtime.langSmithEnabled ? 'green' : 'yellow'}
+                />
+                <ReadinessChip
+                  label={readinessQuery.data.runtime.openAiConfigured ? 'GPT-4o on' : 'OpenAI missing'}
+                  tone={readinessQuery.data.runtime.openAiConfigured ? 'green' : 'yellow'}
+                />
+                <ReadinessChip
+                  label={readinessQuery.data.deployment.publiclyAccessible ? 'Public URL set' : 'No public URL'}
+                  tone={readinessQuery.data.deployment.publiclyAccessible ? 'green' : 'yellow'}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-slate-300">
+              <span className="rounded-full border border-slate-700 bg-black/40 px-2 py-0.5">
+                queue {Math.round(readinessQuery.data.runtime.queueIntervalMs / 60000)} min
+              </span>
+              <span className="rounded-full border border-slate-700 bg-black/40 px-2 py-0.5">
+                collab idle {Math.round(readinessQuery.data.runtime.collaborationIdleMs / 1000)} s
+              </span>
+              <span className="rounded-full border border-slate-700 bg-black/40 px-2 py-0.5">
+                graph depth {readinessQuery.data.runtime.maxGraphDepth}
+              </span>
+              <span className="rounded-full border border-slate-700 bg-black/40 px-2 py-0.5">
+                graph docs {readinessQuery.data.runtime.maxGraphDocuments}
+              </span>
+              {readinessQuery.data.deployment.publicBaseUrl && (
+                <span className="rounded-full border border-slate-700 bg-black/40 px-2 py-0.5">
+                  {readinessQuery.data.deployment.publicBaseUrl}
+                </span>
+              )}
+            </div>
+
+            {readinessQuery.data.missing.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {readinessQuery.data.missing.map((item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-amber-700/50 bg-amber-950/60 px-2 py-0.5 text-[11px] text-amber-200"
+                  >
+                    missing {item}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {scanMutation.data && (
           <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
@@ -392,6 +463,27 @@ export function FleetGraphReportsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ReadinessChip({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'green' | 'yellow';
+}) {
+  return (
+    <span
+      className={cn(
+        'rounded-full border px-2 py-0.5 text-[11px] font-medium',
+        tone === 'green'
+          ? 'border-emerald-700/50 bg-emerald-950/60 text-emerald-200'
+          : 'border-amber-700/50 bg-amber-950/60 text-amber-200'
+      )}
+    >
+      {label}
+    </span>
   );
 }
 
