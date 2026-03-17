@@ -55,19 +55,44 @@ function buildQualityReportContent(
   analysis: FleetGraphAnalysis,
   rootSummary: string
 ): string {
+  const titleById = new Map(
+    [prepared.context.rootDocument, ...prepared.context.relatedDocuments].map((document) => [
+      document.id,
+      document.title,
+    ])
+  );
+  const scoredDocuments = analysis.documents.map((document) => ({
+    ...document,
+    title:
+      document.documentId === prepared.rootDocumentId
+        ? prepared.context.rootDocument.title
+        : titleById.get(document.documentId) ?? document.documentId,
+  }));
+  const redDocuments = scoredDocuments.filter((document) => document.qualityStatus === 'red');
+  const yellowDocuments = scoredDocuments.filter((document) => document.qualityStatus === 'yellow');
   const topSuggestions = analysis.remediationSuggestions.slice(0, 5);
-  const documentLines = analysis.documents
-    .slice(0, 8)
+  const documentLines = scoredDocuments
+    .sort((left, right) => compareStatus(right.qualityStatus, left.qualityStatus))
+    .slice(0, 10)
     .map(
       (document) =>
-        `- ${document.documentType} "${document.documentId === prepared.rootDocumentId ? prepared.context.rootDocument.title : document.documentId}": ${document.qualityStatus.toUpperCase()} ${Math.round(document.qualityScore * 100)}%`
+        `- ${document.documentType} "${document.title}": ${document.qualityStatus.toUpperCase()} ${Math.round(document.qualityScore * 100)}%${document.tags.length > 0 ? ` | ${document.tags.map((tag) => tag.label).join(', ')}` : ''}`
     )
     .join('\n');
+  const riskLines = [
+    `Red documents: ${redDocuments.length}`,
+    `Yellow documents: ${yellowDocuments.length}`,
+    `Green documents: ${scoredDocuments.length - redDocuments.length - yellowDocuments.length}`,
+    `Connected documents reviewed: ${prepared.graph.nodes.length}`,
+    `Relationships traversed: ${prepared.graph.edges.length}`,
+  ].join('\n');
+  const priorityBlock = buildPriorityBlock('Immediate attention', redDocuments);
+  const watchBlock = buildPriorityBlock('Watch list', yellowDocuments);
   const suggestionLines = topSuggestions.length
     ? topSuggestions
         .map(
           (suggestion, index) =>
-            `${index + 1}. ${suggestion.title} (${suggestion.priority})\n   ${suggestion.rationale}`
+            `${index + 1}. ${suggestion.title} (${suggestion.priority})${suggestion.document_id ? `\n   Target: ${titleById.get(suggestion.document_id) ?? suggestion.document_id}` : ''}\n   ${suggestion.rationale}`
         )
         .join('\n')
     : '1. No remediation suggestions generated.';
@@ -82,10 +107,54 @@ function buildQualityReportContent(
     '## Summary',
     rootSummary,
     '',
+    '## Health Snapshot',
+    riskLines,
+    '',
+    '## Priority Findings',
+    priorityBlock,
+    '',
+    '## Watch List',
+    watchBlock,
+    '',
     '## Document Scores',
     documentLines,
     '',
     '## Recommended Actions',
     suggestionLines,
   ].join('\n');
+}
+
+function buildPriorityBlock(
+  heading: string,
+  documents: Array<{
+    title: string;
+    documentType: string;
+    qualityScore: number;
+    tags: Array<{ label: string }>;
+  }>
+): string {
+  if (documents.length === 0) {
+    return `${heading}: none`;
+  }
+
+  return documents
+    .slice(0, 5)
+    .map(
+      (document) =>
+        `- ${document.documentType} "${document.title}" at ${Math.round(document.qualityScore * 100)}%${document.tags.length > 0 ? ` because ${document.tags.map((tag) => tag.label.toLowerCase()).join(', ')}` : ''}`
+    )
+    .join('\n');
+}
+
+function compareStatus(
+  left: 'green' | 'yellow' | 'red',
+  right: 'green' | 'yellow' | 'red'
+): number {
+  return rankStatus(left) - rankStatus(right);
+}
+
+function rankStatus(status: 'green' | 'yellow' | 'red'): number {
+  if (status === 'red') return 3;
+  if (status === 'yellow') return 2;
+  return 1;
 }
