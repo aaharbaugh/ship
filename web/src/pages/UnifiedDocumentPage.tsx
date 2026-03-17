@@ -2,11 +2,13 @@ import { useCallback, useMemo, useEffect, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UnifiedEditor } from '@/components/UnifiedEditor';
+import { FleetGraphDebugPanel, type PersistedFleetGraphView } from '@/components/FleetGraphDebugPanel';
 import type { UnifiedDocument, SidebarData } from '@/components/UnifiedEditor';
 import { useAuth } from '@/hooks/useAuth';
 import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { useProjectsQuery } from '@/hooks/useProjectsQuery';
+import { useFleetGraphDebugQuery, useFleetGraphPersistMutation } from '@/hooks/useFleetGraphDebugQuery';
 import { useDocumentConversion } from '@/hooks/useDocumentConversion';
 import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
@@ -59,6 +61,8 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
+  const fleetGraphDebugQuery = useFleetGraphDebugQuery(id);
+  const fleetGraphPersistMutation = useFleetGraphPersistMutation(id);
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -442,6 +446,42 @@ export function UnifiedDocumentPage() {
     } as UnifiedDocument;
   }, [document]);
 
+  const persistedFleetGraph = useMemo<PersistedFleetGraphView | null>(() => {
+    const properties = document?.properties as Record<string, unknown> | undefined;
+    if (!properties) return null;
+
+    const qualityScore = properties.quality_score;
+    const qualityStatus = properties.quality_status;
+    const qualitySummary = properties.quality_summary;
+    const qualityTags = properties.quality_tags;
+
+    if (
+      typeof qualityScore !== 'number' ||
+      (qualityStatus !== 'green' && qualityStatus !== 'yellow' && qualityStatus !== 'red') ||
+      typeof qualitySummary !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      qualityScore,
+      qualityStatus,
+      qualitySummary,
+      qualityTags: Array.isArray(qualityTags)
+        ? qualityTags.filter((tag): tag is PersistedFleetGraphView['qualityTags'][number] => {
+            if (!tag || typeof tag !== 'object') return false;
+            const record = tag as Record<string, unknown>;
+            return (
+              typeof record.key === 'string' &&
+              typeof record.label === 'string' &&
+              (record.severity === 'high' || record.severity === 'medium' || record.severity === 'low')
+            );
+          })
+        : [],
+      lastScoredAt: typeof properties.last_scored_at === 'string' ? properties.last_scored_at : null,
+    };
+  }, [document?.properties]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -516,17 +556,29 @@ export function UnifiedDocumentPage() {
 
   // Non-tabbed documents render directly in editor
   return (
-    <UnifiedEditor
-      document={unifiedDocument}
-      sidebarData={sidebarData}
-      onUpdate={handleUpdate}
-      onTypeChange={handleTypeChange}
-      onDocumentConverted={handleDocumentConverted}
-      onBack={hideBackButton ? undefined : handleBack}
-      backLabel={hideBackButton ? undefined : backLabel}
-      onDelete={handleDelete}
-      showTypeSelector={true}
-      titleSuffix={standupAuthorName}
-    />
+    <div className="flex h-full flex-col">
+      <FleetGraphDebugPanel
+        data={fleetGraphDebugQuery.data}
+        isLoading={fleetGraphDebugQuery.isLoading}
+        error={fleetGraphDebugQuery.error as Error | null}
+        persisted={persistedFleetGraph}
+        onPersist={() => fleetGraphPersistMutation.mutate()}
+        isPersisting={fleetGraphPersistMutation.isPending}
+      />
+      <div className="min-h-0 flex-1">
+        <UnifiedEditor
+          document={unifiedDocument}
+          sidebarData={sidebarData}
+          onUpdate={handleUpdate}
+          onTypeChange={handleTypeChange}
+          onDocumentConverted={handleDocumentConverted}
+          onBack={hideBackButton ? undefined : handleBack}
+          backLabel={hideBackButton ? undefined : backLabel}
+          onDelete={handleDelete}
+          showTypeSelector={true}
+          titleSuffix={standupAuthorName}
+        />
+      </div>
+    </div>
   );
 }

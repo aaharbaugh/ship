@@ -6,6 +6,7 @@ import { isWorkspaceAdmin } from '../middleware/visibility.js';
 import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser } from '../collaboration/index.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent, checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { loadContentFromYjsState } from '../utils/yjsConverter.js';
+import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -544,6 +545,14 @@ router.patch('/:id/content', authMiddleware, async (req: Request, res: Response)
     // Invalidate collaboration cache so connected clients get fresh content
     invalidateDocumentCache(id);
 
+    enqueueFleetGraphRun({
+      workspaceId,
+      documentId: id,
+      source: 'document_content_update',
+      userId,
+      documentType: existing.document_type,
+    });
+
     res.json({
       id: result.rows[0].id,
       title: result.rows[0].title,
@@ -633,6 +642,14 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     if (document_type === 'weekly_plan' || (properties && 'outcome' in properties)) {
       broadcastToUser(req.userId!, 'accountability:updated', { documentId: newDoc.id, documentType: document_type });
     }
+
+    enqueueFleetGraphRun({
+      workspaceId: String(req.workspaceId),
+      documentId: String(newDoc.id),
+      source: 'document_create',
+      userId: String(req.userId),
+      documentType: document_type,
+    });
 
     res.status(201).json(newDoc);
   } catch (err) {
@@ -1101,6 +1118,14 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
         });
       }
     }
+
+    enqueueFleetGraphRun({
+      workspaceId,
+      documentId: id,
+      source: 'document_update',
+      userId,
+      documentType: existing.document_type,
+    });
 
     // Flatten properties for backwards compatibility (match GET endpoint format)
     const updatedDoc = result.rows[0];

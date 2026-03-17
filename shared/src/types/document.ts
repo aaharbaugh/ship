@@ -65,6 +65,71 @@ export type AccountabilityType =
   | 'changes_requested_plan'
   | 'changes_requested_retro';
 
+export type FleetGraphQualityStatus = 'green' | 'yellow' | 'red';
+
+export type FleetGraphTriggerSource =
+  | 'document_create'
+  | 'document_update'
+  | 'document_content_update'
+  | 'collaboration_persist'
+  | 'manual'
+  | 'nightly_scan';
+
+export interface FleetGraphRemediationSuggestion {
+  title: string;
+  priority: 'high' | 'medium' | 'low';
+  rationale: string;
+  document_id?: string | null;
+  [key: string]: unknown;
+}
+
+export interface FleetGraphDirectorResponseOption {
+  label: string;
+  message: string;
+  target_document_id?: string | null;
+  [key: string]: unknown;
+}
+
+export interface FleetGraphAlertTag {
+  key: string;
+  label: string;
+  severity: 'high' | 'medium' | 'low';
+  source?: string | null;
+  [key: string]: unknown;
+}
+
+export interface FleetGraphDocumentMetadata {
+  quality_score?: number | null;
+  quality_status?: FleetGraphQualityStatus | null;
+  quality_summary?: string | null;
+  quality_tags?: FleetGraphAlertTag[] | null;
+  last_scored_at?: string | null;
+  quality_report_id?: string | null;
+  quality_summary_hash?: string | null;
+  fleetgraph_version?: string | null;
+  [key: string]: unknown;
+}
+
+export interface FleetGraphDocumentScore {
+  document_id: string;
+  document_type: DocumentType;
+  quality_score: number;
+  quality_status: FleetGraphQualityStatus;
+  quality_summary: string;
+  quality_tags: FleetGraphAlertTag[];
+  remediation_suggestions?: FleetGraphRemediationSuggestion[];
+}
+
+export interface FleetGraphGraphResult {
+  trigger_source: FleetGraphTriggerSource;
+  project_id?: string | null;
+  root_document_id: string;
+  document_scores: FleetGraphDocumentScore[];
+  remediation_suggestions: FleetGraphRemediationSuggestion[];
+  director_response_options?: FleetGraphDirectorResponseOption[];
+  generated_at: string;
+}
+
 // Sprint status - computed from dates, not stored
 export type WeekStatus = 'active' | 'upcoming' | 'completed';
 

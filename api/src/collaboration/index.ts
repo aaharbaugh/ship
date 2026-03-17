@@ -10,6 +10,7 @@ import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extrac
 import { yjsToJson, jsonToYjs } from '../utils/yjsConverter.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
 import cookie from 'cookie';
+import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -125,11 +126,12 @@ async function persistDocument(docName: string, doc: Y.Doc) {
 
     // Get existing properties, document_type, and content to check for changes
     const existingResult = await pool.query(
-      'SELECT properties, document_type, content, created_by FROM documents WHERE id = $1',
+      'SELECT workspace_id, properties, document_type, content, created_by FROM documents WHERE id = $1',
       [docId]
     );
     const existingProps = existingResult.rows[0]?.properties || {};
     const documentType = existingResult.rows[0]?.document_type;
+    const workspaceId = existingResult.rows[0]?.workspace_id;
     const existingContent = existingResult.rows[0]?.content;
     const createdBy = existingResult.rows[0]?.created_by;
 
@@ -173,6 +175,16 @@ async function persistDocument(docName: string, doc: Y.Doc) {
       `UPDATE documents SET yjs_state = $1, content = $2, properties = $3, updated_at = now() WHERE id = $4`,
       [Buffer.from(state), JSON.stringify(content), JSON.stringify(updatedProps), docId]
     );
+
+    if (typeof workspaceId === 'string') {
+      enqueueFleetGraphRun({
+        workspaceId,
+        documentId: docId,
+        source: 'collaboration_persist',
+        userId: typeof createdBy === 'string' ? createdBy : null,
+        documentType: typeof documentType === 'string' ? documentType : null,
+      });
+    }
   } catch (err) {
     console.error('Failed to persist document:', err);
   }
