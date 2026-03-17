@@ -4,6 +4,8 @@ import type {
   FleetGraphRemediationSuggestion,
 } from '@ship/shared';
 import type { FleetGraphScoringDocument, FleetGraphScoringPayload } from './payload.js';
+import { traceable } from 'langsmith/traceable';
+import { fleetGraphTraceConfig } from './tracing.js';
 
 export interface FleetGraphDocumentAnalysis {
   documentId: string;
@@ -25,6 +27,11 @@ export interface FleetGraphDeterministicAnalysis {
 export function analyzeFleetGraphPayload(
   payload: FleetGraphScoringPayload
 ): FleetGraphDeterministicAnalysis {
+  return tracedAnalyzeFleetGraphPayload(payload);
+}
+
+const tracedAnalyzeFleetGraphPayload = traceable(
+  function analyzePayload(payload: FleetGraphScoringPayload): FleetGraphDeterministicAnalysis {
   const documents = payload.documents.map(analyzeDocument);
 
   return {
@@ -33,7 +40,9 @@ export function analyzeFleetGraphPayload(
     remediationSuggestions: buildRemediationSuggestions(documents),
     documents,
   };
-}
+  },
+  fleetGraphTraceConfig('fleetgraph.analyze_deterministic')
+);
 
 function analyzeDocument(document: FleetGraphScoringDocument): FleetGraphDocumentAnalysis {
   const tags: FleetGraphAlertTag[] = [];

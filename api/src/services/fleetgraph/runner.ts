@@ -7,6 +7,8 @@ import type {
 import { buildFleetGraphSnapshot, type FleetGraphGraphSnapshot } from './graph.js';
 import { buildFleetGraphRunPlan } from './nodes.js';
 import { buildFleetGraphScoringPayload, type FleetGraphScoringPayload } from './payload.js';
+import { traceable } from 'langsmith/traceable';
+import { fleetGraphTraceConfig } from './tracing.js';
 
 export interface FleetGraphRunPreview {
   rootDocumentId: string;
@@ -31,6 +33,14 @@ export async function prepareFleetGraphRun(
   client: FleetGraphShipApiClient,
   trigger: FleetGraphTriggerRequest
 ): Promise<FleetGraphPreparedRun> {
+  return tracedPrepareFleetGraphRun(client, trigger);
+}
+
+const tracedPrepareFleetGraphRun = traceable(
+  async function prepareRun(
+    client: FleetGraphShipApiClient,
+    trigger: FleetGraphTriggerRequest
+  ): Promise<FleetGraphPreparedRun> {
   const rootDocument = await client.getDocument(trigger.documentId);
   const [directAssociations, reverseAssociations] = await Promise.all([
     client.getDocumentAssociations(rootDocument.id),
@@ -66,7 +76,9 @@ export async function prepareFleetGraphRun(
     graph,
     scoringPayload: buildFleetGraphScoringPayload(graph),
   };
-}
+  },
+  fleetGraphTraceConfig('fleetgraph.prepare_run')
+);
 
 export async function previewFleetGraphRun(
   client: FleetGraphShipApiClient,

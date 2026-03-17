@@ -3,6 +3,8 @@ import type {
   FleetGraphDocumentRecord,
 } from './client.js';
 import type { FleetGraphFetchContext } from './runner.js';
+import { traceable } from 'langsmith/traceable';
+import { fleetGraphTraceConfig } from './tracing.js';
 
 export interface FleetGraphNodeSnapshot {
   id: string;
@@ -28,6 +30,11 @@ export interface FleetGraphGraphSnapshot {
 }
 
 export function buildFleetGraphSnapshot(context: FleetGraphFetchContext): FleetGraphGraphSnapshot {
+  return tracedBuildFleetGraphSnapshot(context);
+}
+
+const tracedBuildFleetGraphSnapshot = traceable(
+  function buildSnapshot(context: FleetGraphFetchContext): FleetGraphGraphSnapshot {
   const documentMap = new Map<string, FleetGraphDocumentRecord>();
   documentMap.set(context.rootDocument.id, context.rootDocument);
 
@@ -55,7 +62,9 @@ export function buildFleetGraphSnapshot(context: FleetGraphFetchContext): FleetG
     })),
     edges: dedupeEdges(edges),
   };
-}
+  },
+  fleetGraphTraceConfig('fleetgraph.build_graph')
+);
 
 function buildParentEdge(document: FleetGraphDocumentRecord): FleetGraphEdgeSnapshot[] {
   if (!document.parent_id) {

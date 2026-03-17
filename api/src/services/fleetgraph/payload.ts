@@ -1,5 +1,7 @@
 import { extractText, hasContent } from '../../utils/document-content.js';
 import type { FleetGraphGraphSnapshot, FleetGraphNodeSnapshot } from './graph.js';
+import { traceable } from 'langsmith/traceable';
+import { fleetGraphTraceConfig } from './tracing.js';
 
 export interface FleetGraphScoringDocument {
   id: string;
@@ -32,6 +34,11 @@ export interface FleetGraphScoringPayload {
 export function buildFleetGraphScoringPayload(
   graph: FleetGraphGraphSnapshot
 ): FleetGraphScoringPayload {
+  return tracedBuildFleetGraphScoringPayload(graph);
+}
+
+const tracedBuildFleetGraphScoringPayload = traceable(
+  function buildPayload(graph: FleetGraphGraphSnapshot): FleetGraphScoringPayload {
   return {
     rootDocumentId: graph.rootDocumentId,
     documentCount: graph.nodes.length,
@@ -44,7 +51,9 @@ export function buildFleetGraphScoringPayload(
       direction: edge.direction,
     })),
   };
-}
+  },
+  fleetGraphTraceConfig('fleetgraph.build_scoring_payload')
+);
 
 function toScoringDocument(node: FleetGraphNodeSnapshot): FleetGraphScoringDocument {
   const content = node.content ?? null;
