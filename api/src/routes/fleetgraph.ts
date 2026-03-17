@@ -17,6 +17,7 @@ import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
 import { sendFleetGraphDirectorFeedback } from '../services/fleetgraph/feedback.js';
+import { getFleetGraphReadinessStatus } from '../services/fleetgraph/readiness.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -97,6 +98,19 @@ router.get('/queue-status', authMiddleware, async (_req: Request, res: Response)
   } catch (error) {
     console.error('FleetGraph queue status error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph queue status' });
+  }
+});
+
+router.get('/readiness', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
+      return res.status(403).json({ error: 'FleetGraph readiness requires workspace admin access' });
+    }
+
+    return res.json(getFleetGraphReadinessStatus());
+  } catch (error) {
+    console.error('FleetGraph readiness error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph readiness' });
   }
 });
 

@@ -15,6 +15,17 @@ Current MVP status:
   - sending director feedback
 - LangSmith tracing is wired into the runtime and GPT-4o reasoning path.
 
+## MVP Checklist
+
+- [x] Graph running with at least one proactive detection wired end-to-end
+- [ ] LangSmith tracing enabled with at least two shared trace links submitted
+- [x] `FLEETGRAPH.md` submitted with Agent Responsibility and Use Cases sections completed
+- [x] Graph outline complete with node types, edges, and branching conditions documented
+- [x] At least one human-in-the-loop gate implemented
+- [x] Running against real Ship data with no mocked app/runtime responses
+- [ ] Deployed and publicly accessible
+- [x] Trigger model decision documented and defended
+
 Current gaps for external MVP completion:
 
 - public deployment
@@ -298,6 +309,14 @@ Required env on API:
 - `LANGSMITH_TRACING=true`
 - `LANGSMITH_PROJECT`
 
+Trace submission file:
+
+- `TRACE_LINKS.md`
+
+Readiness check route:
+
+- `GET /api/fleetgraph/readiness`
+
 ## Current UI Surface
 
 Current MVP surfaces:
@@ -319,9 +338,24 @@ Current status:
 - local Docker/dev deployment is working
 - not yet publicly deployed
 
-Required MVP next step:
+Deployment runbook:
 
-- deploy the API and web surfaces publicly so FleetGraph is accessible outside local development
+- `../RAILWAY_DEPLOYMENT.md`
+
+Deployment-ready runtime additions completed in code:
+
+- `GET /api/fleetgraph/readiness` for env/runtime verification
+- `pnpm fleetgraph:nightly-scan` for Railway cron or scheduled execution
+
+Public deployment target for MVP:
+
+- one Railway web service from the repo root
+- one Railway Postgres database
+- Ship web and API served from the same origin
+
+Remaining action outside the repo:
+
+- deploy the service publicly and record the URL
 
 ## Diagrams
 
@@ -331,6 +365,7 @@ Supporting diagrams in this folder:
 - `FLEETGRAPH_RUNTIME_GRAPH.svg`
 - `FLEETGRAPH_CIRCULAR_NODE_GRAPH.svg`
 - `FLEETGRAPH_REUSE_GRAPH.svg`
+- `TRACE_LINKS.md`
 
 The most useful diagram for dependency overlap is:
 

@@ -37,6 +37,7 @@
     "db:migrate": "pnpm --filter @ship/api db:migrate",
     "db:init:deploy": "./scripts/init-database.sh",
     "db:seed:deploy": "./scripts/seed-deployment.sh",
+    "fleetgraph:nightly-scan": "node scripts/fleetgraph-nightly-scan.mjs",
     "db:orphan-check": "pnpm --filter @ship/api db:orphan-check",
     "prepare": "husky",
     "postinstall": "git config merge.ours.driver true && (command -v comply >/dev/null 2>&1 || echo '\\n⚠️  comply CLI not installed - pre-commit hooks require it\\n   Install with: pip install comply-cli\\n')"
