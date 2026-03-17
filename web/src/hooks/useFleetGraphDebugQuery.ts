@@ -26,6 +26,12 @@ export interface FleetGraphDebugResponse {
       documentType: string;
       title: string;
       parentId: string | null;
+      belongsTo: Array<{
+        id: string;
+        type: string;
+        title?: string;
+        color?: string;
+      }>;
     }>;
     edges: Array<{
       from: string;
@@ -38,6 +44,18 @@ export interface FleetGraphDebugResponse {
     rootDocumentId: string;
     documentCount: number;
     edgeCount: number;
+    documents: Array<{
+      id: string;
+      documentType: string;
+      title: string;
+      summaryText: string;
+      hasContent: boolean;
+      qualityScore: number | null;
+      qualityStatus: string | null;
+      ownerId: string | null;
+      tags: string[];
+      belongsToIds: string[];
+    }>;
   };
   analysis: {
     generatedAt: string;

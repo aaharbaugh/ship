@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { FleetGraphViewer } from '@/components/FleetGraphViewer';
@@ -27,6 +28,9 @@ const PRIORITY_STYLES: Record<'high' | 'medium' | 'low', string> = {
   medium: 'text-yellow-700',
   low: 'text-slate-600',
 };
+
+const FILTER_BUTTON_BASE =
+  'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors';
 
 export function FleetGraphDebugPanel({
   data,
@@ -67,6 +71,41 @@ export function FleetGraphDebugPanel({
   const primaryDocument =
     data.analysis.documents.find((document) => document.documentId === data.rootDocumentId) ??
     data.analysis.documents[0];
+  const availableTypes = useMemo(
+    () => Array.from(new Set(data.graph.nodes.map((node) => node.documentType))).sort(),
+    [data.graph.nodes]
+  );
+  const [activeTypes, setActiveTypes] = useState<string[]>([]);
+  const filteredGraph = useMemo(() => {
+    if (activeTypes.length === 0) {
+      return data.graph;
+    }
+
+    const allowed = new Set(
+      data.graph.nodes
+        .filter((node) => node.id === data.rootDocumentId || activeTypes.includes(node.documentType))
+        .map((node) => node.id)
+    );
+
+    return {
+      ...data.graph,
+      nodes: data.graph.nodes.filter((node) => allowed.has(node.id)),
+      edges: data.graph.edges.filter((edge) => allowed.has(edge.from) && allowed.has(edge.to)),
+    };
+  }, [activeTypes, data.graph, data.rootDocumentId]);
+  const [selectedNodeId, setSelectedNodeId] = useState(data.rootDocumentId);
+  const effectiveSelectedNodeId = filteredGraph.nodes.some((node) => node.id === selectedNodeId)
+    ? selectedNodeId
+    : data.rootDocumentId;
+  const selectedAnalysis =
+    data.analysis.documents.find((document) => document.documentId === effectiveSelectedNodeId) ??
+    primaryDocument;
+  const selectedGraphNode = filteredGraph.nodes.find((node) => node.id === effectiveSelectedNodeId);
+  const selectedScoringDocument = data.scoringPayload.documents.find((document) => document.id === effectiveSelectedNodeId);
+  const connectedEdges = useMemo(
+    () => filteredGraph.edges.filter((edge) => edge.from === effectiveSelectedNodeId || edge.to === effectiveSelectedNodeId),
+    [effectiveSelectedNodeId, filteredGraph.edges]
+  );
   const displayStatus = persisted?.qualityStatus ?? primaryDocument?.qualityStatus;
   const displayScore = persisted?.qualityScore ?? primaryDocument?.qualityScore;
   const displaySummary = persisted?.qualitySummary ?? primaryDocument?.summary;
@@ -139,10 +178,108 @@ export function FleetGraphDebugPanel({
           </div>
         )}
 
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setActiveTypes([])}
+            className={cn(
+              FILTER_BUTTON_BASE,
+              activeTypes.length === 0
+                ? 'border-slate-900 bg-slate-900 text-white'
+                : 'border-border bg-background text-muted hover:bg-slate-100'
+            )}
+          >
+            All
+          </button>
+          {availableTypes.map((documentType) => {
+            const active = activeTypes.includes(documentType);
+            return (
+              <button
+                key={documentType}
+                type="button"
+                onClick={() =>
+                  setActiveTypes((current) =>
+                    current.includes(documentType)
+                      ? current.filter((type) => type !== documentType)
+                      : [...current, documentType]
+                  )
+                }
+                className={cn(
+                  FILTER_BUTTON_BASE,
+                  active
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-border bg-background text-muted hover:bg-slate-100'
+                )}
+              >
+                {documentType}
+              </button>
+            );
+          })}
+        </div>
+
         <FleetGraphViewer
           rootDocumentId={data.rootDocumentId}
-          graph={data.graph}
+          graph={filteredGraph}
+          selectedNodeId={effectiveSelectedNodeId}
+          onSelectNode={setSelectedNodeId}
         />
+
+        {selectedAnalysis && selectedGraphNode && (
+          <div className="rounded-xl border border-border bg-white p-4">
+            <div className="flex flex-wrap items-start gap-3">
+              <div className={cn(
+                'rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide',
+                STATUS_STYLES[selectedAnalysis.qualityStatus]
+              )}>
+                {selectedAnalysis.qualityStatus} {Math.round(selectedAnalysis.qualityScore * 100)}%
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-foreground">{selectedGraphNode.title}</h3>
+                  <span className="text-xs uppercase tracking-wide text-muted">
+                    {selectedGraphNode.documentType}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-foreground">{selectedAnalysis.summary}</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted">Tags</div>
+                <div className="flex flex-wrap gap-2">
+                  {selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
+                    <span
+                      key={`${selectedAnalysis.documentId}-${tag.key}`}
+                      className="rounded-full border border-border bg-slate-50 px-2 py-0.5 text-xs text-muted"
+                    >
+                      {tag.label}
+                    </span>
+                  )) : (
+                    <span className="text-xs text-muted">No findings</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted">Graph Context</div>
+                <div className="space-y-1 text-xs text-muted">
+                  <div>Connected edges: {connectedEdges.length}</div>
+                  <div>Parent: {selectedGraphNode.parentId ?? 'None'}</div>
+                  <div>Belongs to: {selectedGraphNode.belongsTo.length > 0 ? selectedGraphNode.belongsTo.map((item) => item.type).join(', ') : 'None'}</div>
+                  <div>Owner: {selectedScoringDocument?.ownerId ?? 'None'}</div>
+                </div>
+              </div>
+            </div>
+
+            {selectedScoringDocument?.summaryText && (
+              <div className="mt-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted">Summary Text</div>
+                <p className="mt-1 text-xs leading-5 text-muted">{selectedScoringDocument.summaryText}</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
