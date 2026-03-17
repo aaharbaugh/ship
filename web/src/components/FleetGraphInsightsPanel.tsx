@@ -152,6 +152,9 @@ export function FleetGraphInsightsPanel({
     selectedSummaryText.length > 0 &&
     normalizeFleetGraphText(selectedSummaryText) !==
       normalizeFleetGraphText(selectedAnalysis?.summary ?? '');
+  const isRootSelection = effectiveSelectedNodeId === data.rootDocumentId;
+  const shouldShowSelectedCard =
+    Boolean(selectedAnalysis && selectedGraphNode) && (!isRootSelection || selectedContextLines.length > 0);
   const sourceLabel = persisted
     ? 'Persisted metadata'
     : data.analysis.mode === 'gpt-4o'
@@ -373,7 +376,7 @@ export function FleetGraphInsightsPanel({
           </div>
         )}
 
-        {isExpanded && selectedAnalysis && selectedGraphNode && (
+        {isExpanded && shouldShowSelectedCard && selectedAnalysis && selectedGraphNode && (
           <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className={cn(
@@ -389,23 +392,26 @@ export function FleetGraphInsightsPanel({
                     {selectedGraphNode.documentType}
                   </span>
                 </div>
-                {normalizeFleetGraphText(selectedAnalysis.summary) !== normalizeFleetGraphText(displaySummary ?? '') && (
+                {!isRootSelection && normalizeFleetGraphText(selectedAnalysis.summary) !== normalizeFleetGraphText(displaySummary ?? '') && (
                   <p className="mt-1 text-sm text-slate-200">{selectedAnalysis.summary}</p>
                 )}
               </div>
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              {selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
+              {!isRootSelection && selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
                 <span
                   key={`${selectedAnalysis.documentId}-${tag.key}`}
                   className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-xs text-slate-300"
                 >
                   {tag.label}
                 </span>
-              )) : (
+              )) : !isRootSelection ? (
                 <span className="text-xs text-slate-500">No findings</span>
-              )}
+              ) : null}
+              {selectedContextLines.length === 0 && isRootSelection ? (
+                <span className="text-xs text-slate-500">Select another node for more detail.</span>
+              ) : null}
               {selectedContextLines.map((line) => (
                 <span
                   key={line}
@@ -416,7 +422,7 @@ export function FleetGraphInsightsPanel({
               ))}
             </div>
 
-            {shouldShowSelectedSummaryText && (
+            {!isRootSelection && shouldShowSelectedSummaryText && (
               <div className="mt-3">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Source Text</div>
                 <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-400">{selectedSummaryText}</p>
