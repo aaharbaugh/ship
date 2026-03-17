@@ -27,6 +27,18 @@ export function FleetGraphReportsPage() {
   const [severityFilter, setSeverityFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [search, setSearch] = useState('');
   const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
+  const [pendingAction, setPendingAction] = useState<
+    | null
+    | { type: 'publish'; reportId: string; title: string }
+    | {
+        type: 'director-feedback';
+        reportId: string;
+        reportTitle: string;
+        optionIndex: number;
+        optionLabel: string;
+        optionMessage: string;
+      }
+  >(null);
 
   const reports = reportsQuery.data ?? [];
   const filteredReports = useMemo(() => {
@@ -276,7 +288,13 @@ export function FleetGraphReportsPage() {
                         : [...current, report.id]
                     )
                   }
-                  onPublish={() => publishMutation.mutate(report.id)}
+                  onPublish={() =>
+                    setPendingAction({
+                      type: 'publish',
+                      reportId: report.id,
+                      title: report.title,
+                    })
+                  }
                   isPublishing={publishMutation.isPending}
                 />
               ))}
@@ -302,9 +320,13 @@ export function FleetGraphReportsPage() {
                   key={report.id}
                   report={report}
                   onSendDirectorFeedback={(optionIndex) =>
-                    directorFeedbackMutation.mutate({
+                    setPendingAction({
+                      type: 'director-feedback',
                       reportId: report.id,
+                      reportTitle: report.title,
                       optionIndex,
+                      optionLabel: report.directorResponseOptions[optionIndex]?.label ?? 'Send feedback',
+                      optionMessage: report.directorResponseOptions[optionIndex]?.message ?? '',
                     })
                   }
                   isSendingDirectorFeedback={directorFeedbackMutation.isPending}
@@ -313,6 +335,55 @@ export function FleetGraphReportsPage() {
             </div>
           )}
         </section>
+
+        {pendingAction && (
+          <ConfirmationPanel
+            title={
+              pendingAction.type === 'publish'
+                ? 'Publish FleetGraph report?'
+                : 'Send director feedback?'
+            }
+            description={
+              pendingAction.type === 'publish'
+                ? `This will mark "${pendingAction.title}" as published and move it into the reviewed state.`
+                : `This will send "${pendingAction.optionLabel}" for "${pendingAction.reportTitle}" and write the feedback onto the affected document metadata.`
+            }
+            detail={
+              pendingAction.type === 'director-feedback'
+                ? pendingAction.optionMessage
+                : 'Publishing should happen only after the PM has reviewed the draft report content.'
+            }
+            confirmLabel={
+              pendingAction.type === 'publish'
+                ? publishMutation.isPending
+                  ? 'Publishing...'
+                  : 'Confirm Publish'
+                : directorFeedbackMutation.isPending
+                  ? 'Sending...'
+                  : 'Confirm Send'
+            }
+            disabled={publishMutation.isPending || directorFeedbackMutation.isPending}
+            onCancel={() => setPendingAction(null)}
+            onConfirm={() => {
+              if (pendingAction.type === 'publish') {
+                publishMutation.mutate(pendingAction.reportId, {
+                  onSuccess: () => setPendingAction(null),
+                });
+                return;
+              }
+
+              directorFeedbackMutation.mutate(
+                {
+                  reportId: pendingAction.reportId,
+                  optionIndex: pendingAction.optionIndex,
+                },
+                {
+                  onSuccess: () => setPendingAction(null),
+                }
+              );
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -556,6 +627,52 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950 px-4 py-6 text-sm text-slate-500">
       {message}
+    </div>
+  );
+}
+
+function ConfirmationPanel({
+  title,
+  description,
+  detail,
+  confirmLabel,
+  disabled,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  detail: string;
+  confirmLabel: string;
+  disabled?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed bottom-6 right-6 z-40 w-full max-w-md rounded-2xl border border-slate-700 bg-black p-4 shadow-2xl shadow-black/60">
+      <div className="text-sm font-semibold text-white">{title}</div>
+      <div className="mt-2 text-sm text-slate-300">{description}</div>
+      <div className="mt-3 rounded-xl border border-slate-800 bg-slate-950 p-3 text-xs text-slate-400">
+        {detail}
+      </div>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={disabled}
+          className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={disabled}
+          className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {confirmLabel}
+        </button>
+      </div>
     </div>
   );
 }
