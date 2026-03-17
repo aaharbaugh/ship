@@ -21,6 +21,29 @@ export interface FleetGraphReportListItem {
   directorFeedbackSentAt: string | null;
 }
 
+export interface FleetGraphReportDetail {
+  report: FleetGraphReportListItem;
+  reportContentText: string;
+  rootDocument: {
+    id: string;
+    title: string;
+    documentType: string;
+    qualityStatus: 'green' | 'yellow' | 'red' | null;
+    qualityScore: number | null;
+    qualitySummary: string | null;
+    lastScoredAt: string | null;
+  } | null;
+  targetDocuments: Array<{
+    id: string;
+    title: string;
+    documentType: string;
+    qualityStatus: 'green' | 'yellow' | 'red' | null;
+    qualityScore: number | null;
+    qualitySummary: string | null;
+    directorFeedbackSentAt: string | null;
+  }>;
+}
+
 export interface FleetGraphWorkspaceScanResult {
   workspaceId: string;
   scannedAt: string;
@@ -71,6 +94,16 @@ async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
   return payload.reports;
 }
 
+async function fetchFleetGraphReportDetail(reportId: string): Promise<FleetGraphReportDetail> {
+  const response = await apiGet(`/api/fleetgraph/reports/${reportId}`);
+  if (!response.ok) {
+    throw new Error('Failed to fetch FleetGraph report detail');
+  }
+
+  const payload = (await response.json()) as { report: FleetGraphReportDetail };
+  return payload.report;
+}
+
 async function fetchFleetGraphQueueStatus(): Promise<FleetGraphQueueStatus> {
   const response = await apiGet('/api/fleetgraph/queue-status');
   if (!response.ok) {
@@ -97,6 +130,15 @@ export function useFleetGraphQueueStatusQuery() {
   });
 }
 
+export function useFleetGraphReportDetailQuery(reportId: string | undefined) {
+  return useQuery({
+    queryKey: ['fleetgraph-report-detail', reportId],
+    queryFn: () => fetchFleetGraphReportDetail(reportId!),
+    enabled: !!reportId,
+    staleTime: 30_000,
+  });
+}
+
 export function useFleetGraphPublishReportMutation() {
   const queryClient = useQueryClient();
 
@@ -112,6 +154,7 @@ export function useFleetGraphPublishReportMutation() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -137,6 +180,7 @@ export function useFleetGraphBulkPublishReportsMutation() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -158,6 +202,7 @@ export function useFleetGraphWorkspaceScanMutation() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -190,6 +235,7 @@ export function useFleetGraphDirectorFeedbackMutation() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },

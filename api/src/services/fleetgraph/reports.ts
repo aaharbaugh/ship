@@ -1,6 +1,7 @@
 import { traceable } from 'langsmith/traceable';
 import type { FleetGraphShipApiClient } from './client.js';
 import { fleetGraphTraceConfig } from './tracing.js';
+import { extractText } from '../../utils/document-content.js';
 
 export interface FleetGraphReportListItem {
   id: string;
@@ -22,10 +23,40 @@ export interface FleetGraphReportListItem {
   directorFeedbackSentAt: string | null;
 }
 
+export interface FleetGraphReportDetail {
+  report: FleetGraphReportListItem;
+  reportContentText: string;
+  rootDocument: {
+    id: string;
+    title: string;
+    documentType: string;
+    qualityStatus: 'green' | 'yellow' | 'red' | null;
+    qualityScore: number | null;
+    qualitySummary: string | null;
+    lastScoredAt: string | null;
+  } | null;
+  targetDocuments: Array<{
+    id: string;
+    title: string;
+    documentType: string;
+    qualityStatus: 'green' | 'yellow' | 'red' | null;
+    qualityScore: number | null;
+    qualitySummary: string | null;
+    directorFeedbackSentAt: string | null;
+  }>;
+}
+
 export async function listFleetGraphReports(
   client: FleetGraphShipApiClient
 ): Promise<FleetGraphReportListItem[]> {
   return tracedListFleetGraphReports(client);
+}
+
+export async function getFleetGraphReportDetail(
+  client: FleetGraphShipApiClient,
+  reportId: string
+): Promise<FleetGraphReportDetail> {
+  return tracedGetFleetGraphReportDetail(client, reportId);
 }
 
 const tracedListFleetGraphReports = traceable(
@@ -106,6 +137,118 @@ const tracedListFleetGraphReports = traceable(
   },
   fleetGraphTraceConfig('fleetgraph.list_reports')
 );
+
+const tracedGetFleetGraphReportDetail = traceable(
+  async function getReportDetail(
+    client: FleetGraphShipApiClient,
+    reportId: string
+  ): Promise<FleetGraphReportDetail> {
+    const reportDocument = await client.getDocument(reportId);
+    const report = await buildReportListItem(client, reportDocument);
+    const rootDocument = report.rootDocumentId
+      ? await safeGetDocument(client, report.rootDocumentId)
+      : null;
+    const targetIds = [
+      ...new Set(
+        report.directorResponseOptions.flatMap((option) =>
+          option.targetDocumentId ? [option.targetDocumentId] : []
+        )
+      ),
+    ];
+    const targetDocuments = await Promise.all(
+      targetIds.map(async (documentId) => safeGetDocument(client, documentId))
+    );
+
+    return {
+      report,
+      reportContentText: extractText(reportDocument.content ?? null).trim(),
+      rootDocument: rootDocument ? toLinkedDocumentSummary(rootDocument) : null,
+      targetDocuments: targetDocuments
+        .filter((document): document is NonNullable<typeof document> => document !== null)
+        .map(toLinkedDocumentSummary),
+    };
+  },
+  fleetGraphTraceConfig('fleetgraph.get_report_detail')
+);
+
+async function buildReportListItem(
+  client: FleetGraphShipApiClient,
+  document: Awaited<ReturnType<FleetGraphShipApiClient['getDocument']>>
+): Promise<FleetGraphReportListItem> {
+  const rootDocumentId =
+    typeof document.properties.fleetgraph_root_document_id === 'string'
+      ? document.properties.fleetgraph_root_document_id
+      : null;
+  const rootDocument = rootDocumentId ? await safeGetDocument(client, rootDocumentId) : null;
+
+  return {
+    id: document.id,
+    title: document.title,
+    rootDocumentId,
+    rootDocumentTitle: rootDocument?.title ?? null,
+    rootDocumentType: rootDocument?.document_type ?? null,
+    state: parseReportState(document.properties.fleetgraph_report_state),
+    qualityStatus: parseQualityStatus(document.properties.quality_status),
+    qualityScore:
+      typeof document.properties.quality_score === 'number'
+        ? document.properties.quality_score
+        : null,
+    generatedAt:
+      typeof document.properties.fleetgraph_generated_at === 'string'
+        ? document.properties.fleetgraph_generated_at
+        : null,
+    updatedAt: document.updated_at ?? null,
+    publishedAt:
+      typeof document.properties.fleetgraph_report_published_at === 'string'
+        ? document.properties.fleetgraph_report_published_at
+        : null,
+    directorResponseOptions: parseDirectorResponseOptions(
+      document.properties.fleetgraph_director_response_options
+    ),
+    directorFeedbackSentAt:
+      typeof document.properties.fleetgraph_director_feedback_sent_at === 'string'
+        ? document.properties.fleetgraph_director_feedback_sent_at
+        : null,
+  };
+}
+
+async function safeGetDocument(
+  client: FleetGraphShipApiClient,
+  documentId: string
+) {
+  try {
+    return await client.getDocument(documentId);
+  } catch {
+    return null;
+  }
+}
+
+function toLinkedDocumentSummary(
+  document: Awaited<ReturnType<FleetGraphShipApiClient['getDocument']>>
+) {
+  return {
+    id: document.id,
+    title: document.title,
+    documentType: document.document_type,
+    qualityStatus: parseQualityStatus(document.properties.quality_status),
+    qualityScore:
+      typeof document.properties.quality_score === 'number'
+        ? document.properties.quality_score
+        : null,
+    qualitySummary:
+      typeof document.properties.quality_summary === 'string'
+        ? document.properties.quality_summary
+        : null,
+    lastScoredAt:
+      typeof document.properties.last_scored_at === 'string'
+        ? document.properties.last_scored_at
+        : null,
+    directorFeedbackSentAt:
+      typeof document.properties.fleetgraph_director_feedback_sent_at === 'string'
+        ? document.properties.fleetgraph_director_feedback_sent_at
+        : null,
+  };
+}
 
 function parseQualityStatus(
   value: unknown

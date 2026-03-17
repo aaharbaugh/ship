@@ -8,7 +8,7 @@ import {
   createFleetGraphQualityReportDraft,
   publishFleetGraphQualityReport,
 } from '../services/fleetgraph/report.js';
-import { listFleetGraphReports } from '../services/fleetgraph/reports.js';
+import { getFleetGraphReportDetail, listFleetGraphReports } from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
@@ -60,6 +60,18 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('FleetGraph report list error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph reports' });
+  }
+});
+
+router.get('/reports/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const client = createRouteClient(req);
+    return res.json({
+      report: await getFleetGraphReportDetail(client, String(req.params.id)),
+    });
+  } catch (error) {
+    console.error('FleetGraph report detail error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph report detail' });
   }
 });
 

@@ -526,10 +526,16 @@ function ReportCard({
 
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            to={`/team/reviews/fleetgraph/${report.id}`}
+            className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+          >
+            Review Report
+          </Link>
+          <Link
             to={`/documents/${report.id}`}
             className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
           >
-            Open Report
+            Open Raw Report
           </Link>
           {report.rootDocumentId && (
             <Link
