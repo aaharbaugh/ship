@@ -26,6 +26,8 @@ const INNER_COLUMN_X_SPACING = 210;
 const ROW_Y_SPACING = 140;
 const MAX_ROWS_PER_COLUMN = 6;
 const EDGE_LABEL_THRESHOLD = 18;
+const MAIN_PATH_Y = 160;
+const GRID_START_Y = 330;
 
 function colorForType(documentType: string): string {
   return NODE_COLORS[documentType] ?? '#334155';
@@ -235,20 +237,33 @@ function buildFleetGraphLayout(
     });
 
     bucket.forEach((node, index) => {
-      const subColumnCount = Math.ceil(bucket.length / MAX_ROWS_PER_COLUMN);
-      const subColumnIndex = Math.floor(index / MAX_ROWS_PER_COLUMN);
-      const rowIndex = index % MAX_ROWS_PER_COLUMN;
+      const baseX = (column + 2) * COLUMN_X_SPACING;
+
+      if (index === 0) {
+        positions.set(node.id, {
+          x: baseX,
+          y: MAIN_PATH_Y,
+        });
+        orderByNode.set(node.id, index);
+        return;
+      }
+
+      const gridIndex = index - 1;
+      const overflowCount = bucket.length - 1;
+      const subColumnCount = Math.ceil(overflowCount / MAX_ROWS_PER_COLUMN);
+      const subColumnIndex = Math.floor(gridIndex / MAX_ROWS_PER_COLUMN);
+      const rowIndex = gridIndex % MAX_ROWS_PER_COLUMN;
       const rowsInSubColumn =
         subColumnIndex === subColumnCount - 1
-          ? bucket.length - subColumnIndex * MAX_ROWS_PER_COLUMN
+          ? overflowCount - subColumnIndex * MAX_ROWS_PER_COLUMN
           : MAX_ROWS_PER_COLUMN;
       const subColumnOffset =
         (subColumnIndex - (subColumnCount - 1) / 2) * INNER_COLUMN_X_SPACING;
       const totalHeight = (rowsInSubColumn - 1) * ROW_Y_SPACING;
 
       positions.set(node.id, {
-        x: (column + 2) * COLUMN_X_SPACING + subColumnOffset,
-        y: rowIndex * ROW_Y_SPACING - totalHeight / 2 + 160,
+        x: baseX + subColumnOffset,
+        y: GRID_START_Y + rowIndex * ROW_Y_SPACING - totalHeight / 2,
       });
       orderByNode.set(node.id, index);
     });
