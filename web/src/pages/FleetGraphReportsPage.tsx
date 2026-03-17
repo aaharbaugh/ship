@@ -166,13 +166,25 @@ export function FleetGraphReportsPage() {
               <div>
                 <div className="text-sm font-medium text-white">FleetGraph Queue</div>
                 <div className="mt-1 text-xs text-slate-400">
-                  {queueStatusQuery.data.pendingCount} queued · every {Math.round(queueStatusQuery.data.batchIntervalMs / 60000)} min · {queueStatusQuery.data.isFlushing ? 'flush in progress' : 'idle'}
+                  {queueStatusQuery.data.pendingCount} queued · every {Math.round(queueStatusQuery.data.batchIntervalMs / 60000)} min · up to {queueStatusQuery.data.maxDocumentsPerFlush} docs/flush · {queueStatusQuery.data.isFlushing ? 'flush in progress' : 'idle'}
                 </div>
               </div>
               <div className="text-xs text-slate-500">
                 Last flush: {formatFleetGraphTimestamp(queueStatusQuery.data.lastFlushCompletedAt)}
               </div>
             </div>
+            {queueStatusQuery.data.workspaceGroups.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {queueStatusQuery.data.workspaceGroups.slice(0, 6).map((group) => (
+                  <span
+                    key={group.workspaceId}
+                    className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-[11px] text-slate-300"
+                  >
+                    workspace {group.workspaceId.slice(0, 8)} · {group.pendingCount}
+                  </span>
+                ))}
+              </div>
+            )}
             {queueStatusQuery.data.pendingDocuments.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {queueStatusQuery.data.pendingDocuments.slice(0, 8).map((event) => (

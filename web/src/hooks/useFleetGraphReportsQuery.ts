@@ -37,10 +37,15 @@ export interface FleetGraphWorkspaceScanResult {
 
 export interface FleetGraphQueueStatus {
   batchIntervalMs: number;
+  maxDocumentsPerFlush: number;
   isFlushing: boolean;
   pendingCount: number;
   lastFlushStartedAt: string | null;
   lastFlushCompletedAt: string | null;
+  workspaceGroups: Array<{
+    workspaceId: string;
+    pendingCount: number;
+  }>;
   pendingDocuments: Array<{
     workspaceId: string;
     documentId: string;

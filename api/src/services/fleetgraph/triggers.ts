@@ -18,10 +18,15 @@ export interface FleetGraphTriggerResult {
 
 export interface FleetGraphQueueStatus {
   batchIntervalMs: number;
+  maxDocumentsPerFlush: number;
   isFlushing: boolean;
   pendingCount: number;
   lastFlushStartedAt: string | null;
   lastFlushCompletedAt: string | null;
+  workspaceGroups: Array<{
+    workspaceId: string;
+    pendingCount: number;
+  }>;
   pendingDocuments: Array<{
     workspaceId: string;
     documentId: string;
@@ -32,6 +37,7 @@ export interface FleetGraphQueueStatus {
 }
 
 const BATCH_INTERVAL_MS = Number(process.env.FLEETGRAPH_BATCH_INTERVAL_MS || 4 * 60 * 1000);
+const MAX_DOCUMENTS_PER_FLUSH = Number(process.env.FLEETGRAPH_MAX_DOCUMENTS_PER_FLUSH || 24);
 const pendingByDocument = new Map<string, FleetGraphTriggerEvent>();
 const lastHashByDocument = new Map<string, string>();
 let batchInterval: NodeJS.Timeout | null = null;
@@ -104,11 +110,20 @@ export async function flushFleetGraphQueue(): Promise<void> {
   isFlushing = true;
   lastFlushStartedAt = new Date().toISOString();
   const batch = [...pendingByDocument.values()];
+  const executionBatch = selectBatchForFlush(batch, MAX_DOCUMENTS_PER_FLUSH);
+  const selectedIds = new Set(executionBatch.map((event) => event.documentId));
+  const deferredEvents = batch.filter((event) => !selectedIds.has(event.documentId));
   pendingByDocument.clear();
+  for (const event of deferredEvents) {
+    pendingByDocument.set(event.documentId, event);
+  }
 
   console.info('[FleetGraph] Batch flush started', {
     queuedDocuments: batch.length,
+    executingDocuments: executionBatch.length,
+    deferredDocuments: deferredEvents.length,
     batchIntervalMs: BATCH_INTERVAL_MS,
+    maxDocumentsPerFlush: MAX_DOCUMENTS_PER_FLUSH,
   });
 
   const results = {
@@ -118,7 +133,7 @@ export async function flushFleetGraphQueue(): Promise<void> {
   };
 
   try {
-    for (const event of batch) {
+    for (const event of executionBatch) {
       if (event.contentHash) {
         lastHashByDocument.set(event.documentId, event.contentHash);
       }
@@ -154,6 +169,8 @@ export async function flushFleetGraphQueue(): Promise<void> {
     lastFlushCompletedAt = new Date().toISOString();
     console.info('[FleetGraph] Batch flush completed', {
       queuedDocuments: batch.length,
+      executedBatchSize: executionBatch.length,
+      deferredDocuments: deferredEvents.length,
       ...results,
       remainingQueuedDocuments: pendingByDocument.size,
     });
@@ -161,13 +178,24 @@ export async function flushFleetGraphQueue(): Promise<void> {
 }
 
 export function getFleetGraphQueueStatus(): FleetGraphQueueStatus {
+  const pendingDocuments = [...pendingByDocument.values()];
+  const workspaceCounts = new Map<string, number>();
+
+  for (const event of pendingDocuments) {
+    workspaceCounts.set(event.workspaceId, (workspaceCounts.get(event.workspaceId) ?? 0) + 1);
+  }
+
   return {
     batchIntervalMs: BATCH_INTERVAL_MS,
+    maxDocumentsPerFlush: MAX_DOCUMENTS_PER_FLUSH,
     isFlushing,
     pendingCount: pendingByDocument.size,
     lastFlushStartedAt,
     lastFlushCompletedAt,
-    pendingDocuments: [...pendingByDocument.values()].slice(0, 25).map((event) => ({
+    workspaceGroups: [...workspaceCounts.entries()]
+      .map(([workspaceId, pendingCount]) => ({ workspaceId, pendingCount }))
+      .sort((left, right) => right.pendingCount - left.pendingCount),
+    pendingDocuments: pendingDocuments.slice(0, 25).map((event) => ({
       workspaceId: event.workspaceId,
       documentId: event.documentId,
       source: event.source,
@@ -175,6 +203,44 @@ export function getFleetGraphQueueStatus(): FleetGraphQueueStatus {
       userId: event.userId ?? null,
     })),
   };
+}
+
+function selectBatchForFlush(
+  events: FleetGraphTriggerEvent[],
+  maxDocumentsPerFlush: number
+): FleetGraphTriggerEvent[] {
+  if (events.length <= maxDocumentsPerFlush) {
+    return events;
+  }
+
+  const workspaceQueues = new Map<string, FleetGraphTriggerEvent[]>();
+  for (const event of events) {
+    const queue = workspaceQueues.get(event.workspaceId) ?? [];
+    queue.push(event);
+    workspaceQueues.set(event.workspaceId, queue);
+  }
+
+  const executionBatch: FleetGraphTriggerEvent[] = [];
+  while (executionBatch.length < maxDocumentsPerFlush && workspaceQueues.size > 0) {
+    for (const [workspaceId, queue] of workspaceQueues) {
+      const next = queue.shift();
+      if (next) {
+        executionBatch.push(next);
+      }
+
+      if (queue.length === 0) {
+        workspaceQueues.delete(workspaceId);
+      } else {
+        workspaceQueues.set(workspaceId, queue);
+      }
+
+      if (executionBatch.length >= maxDocumentsPerFlush) {
+        break;
+      }
+    }
+  }
+
+  return executionBatch;
 }
 
 function ensureFleetGraphBatchProcessor(): void {
