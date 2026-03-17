@@ -25,6 +25,7 @@ const COLUMN_X_SPACING = 320;
 const INNER_COLUMN_X_SPACING = 210;
 const ROW_Y_SPACING = 140;
 const MAX_ROWS_PER_COLUMN = 6;
+const EDGE_LABEL_THRESHOLD = 18;
 
 function colorForType(documentType: string): string {
   return NODE_COLORS[documentType] ?? '#334155';
@@ -103,15 +104,19 @@ export function FleetGraphViewer({
       id: `${edge.from}-${edge.to}-${edge.relationshipType}-${index}`,
       source: edge.from,
       target: edge.to,
-      label: edge.relationshipType,
-      labelStyle: {
+      label: graph.edges.length <= EDGE_LABEL_THRESHOLD ? edge.relationshipType : undefined,
+      labelStyle: graph.edges.length <= EDGE_LABEL_THRESHOLD ? {
         fontSize: 10,
         fontWeight: 600,
         fill: '#475569',
-      },
+      } : undefined,
       style: {
         stroke: '#94a3b8',
         strokeWidth: edge.direction === 'parent' ? 2 : 1.5,
+      },
+      type: 'smoothstep',
+      pathOptions: {
+        borderRadius: 18,
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -201,12 +206,33 @@ function buildFleetGraphLayout(
     columns.set(column, bucket);
   }
 
-  for (const [column, bucket] of columns) {
-    bucket.sort((a, b) =>
-      a.documentType === b.documentType
-        ? a.title.localeCompare(b.title)
-        : a.documentType.localeCompare(b.documentType)
-    );
+  const orderedColumns = [...columns.keys()].sort((a, b) => Math.abs(a) - Math.abs(b) || a - b);
+  const orderByNode = new Map<string, number>([[rootDocumentId, 0]]);
+
+  for (const column of orderedColumns) {
+    const bucket = columns.get(column);
+    if (!bucket) {
+      continue;
+    }
+
+    const referenceColumn = column === 0
+      ? null
+      : column > 0
+        ? column - 1
+        : column + 1;
+
+    bucket.sort((left, right) => {
+      const leftScore = computeNodeSortScore(left.id, referenceColumn, columnByNode, adjacency, orderByNode);
+      const rightScore = computeNodeSortScore(right.id, referenceColumn, columnByNode, adjacency, orderByNode);
+
+      if (leftScore !== rightScore) {
+        return leftScore - rightScore;
+      }
+
+      return left.documentType === right.documentType
+        ? left.title.localeCompare(right.title)
+        : left.documentType.localeCompare(right.documentType);
+    });
 
     bucket.forEach((node, index) => {
       const subColumnCount = Math.ceil(bucket.length / MAX_ROWS_PER_COLUMN);
@@ -224,8 +250,32 @@ function buildFleetGraphLayout(
         x: (column + 2) * COLUMN_X_SPACING + subColumnOffset,
         y: rowIndex * ROW_Y_SPACING - totalHeight / 2 + 160,
       });
+      orderByNode.set(node.id, index);
     });
   }
 
   return positions;
+}
+
+function computeNodeSortScore(
+  nodeId: string,
+  referenceColumn: number | null,
+  columnByNode: Map<string, number>,
+  adjacency: Map<string, Set<string>>,
+  orderByNode: Map<string, number>
+): number {
+  if (referenceColumn === null) {
+    return 0;
+  }
+
+  const neighborOrders = [...(adjacency.get(nodeId) ?? [])]
+    .filter((neighborId) => columnByNode.get(neighborId) === referenceColumn)
+    .map((neighborId) => orderByNode.get(neighborId))
+    .filter((value): value is number => typeof value === 'number');
+
+  if (neighborOrders.length === 0) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  return neighborOrders.reduce((sum, value) => sum + value, 0) / neighborOrders.length;
 }
