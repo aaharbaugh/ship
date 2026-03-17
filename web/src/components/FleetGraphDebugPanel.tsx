@@ -20,15 +20,15 @@ export interface PersistedFleetGraphView {
 }
 
 const STATUS_STYLES: Record<'green' | 'yellow' | 'red', string> = {
-  green: 'bg-green-500/10 text-green-700 border-green-500/20',
-  yellow: 'bg-yellow-500/10 text-yellow-700 border-yellow-500/20',
-  red: 'bg-red-500/10 text-red-700 border-red-500/20',
+  green: 'bg-green-500/10 text-green-300 border-green-500/30',
+  yellow: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30',
+  red: 'bg-red-500/10 text-red-300 border-red-500/30',
 };
 
 const PRIORITY_STYLES: Record<'high' | 'medium' | 'low', string> = {
-  high: 'text-red-700',
-  medium: 'text-yellow-700',
-  low: 'text-slate-600',
+  high: 'text-red-300',
+  medium: 'text-yellow-300',
+  low: 'text-slate-400',
 };
 
 const FILTER_BUTTON_BASE =
@@ -61,7 +61,7 @@ export function FleetGraphDebugPanel({
 }) {
   if (isLoading) {
     return (
-      <div className="border-b border-border bg-slate-50/70 px-4 py-3">
+      <div className="border-b border-slate-800 bg-black px-4 py-3">
         <div className="mx-auto max-w-6xl space-y-2">
           <Skeleton className="h-4 w-44" />
           <Skeleton className="h-16 w-full" />
@@ -72,8 +72,8 @@ export function FleetGraphDebugPanel({
 
   if (error || !data) {
     return (
-      <div className="border-b border-border bg-slate-50/70 px-4 py-3">
-        <div className="mx-auto max-w-6xl text-xs text-muted">
+      <div className="border-b border-slate-800 bg-black px-4 py-3">
+        <div className="mx-auto max-w-6xl text-xs text-slate-500">
           FleetGraph debug unavailable.
         </div>
       </div>
@@ -124,6 +124,7 @@ export function FleetGraphDebugPanel({
   const displayTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
   const qualityReportId = persisted?.qualityReportId ?? null;
   const linkedReport = reports?.find((report) => report.id === qualityReportId);
+  const [isExpanded, setIsExpanded] = useState(false);
   const sourceLabel = persisted
     ? 'Persisted metadata'
     : data.analysis.mode === 'gpt-4o'
@@ -131,14 +132,21 @@ export function FleetGraphDebugPanel({
       : 'Live deterministic analysis';
 
   return (
-    <div className="border-b border-border bg-slate-50/70 px-4 py-3">
+    <div className="border-b border-slate-800 bg-black px-4 py-3">
       <div className="mx-auto max-w-6xl space-y-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-          <span className="font-medium text-foreground">FleetGraph Debug</span>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span className="font-medium text-white">FleetGraph</span>
           <span>{sourceLabel}</span>
           <span>{data.scoringPayload.documentCount} docs</span>
           <span>{data.scoringPayload.edgeCount} edges</span>
           <span>{persisted?.lastScoredAt || data.analysis.generatedAt}</span>
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-900"
+          >
+            {isExpanded ? 'Hide Details' : 'Show Details'}
+          </button>
           {onPersist && (
             <div className="ml-auto flex items-center gap-2">
               {onCreateReportDraft && (
@@ -146,7 +154,7 @@ export function FleetGraphDebugPanel({
                   type="button"
                   onClick={onCreateReportDraft}
                   disabled={isCreatingReportDraft || !!qualityReportId}
-                  className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {qualityReportId
                     ? 'Draft Report Linked'
@@ -158,7 +166,7 @@ export function FleetGraphDebugPanel({
               {qualityReportId && (
                 <a
                   href={`/documents/${qualityReportId}`}
-                  className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100"
+                  className="rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-900"
                 >
                   Open Draft Report
                 </a>
@@ -168,7 +176,7 @@ export function FleetGraphDebugPanel({
                   type="button"
                   onClick={() => onPublishReport(qualityReportId)}
                   disabled={isPublishingReport}
-                  className="rounded-md border border-border bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-md border border-slate-700 bg-white px-2.5 py-1 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isPublishingReport ? 'Publishing...' : 'Publish Report'}
                 </button>
@@ -177,7 +185,7 @@ export function FleetGraphDebugPanel({
                 type="button"
                 onClick={onPersist}
                 disabled={isPersisting}
-                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isPersisting ? 'Persisting...' : 'Persist Analysis'}
               </button>
@@ -195,7 +203,7 @@ export function FleetGraphDebugPanel({
             </div>
 
             <div className="min-w-0 flex-1 space-y-1">
-              <p className="text-sm font-medium text-foreground">
+              <p className="line-clamp-2 text-sm font-medium text-white">
                 {displaySummary}
               </p>
               {displayTags.length > 0 && (
@@ -203,7 +211,7 @@ export function FleetGraphDebugPanel({
                   {displayTags.map((tag) => (
                     <span
                       key={`${tag.key}-${tag.label}`}
-                      className="rounded-full border border-border bg-background px-2 py-0.5 text-xs text-muted"
+                      className="rounded-full border border-slate-700 bg-slate-950 px-2 py-0.5 text-xs text-slate-300"
                     >
                       {tag.label}
                     </span>
@@ -211,7 +219,7 @@ export function FleetGraphDebugPanel({
                 </div>
               )}
               {qualityReportId && (
-                <div className="text-xs text-muted">
+                <div className="text-xs text-slate-400">
                   Linked report {linkedReport?.state === 'published' ? 'published.' : 'ready for review.'}
                 </div>
               )}
@@ -219,22 +227,23 @@ export function FleetGraphDebugPanel({
           </div>
         )}
 
-        {!persisted && data.analysis.remediationSuggestions.length > 0 && (
+        {isExpanded && !persisted && data.analysis.remediationSuggestions.length > 0 && (
           <div className="grid gap-2 md:grid-cols-2">
             {data.analysis.remediationSuggestions.slice(0, 4).map((suggestion, index) => (
-              <div key={`${suggestion.title}-${index}`} className="rounded-md border border-border bg-background px-3 py-2">
+              <div key={`${suggestion.title}-${index}`} className="rounded-md border border-slate-800 bg-slate-950 px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-foreground">{suggestion.title}</span>
+                  <span className="text-sm font-medium text-white">{suggestion.title}</span>
                   <span className={cn('text-xs font-medium uppercase', PRIORITY_STYLES[suggestion.priority])}>
                     {suggestion.priority}
                   </span>
                 </div>
-                <p className="mt-1 text-xs text-muted">{suggestion.rationale}</p>
+                <p className="mt-1 text-xs text-slate-400">{suggestion.rationale}</p>
               </div>
             ))}
           </div>
         )}
 
+        {isExpanded && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -243,7 +252,7 @@ export function FleetGraphDebugPanel({
               FILTER_BUTTON_BASE,
               activeTypes.length === 0
                 ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-border bg-background text-muted hover:bg-slate-100'
+                : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-900'
             )}
           >
             All
@@ -265,7 +274,7 @@ export function FleetGraphDebugPanel({
                   FILTER_BUTTON_BASE,
                   active
                     ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-border bg-background text-muted hover:bg-slate-100'
+                    : 'border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-900'
                 )}
               >
                 {documentType}
@@ -273,32 +282,35 @@ export function FleetGraphDebugPanel({
             );
           })}
         </div>
+        )}
 
+        {isExpanded && (
         <FleetGraphViewer
           rootDocumentId={data.rootDocumentId}
           graph={filteredGraph}
           selectedNodeId={effectiveSelectedNodeId}
           onSelectNode={setSelectedNodeId}
         />
+        )}
 
-        {reports && reports.length > 0 && (
-          <div className="rounded-xl border border-border bg-white p-4">
+        {isExpanded && reports && reports.length > 0 && (
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold text-foreground">Recent FleetGraph Reports</h3>
-              <span className="text-xs text-muted">{reports.length} linked drafts</span>
+              <h3 className="text-sm font-semibold text-white">Recent FleetGraph Reports</h3>
+              <span className="text-xs text-slate-400">{reports.length} linked drafts</span>
             </div>
             <div className="mt-3 grid gap-2 md:grid-cols-2">
               {reports.slice(0, 6).map((report) => (
                 <a
                   key={report.id}
                   href={`/documents/${report.id}`}
-                  className="rounded-lg border border-border bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100"
+                  className="rounded-lg border border-slate-800 bg-black px-3 py-2 transition-colors hover:bg-slate-900"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-sm font-medium text-foreground">{report.title}</span>
+                    <span className="text-sm font-medium text-white">{report.title}</span>
                     {report.qualityStatus && typeof report.qualityScore === 'number' && (
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] uppercase tracking-wide text-muted">
+                        <span className="text-[11px] uppercase tracking-wide text-slate-400">
                           {report.state}
                         </span>
                         <span
@@ -312,7 +324,7 @@ export function FleetGraphDebugPanel({
                       </div>
                     )}
                   </div>
-                  <div className="mt-1 text-xs text-muted">
+                  <div className="mt-1 text-xs text-slate-400">
                     {report.state === 'published'
                       ? report.publishedAt ?? report.updatedAt ?? 'No timestamp'
                       : report.generatedAt ?? report.updatedAt ?? 'No timestamp'}
@@ -323,8 +335,8 @@ export function FleetGraphDebugPanel({
           </div>
         )}
 
-        {selectedAnalysis && selectedGraphNode && (
-          <div className="rounded-xl border border-border bg-white p-4">
+        {isExpanded && selectedAnalysis && selectedGraphNode && (
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
             <div className="flex flex-wrap items-start gap-3">
               <div className={cn(
                 'rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide',
@@ -334,35 +346,35 @@ export function FleetGraphDebugPanel({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-foreground">{selectedGraphNode.title}</h3>
-                  <span className="text-xs uppercase tracking-wide text-muted">
+                  <h3 className="text-sm font-semibold text-white">{selectedGraphNode.title}</h3>
+                  <span className="text-xs uppercase tracking-wide text-slate-400">
                     {selectedGraphNode.documentType}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-foreground">{selectedAnalysis.summary}</p>
+                <p className="mt-1 text-sm text-slate-200">{selectedAnalysis.summary}</p>
               </div>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-muted">Tags</div>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Tags</div>
                 <div className="flex flex-wrap gap-2">
                   {selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
                     <span
                       key={`${selectedAnalysis.documentId}-${tag.key}`}
-                      className="rounded-full border border-border bg-slate-50 px-2 py-0.5 text-xs text-muted"
+                      className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-xs text-slate-300"
                     >
                       {tag.label}
                     </span>
                   )) : (
-                    <span className="text-xs text-muted">No findings</span>
+                    <span className="text-xs text-slate-500">No findings</span>
                   )}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-muted">Graph Context</div>
-                <div className="space-y-1 text-xs text-muted">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Graph Context</div>
+                <div className="space-y-1 text-xs text-slate-400">
                   <div>Connected edges: {connectedEdges.length}</div>
                   <div>Parent: {selectedGraphNode.parentId ?? 'None'}</div>
                   <div>Belongs to: {selectedGraphNode.belongsTo.length > 0 ? selectedGraphNode.belongsTo.map((item) => item.type).join(', ') : 'None'}</div>
@@ -373,8 +385,8 @@ export function FleetGraphDebugPanel({
 
             {selectedScoringDocument?.summaryText && (
               <div className="mt-3">
-                <div className="text-xs font-medium uppercase tracking-wide text-muted">Summary Text</div>
-                <p className="mt-1 text-xs leading-5 text-muted">{selectedScoringDocument.summaryText}</p>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Summary Text</div>
+                <p className="mt-1 text-xs leading-5 text-slate-400">{selectedScoringDocument.summaryText}</p>
               </div>
             )}
           </div>
