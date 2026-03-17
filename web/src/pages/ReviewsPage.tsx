@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { apiPost, apiGet } from '@/lib/api';
 import { formatDateRange } from '@/lib/date-utils';
@@ -626,6 +626,22 @@ export function ReviewsPage() {
     <div className="flex h-full">
       {/* Main grid area */}
       <div className={cn('flex flex-col', selectedCell ? 'flex-1 min-w-0' : 'flex-1')}>
+      <div className="border-b border-border bg-slate-50/80 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-medium text-foreground">Weekly Reviews</div>
+            <div className="text-xs text-muted">
+              Plans and retros stay here. FleetGraph quality reports now have a dedicated review queue.
+            </div>
+          </div>
+          <Link
+            to="/team/reviews/fleetgraph"
+            className="rounded-md border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-slate-100"
+          >
+            Open FleetGraph Reports
+          </Link>
+        </div>
+      </div>
       {/* Status legend + filters */}
       <div className="border-b border-border px-4 py-2 text-xs">
         <div className="flex flex-wrap items-center gap-3">

@@ -41,6 +41,7 @@ const ConvertedDocumentsPage = lazy(async () => ({ default: (await import('@/pag
 const UnifiedDocumentPage = lazy(async () => ({ default: (await import('@/pages/UnifiedDocumentPage')).UnifiedDocumentPage }));
 const StatusOverviewPage = lazy(async () => ({ default: (await import('@/pages/StatusOverviewPage')).StatusOverviewPage }));
 const ReviewsPage = lazy(async () => ({ default: (await import('@/pages/ReviewsPage')).ReviewsPage }));
+const FleetGraphReportsPage = lazy(async () => ({ default: (await import('@/pages/FleetGraphReportsPage')).FleetGraphReportsPage }));
 const OrgChartPage = lazy(async () => ({ default: (await import('@/pages/OrgChartPage')).OrgChartPage }));
 const InviteAcceptPage = lazy(async () => ({ default: (await import('@/pages/InviteAccept')).InviteAcceptPage }));
 const SetupPage = lazy(async () => ({ default: (await import('@/pages/Setup')).SetupPage }));
@@ -247,6 +248,7 @@ function AppRoutes() {
         <Route path="team/directory" element={<TeamDirectoryPage />} />
         <Route path="team/status" element={<StatusOverviewPage />} />
         <Route path="team/reviews" element={<ReviewsPage />} />
+        <Route path="team/reviews/fleetgraph" element={<FleetGraphReportsPage />} />
         <Route path="team/org-chart" element={<OrgChartPage />} />
         {/* Person profile stays in Teams context - no redirect to /documents */}
         <Route path="team/:id" element={<PersonEditorPage />} />
