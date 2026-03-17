@@ -5,6 +5,7 @@ import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
 import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
 import { createFleetGraphQualityReportDraft } from '../services/fleetgraph/report.js';
+import { listFleetGraphReports } from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 
@@ -30,6 +31,18 @@ router.get('/debug/:id', authMiddleware, async (req: Request, res: Response) => 
   } catch (error) {
     console.error('FleetGraph debug error:', error);
     return res.status(500).json({ error: 'Failed to prepare FleetGraph run' });
+  }
+});
+
+router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const client = createRouteClient(req);
+    return res.json({
+      reports: await listFleetGraphReports(client),
+    });
+  } catch (error) {
+    console.error('FleetGraph report list error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph reports' });
   }
 });
 

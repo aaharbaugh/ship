@@ -13,6 +13,7 @@ import {
   useFleetGraphPersistMutation,
   useFleetGraphReportDraftMutation,
 } from '@/hooks/useFleetGraphDebugQuery';
+import { useFleetGraphReportsQuery } from '@/hooks/useFleetGraphReportsQuery';
 import { useDocumentConversion } from '@/hooks/useDocumentConversion';
 import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
@@ -68,6 +69,7 @@ export function UnifiedDocumentPage() {
   const fleetGraphDebugQuery = useFleetGraphDebugQuery(id);
   const fleetGraphPersistMutation = useFleetGraphPersistMutation(id);
   const fleetGraphReportDraftMutation = useFleetGraphReportDraftMutation(id);
+  const fleetGraphReportsQuery = useFleetGraphReportsQuery();
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -572,6 +574,7 @@ export function UnifiedDocumentPage() {
         isPersisting={fleetGraphPersistMutation.isPending}
         onCreateReportDraft={() => fleetGraphReportDraftMutation.mutate()}
         isCreatingReportDraft={fleetGraphReportDraftMutation.isPending}
+        reports={fleetGraphReportsQuery.data}
       />
       <div className="min-h-0 flex-1">
         <UnifiedEditor

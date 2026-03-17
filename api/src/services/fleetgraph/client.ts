@@ -10,6 +10,8 @@ export interface FleetGraphDocumentRecord {
   document_type: DocumentType | string;
   title: string;
   parent_id: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
   properties: Record<string, unknown>;
   content?: Record<string, unknown> | null;
   belongs_to?: Array<{ id: string; type: string; title?: string; color?: string }>;

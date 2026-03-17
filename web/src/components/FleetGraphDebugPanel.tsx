@@ -3,6 +3,7 @@ import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { FleetGraphViewer } from '@/components/FleetGraphViewer';
 import type { FleetGraphDebugResponse } from '@/hooks/useFleetGraphDebugQuery';
+import type { FleetGraphReportListItem } from '@/hooks/useFleetGraphReportsQuery';
 
 export interface PersistedFleetGraphView {
   qualityScore: number;
@@ -42,6 +43,7 @@ export function FleetGraphDebugPanel({
   isPersisting,
   onCreateReportDraft,
   isCreatingReportDraft,
+  reports,
 }: {
   data?: FleetGraphDebugResponse;
   isLoading: boolean;
@@ -51,6 +53,7 @@ export function FleetGraphDebugPanel({
   isPersisting?: boolean;
   onCreateReportDraft?: () => void;
   isCreatingReportDraft?: boolean;
+  reports?: FleetGraphReportListItem[];
 }) {
   if (isLoading) {
     return (
@@ -262,6 +265,41 @@ export function FleetGraphDebugPanel({
           selectedNodeId={effectiveSelectedNodeId}
           onSelectNode={setSelectedNodeId}
         />
+
+        {reports && reports.length > 0 && (
+          <div className="rounded-xl border border-border bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-foreground">Recent FleetGraph Reports</h3>
+              <span className="text-xs text-muted">{reports.length} linked drafts</span>
+            </div>
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {reports.slice(0, 6).map((report) => (
+                <a
+                  key={report.id}
+                  href={`/documents/${report.id}`}
+                  className="rounded-lg border border-border bg-slate-50 px-3 py-2 transition-colors hover:bg-slate-100"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-foreground">{report.title}</span>
+                    {report.qualityStatus && typeof report.qualityScore === 'number' && (
+                      <span
+                        className={cn(
+                          'rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+                          STATUS_STYLES[report.qualityStatus]
+                        )}
+                      >
+                        {report.qualityStatus} {Math.round(report.qualityScore * 100)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs text-muted">
+                    {report.generatedAt ?? report.updatedAt ?? 'No timestamp'}
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
 
         {selectedAnalysis && selectedGraphNode && (
           <div className="rounded-xl border border-border bg-white p-4">
