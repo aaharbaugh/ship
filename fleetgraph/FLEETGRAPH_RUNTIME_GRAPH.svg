@@ -1,0 +1,245 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="2200" viewBox="0 0 1400 2200" role="img" aria-labelledby="title desc">
+  <title id="title">FleetGraph Runtime Graph</title>
+  <desc id="desc">Detailed top-to-bottom graph of FleetGraph runtime nodes, functions, and side branches.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#08111f"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#172033"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#67e8f9"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="10" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+    <style>
+      .title { font: 700 34px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 500 16px ui-sans-serif, system-ui, sans-serif; fill: #94a3b8; }
+      .section { font: 700 12px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; letter-spacing: 0.18em; text-transform: uppercase; }
+      .node-title { font: 700 18px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .node-file { font: 700 12px ui-sans-serif, system-ui, sans-serif; fill: #93c5fd; }
+      .node-body { font: 500 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .mini { font: 600 11px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .edge { stroke: #67e8f9; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .edge-soft { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); }
+      .edge-label { font: 600 12px ui-sans-serif, system-ui, sans-serif; fill: #bae6fd; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="2200" fill="url(#bg)"/>
+
+  <text x="70" y="70" class="title">FleetGraph Runtime Graph</text>
+  <text x="70" y="102" class="subtitle">Detailed function/node view, top-to-bottom. Main path in the center; report/review branches to the right.</text>
+
+  <text x="120" y="150" class="section">Trigger Sources</text>
+  <text x="520" y="150" class="section">Main Runtime Path</text>
+  <text x="1000" y="150" class="section">Report / Review Branches</text>
+
+  <!-- left triggers -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="190" rx="20" width="260" height="105" fill="url(#card)" stroke="#22c55e" stroke-width="2"/>
+    <text x="92" y="222" class="node-title">Document REST Trigger</text>
+    <text x="92" y="244" class="node-file">api/src/routes/documents.ts</text>
+    <text x="92" y="265" class="node-body">create / update / content routes</text>
+    <text x="92" y="284" class="node-body">computeFleetGraphContentHash()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="335" rx="20" width="260" height="120" fill="url(#card)" stroke="#22c55e" stroke-width="2"/>
+    <text x="92" y="367" class="node-title">Collaboration Idle Trigger</text>
+    <text x="92" y="389" class="node-file">api/src/collaboration/index.ts</text>
+    <text x="92" y="410" class="node-body">Y.js persists frequently</text>
+    <text x="92" y="429" class="node-body">Latest contentHash captured</text>
+    <text x="92" y="448" class="node-body">Queues only after idle / disconnect</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="500" rx="20" width="260" height="100" fill="url(#card)" stroke="#22c55e" stroke-width="2"/>
+    <text x="92" y="532" class="node-title">Manual + Nightly Scan</text>
+    <text x="92" y="554" class="node-file">api/src/routes/fleetgraph.ts</text>
+    <text x="92" y="575" class="node-body">manual insights + nightly-scan entry</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="650" rx="20" width="260" height="120" fill="url(#card)" stroke="#f59e0b" stroke-width="2"/>
+    <text x="92" y="682" class="node-title">enqueueFleetGraphRun()</text>
+    <text x="92" y="704" class="node-file">api/src/services/fleetgraph/triggers.ts</text>
+    <text x="92" y="725" class="node-body">Queue by latest document state</text>
+    <text x="92" y="744" class="node-body">Hash dedupe + workspace balancing</text>
+    <text x="92" y="763" class="node-body">4-minute flush</text>
+  </g>
+
+  <!-- main center path -->
+  <g filter="url(#shadow)">
+    <rect x="430" y="190" rx="22" width="360" height="120" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="222" class="node-title">flushFleetGraphQueue()</text>
+    <text x="455" y="244" class="node-file">api/src/services/fleetgraph/triggers.ts</text>
+    <text x="455" y="265" class="node-body">selectBatchForFlush()</text>
+    <text x="455" y="284" class="node-body">accept / skip / execute events</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="360" rx="22" width="360" height="120" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="392" class="node-title">executeFleetGraphTrigger()</text>
+    <text x="455" y="414" class="node-file">api/src/services/fleetgraph/execute.ts</text>
+    <text x="455" y="435" class="node-body">createFleetGraphBearerClient()</text>
+    <text x="455" y="454" class="node-body">missing-config guard for SHIP_API_TOKEN</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="530" rx="22" width="360" height="120" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="562" class="node-title">prepareFleetGraphRun()</text>
+    <text x="455" y="584" class="node-file">api/src/services/fleetgraph/runner.ts</text>
+    <text x="455" y="605" class="node-body">buildFleetGraphRunPlan()</text>
+    <text x="455" y="624" class="node-body">expandFleetGraphTraversal()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="700" rx="22" width="360" height="165" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="732" class="node-title">Traversal Subnodes</text>
+    <text x="455" y="754" class="node-file">api/src/services/fleetgraph/nodes.ts</text>
+    <text x="455" y="775" class="node-body">1. load-trigger-context</text>
+    <text x="455" y="794" class="node-body">2. load-document</text>
+    <text x="455" y="813" class="node-body">3. load-associations</text>
+    <text x="455" y="832" class="node-body">4. load-related-documents</text>
+    <text x="455" y="851" class="node-body">bounded recursive REST crawl</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="915" rx="22" width="360" height="115" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="947" class="node-title">buildFleetGraphSnapshot()</text>
+    <text x="455" y="969" class="node-file">api/src/services/fleetgraph/graph.ts</text>
+    <text x="455" y="990" class="node-body">nodes + edges + traversal metadata</text>
+    <text x="455" y="1009" class="node-body">depth / truncation / limits</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="1080" rx="22" width="360" height="110" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="1112" class="node-title">buildFleetGraphScoringPayload()</text>
+    <text x="455" y="1134" class="node-file">api/src/services/fleetgraph/payload.ts</text>
+    <text x="455" y="1155" class="node-body">summaryText / owner / tags / counts</text>
+    <text x="455" y="1174" class="node-body">graph compressed for reasoning</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="1240" rx="22" width="360" height="150" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="1272" class="node-title">analyzeFleetGraphWithReasoning()</text>
+    <text x="455" y="1294" class="node-file">api/src/services/fleetgraph/reasoning.ts</text>
+    <text x="455" y="1315" class="node-body">analyzeFleetGraphPayload() first</text>
+    <text x="455" y="1334" class="node-body">wrapOpenAI(new OpenAI(...)) second</text>
+    <text x="455" y="1353" class="node-body">mergeReasoningIntoAnalysis()</text>
+    <text x="455" y="1372" class="node-body">LangSmith traceable + metadata</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="1445" rx="22" width="360" height="110" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="1477" class="node-title">persistFleetGraphAnalysis()</text>
+    <text x="455" y="1499" class="node-file">api/src/services/fleetgraph/persist.ts</text>
+    <text x="455" y="1520" class="node-body">quality metadata back to documents</text>
+    <text x="455" y="1539" class="node-body">REST writes only</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="1605" rx="22" width="360" height="110" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="455" y="1637" class="node-title">Insights Response Path</text>
+    <text x="455" y="1659" class="node-file">api/src/routes/fleetgraph.ts</text>
+    <text x="455" y="1680" class="node-body">GET /documents/:id</text>
+    <text x="455" y="1699" class="node-body">panel + graph viewer + persisted view</text>
+  </g>
+
+  <!-- right branches -->
+  <g filter="url(#shadow)">
+    <rect x="930" y="540" rx="22" width="340" height="125" fill="url(#card)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="955" y="572" class="node-title">createFleetGraphQualityReportDraft()</text>
+    <text x="955" y="594" class="node-file">api/src/services/fleetgraph/report.ts</text>
+    <text x="955" y="615" class="node-body">quality report doc + response options</text>
+    <text x="955" y="634" class="node-body">writes fleetgraph_director_response_options</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="720" rx="22" width="340" height="115" fill="url(#card)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="955" y="752" class="node-title">publishFleetGraphQualityReport()</text>
+    <text x="955" y="774" class="node-file">api/src/services/fleetgraph/report.ts</text>
+    <text x="955" y="795" class="node-body">draft → published</text>
+    <text x="955" y="814" class="node-body">human confirmation required</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="890" rx="22" width="340" height="125" fill="url(#card)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="955" y="922" class="node-title">sendFleetGraphDirectorFeedback()</text>
+    <text x="955" y="944" class="node-file">api/src/services/fleetgraph/feedback.ts</text>
+    <text x="955" y="965" class="node-body">confirm option selection</text>
+    <text x="955" y="984" class="node-body">write feedback onto target documents</text>
+    <text x="955" y="1003" class="node-body">adds director feedback alert tag</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="1070" rx="22" width="340" height="150" fill="url(#card)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="955" y="1102" class="node-title">Reports Feed Functions</text>
+    <text x="955" y="1124" class="node-file">api/src/services/fleetgraph/reports.ts</text>
+    <text x="955" y="1145" class="node-body">listFleetGraphReports()</text>
+    <text x="955" y="1164" class="node-body">getFleetGraphReportDetail()</text>
+    <text x="955" y="1183" class="node-body">getFleetGraphReviewSession()</text>
+    <text x="955" y="1202" class="node-body">flatten findings across current chunk</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="1285" rx="22" width="340" height="130" fill="url(#card)" stroke="#f97316" stroke-width="2"/>
+    <text x="955" y="1317" class="node-title">UI Review Surfaces</text>
+    <text x="955" y="1339" class="node-file">web/src/pages/*</text>
+    <text x="955" y="1360" class="node-body">FleetGraphReportsPage</text>
+    <text x="955" y="1379" class="node-body">FleetGraphReportDetailPage</text>
+    <text x="955" y="1398" class="node-body">FleetGraphReviewSessionPage</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="930" y="1475" rx="22" width="340" height="135" fill="url(#card)" stroke="#f97316" stroke-width="2"/>
+    <text x="955" y="1507" class="node-title">Document Insight Surfaces</text>
+    <text x="955" y="1529" class="node-file">web/src/components/*</text>
+    <text x="955" y="1550" class="node-body">FleetGraphInsightsPanel</text>
+    <text x="955" y="1569" class="node-body">FleetGraphViewer</text>
+    <text x="955" y="1588" class="node-body">Compact summary + graph + actions</text>
+  </g>
+
+  <!-- center path arrows -->
+  <path class="edge" d="M 330 710 C 380 710, 380 250, 430 250"/>
+  <path class="edge-soft" d="M 330 245 C 370 245, 370 245, 430 245"/>
+  <path class="edge-soft" d="M 330 395 C 370 395, 370 255, 430 255"/>
+  <path class="edge-soft" d="M 330 550 C 370 550, 370 265, 430 265"/>
+
+  <path class="edge" d="M 610 310 C 610 330, 610 340, 610 360"/>
+  <path class="edge" d="M 610 480 C 610 500, 610 510, 610 530"/>
+  <path class="edge" d="M 610 650 C 610 670, 610 680, 610 700"/>
+  <path class="edge" d="M 610 865 C 610 885, 610 895, 610 915"/>
+  <path class="edge" d="M 610 1030 C 610 1050, 610 1060, 610 1080"/>
+  <path class="edge" d="M 610 1190 C 610 1210, 610 1220, 610 1240"/>
+  <path class="edge" d="M 610 1390 C 610 1410, 610 1420, 610 1445"/>
+  <path class="edge" d="M 610 1555 C 610 1575, 610 1585, 610 1605"/>
+
+  <!-- branch arrows -->
+  <path class="edge-soft" d="M 790 1320 C 840 1320, 860 602, 930 602"/>
+  <path class="edge-soft" d="M 790 1320 C 850 1320, 860 777, 930 777"/>
+  <path class="edge-soft" d="M 790 1320 C 850 1320, 860 952, 930 952"/>
+  <path class="edge-soft" d="M 790 1500 C 850 1500, 860 1145, 930 1145"/>
+  <path class="edge-soft" d="M 790 1660 C 845 1660, 860 1542, 930 1542"/>
+  <path class="edge-soft" d="M 1270 1145 C 1310 1145, 1310 1348, 1270 1348"/>
+  <path class="edge-soft" d="M 1270 1145 C 1310 1145, 1310 1542, 1270 1542"/>
+
+  <!-- labels -->
+  <text x="645" y="345" class="edge-label">run</text>
+  <text x="645" y="515" class="edge-label">prepare</text>
+  <text x="646" y="885" class="edge-label">snapshot</text>
+  <text x="646" y="1215" class="edge-label">reason</text>
+  <text x="850" y="615" class="edge-label">report</text>
+  <text x="852" y="962" class="edge-label">feedback</text>
+  <text x="850" y="1158" class="edge-label">feeds</text>
+
+  <!-- footer -->
+  <rect x="70" y="2090" width="1260" height="70" rx="18" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="95" y="2120" class="section">Reading Guide</text>
+  <text x="95" y="2148" class="node-body">Center column is the main execution path. Left column shows how runs enter the system. Right column shows the side branches that turn analysis into reports, feedback, and PM review surfaces.</text>
+</svg>
