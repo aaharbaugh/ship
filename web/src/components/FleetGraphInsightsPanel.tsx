@@ -125,6 +125,33 @@ export function FleetGraphInsightsPanel({
   const qualityReportId = persisted?.qualityReportId ?? null;
   const linkedReport = reports?.find((report) => report.id === qualityReportId);
   const [isExpanded, setIsExpanded] = useState(false);
+  const conciseSuggestions = useMemo(
+    () => buildConciseSuggestions(data.analysis.remediationSuggestions, displayTags),
+    [data.analysis.remediationSuggestions, displayTags]
+  );
+  const selectedContextLines = useMemo(() => {
+    const lines: string[] = [];
+
+    if (connectedEdges.length > 0) {
+      lines.push(`${connectedEdges.length} connected edge${connectedEdges.length === 1 ? '' : 's'}`);
+    }
+    if (selectedScoringDocument?.ownerId) {
+      lines.push(`Owner ${selectedScoringDocument.ownerId}`);
+    }
+    if (selectedGraphNode?.parentId) {
+      lines.push(`Parent ${selectedGraphNode.parentId}`);
+    }
+    if (selectedGraphNode && selectedGraphNode.belongsTo.length > 0) {
+      lines.push(`Belongs to ${selectedGraphNode.belongsTo.map((item) => item.type).join(', ')}`);
+    }
+
+    return lines;
+  }, [connectedEdges.length, selectedGraphNode, selectedScoringDocument?.ownerId]);
+  const selectedSummaryText = selectedScoringDocument?.summaryText?.trim() ?? '';
+  const shouldShowSelectedSummaryText =
+    selectedSummaryText.length > 0 &&
+    normalizeFleetGraphText(selectedSummaryText) !==
+      normalizeFleetGraphText(selectedAnalysis?.summary ?? '');
   const sourceLabel = persisted
     ? 'Persisted metadata'
     : data.analysis.mode === 'gpt-4o'
@@ -238,17 +265,17 @@ export function FleetGraphInsightsPanel({
           </div>
         )}
 
-        {isExpanded && !persisted && data.analysis.remediationSuggestions.length > 0 && (
-          <div className="grid gap-2 md:grid-cols-2">
-            {data.analysis.remediationSuggestions.slice(0, 4).map((suggestion, index) => (
-              <div key={`${suggestion.title}-${index}`} className="rounded-md border border-slate-800 bg-slate-950 px-3 py-2">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-white">{suggestion.title}</span>
-                  <span className={cn('text-xs font-medium uppercase', PRIORITY_STYLES[suggestion.priority])}>
-                    {suggestion.priority}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-400">{suggestion.rationale}</p>
+        {isExpanded && !persisted && conciseSuggestions.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {conciseSuggestions.map((suggestion, index) => (
+              <div
+                key={`${suggestion.title}-${index}`}
+                className="rounded-full border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs text-slate-300"
+              >
+                <span className="font-medium text-white">{suggestion.title}</span>
+                <span className={cn('ml-2 uppercase', PRIORITY_STYLES[suggestion.priority])}>
+                  {suggestion.priority}
+                </span>
               </div>
             ))}
           </div>
@@ -362,42 +389,37 @@ export function FleetGraphInsightsPanel({
                     {selectedGraphNode.documentType}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-slate-200">{selectedAnalysis.summary}</p>
+                {normalizeFleetGraphText(selectedAnalysis.summary) !== normalizeFleetGraphText(displaySummary ?? '') && (
+                  <p className="mt-1 text-sm text-slate-200">{selectedAnalysis.summary}</p>
+                )}
               </div>
             </div>
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="space-y-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Tags</div>
-                <div className="flex flex-wrap gap-2">
-                  {selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
-                    <span
-                      key={`${selectedAnalysis.documentId}-${tag.key}`}
-                      className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-xs text-slate-300"
-                    >
-                      {tag.label}
-                    </span>
-                  )) : (
-                    <span className="text-xs text-slate-500">No findings</span>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Graph Context</div>
-                <div className="space-y-1 text-xs text-slate-400">
-                  <div>Connected edges: {connectedEdges.length}</div>
-                  <div>Parent: {selectedGraphNode.parentId ?? 'None'}</div>
-                  <div>Belongs to: {selectedGraphNode.belongsTo.length > 0 ? selectedGraphNode.belongsTo.map((item) => item.type).join(', ') : 'None'}</div>
-                  <div>Owner: {selectedScoringDocument?.ownerId ?? 'None'}</div>
-                </div>
-              </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {selectedAnalysis.tags.length > 0 ? selectedAnalysis.tags.map((tag) => (
+                <span
+                  key={`${selectedAnalysis.documentId}-${tag.key}`}
+                  className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-xs text-slate-300"
+                >
+                  {tag.label}
+                </span>
+              )) : (
+                <span className="text-xs text-slate-500">No findings</span>
+              )}
+              {selectedContextLines.map((line) => (
+                <span
+                  key={line}
+                  className="rounded-full border border-slate-800 bg-slate-950 px-2 py-0.5 text-xs text-slate-400"
+                >
+                  {line}
+                </span>
+              ))}
             </div>
 
-            {selectedScoringDocument?.summaryText && (
+            {shouldShowSelectedSummaryText && (
               <div className="mt-3">
-                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Summary Text</div>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{selectedScoringDocument.summaryText}</p>
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Source Text</div>
+                <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-400">{selectedSummaryText}</p>
               </div>
             )}
           </div>
@@ -405,4 +427,31 @@ export function FleetGraphInsightsPanel({
       </div>
     </div>
   );
+}
+
+function buildConciseSuggestions(
+  suggestions: FleetGraphInsightsResponse['analysis']['remediationSuggestions'],
+  tags: PersistedFleetGraphView['qualityTags']
+) {
+  const normalizedTags = new Set(tags.map((tag) => normalizeFleetGraphText(tag.label)));
+  const seen = new Set<string>();
+
+  return suggestions.flatMap((suggestion) => {
+    const titleKey = normalizeFleetGraphText(suggestion.title);
+    if (!titleKey || seen.has(titleKey)) {
+      return [];
+    }
+
+    const titleWithoutPrefix = titleKey.replace(/^improve [a-z_]+:\s*/, '');
+    if (normalizedTags.has(titleWithoutPrefix)) {
+      return [];
+    }
+
+    seen.add(titleKey);
+    return [suggestion];
+  }).slice(0, 3);
+}
+
+function normalizeFleetGraphText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
