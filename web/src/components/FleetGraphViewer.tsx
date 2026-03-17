@@ -21,6 +21,10 @@ const NODE_COLORS: Record<string, string> = {
   weekly_review: '#c2410c',
   person: '#374151',
 };
+const COLUMN_X_SPACING = 320;
+const INNER_COLUMN_X_SPACING = 210;
+const ROW_Y_SPACING = 140;
+const MAX_ROWS_PER_COLUMN = 6;
 
 function colorForType(documentType: string): string {
   return NODE_COLORS[documentType] ?? '#334155';
@@ -204,11 +208,21 @@ function buildFleetGraphLayout(
         : a.documentType.localeCompare(b.documentType)
     );
 
-    const totalHeight = (bucket.length - 1) * 140;
     bucket.forEach((node, index) => {
+      const subColumnCount = Math.ceil(bucket.length / MAX_ROWS_PER_COLUMN);
+      const subColumnIndex = Math.floor(index / MAX_ROWS_PER_COLUMN);
+      const rowIndex = index % MAX_ROWS_PER_COLUMN;
+      const rowsInSubColumn =
+        subColumnIndex === subColumnCount - 1
+          ? bucket.length - subColumnIndex * MAX_ROWS_PER_COLUMN
+          : MAX_ROWS_PER_COLUMN;
+      const subColumnOffset =
+        (subColumnIndex - (subColumnCount - 1) / 2) * INNER_COLUMN_X_SPACING;
+      const totalHeight = (rowsInSubColumn - 1) * ROW_Y_SPACING;
+
       positions.set(node.id, {
-        x: (column + 2) * 240,
-        y: index * 140 - totalHeight / 2 + 160,
+        x: (column + 2) * COLUMN_X_SPACING + subColumnOffset,
+        y: rowIndex * ROW_Y_SPACING - totalHeight / 2 + 160,
       });
     });
   }
