@@ -16,11 +16,28 @@ export interface FleetGraphTriggerResult {
   reason?: 'duplicate_hash' | 'already_queued';
 }
 
+export interface FleetGraphQueueStatus {
+  batchIntervalMs: number;
+  isFlushing: boolean;
+  pendingCount: number;
+  lastFlushStartedAt: string | null;
+  lastFlushCompletedAt: string | null;
+  pendingDocuments: Array<{
+    workspaceId: string;
+    documentId: string;
+    source: FleetGraphTriggerSource;
+    documentType?: DocumentType | string | null;
+    userId?: string | null;
+  }>;
+}
+
 const BATCH_INTERVAL_MS = Number(process.env.FLEETGRAPH_BATCH_INTERVAL_MS || 4 * 60 * 1000);
 const pendingByDocument = new Map<string, FleetGraphTriggerEvent>();
 const lastHashByDocument = new Map<string, string>();
 let batchInterval: NodeJS.Timeout | null = null;
 let isFlushing = false;
+let lastFlushStartedAt: string | null = null;
+let lastFlushCompletedAt: string | null = null;
 
 export function enqueueFleetGraphRun(event: FleetGraphTriggerEvent): FleetGraphTriggerResult {
   ensureFleetGraphBatchProcessor();
@@ -85,6 +102,7 @@ export async function flushFleetGraphQueue(): Promise<void> {
   }
 
   isFlushing = true;
+  lastFlushStartedAt = new Date().toISOString();
   const batch = [...pendingByDocument.values()];
   pendingByDocument.clear();
 
@@ -133,12 +151,30 @@ export async function flushFleetGraphQueue(): Promise<void> {
     }
   } finally {
     isFlushing = false;
+    lastFlushCompletedAt = new Date().toISOString();
     console.info('[FleetGraph] Batch flush completed', {
       queuedDocuments: batch.length,
       ...results,
       remainingQueuedDocuments: pendingByDocument.size,
     });
   }
+}
+
+export function getFleetGraphQueueStatus(): FleetGraphQueueStatus {
+  return {
+    batchIntervalMs: BATCH_INTERVAL_MS,
+    isFlushing,
+    pendingCount: pendingByDocument.size,
+    lastFlushStartedAt,
+    lastFlushCompletedAt,
+    pendingDocuments: [...pendingByDocument.values()].slice(0, 25).map((event) => ({
+      workspaceId: event.workspaceId,
+      documentId: event.documentId,
+      source: event.source,
+      documentType: event.documentType ?? null,
+      userId: event.userId ?? null,
+    })),
+  };
 }
 
 function ensureFleetGraphBatchProcessor(): void {

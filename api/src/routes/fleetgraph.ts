@@ -11,6 +11,7 @@ import {
 import { listFleetGraphReports } from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
+import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -55,6 +56,15 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('FleetGraph report list error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph reports' });
+  }
+});
+
+router.get('/queue-status', authMiddleware, async (_req: Request, res: Response) => {
+  try {
+    return res.json(getFleetGraphQueueStatus());
+  } catch (error) {
+    console.error('FleetGraph queue status error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph queue status' });
   }
 });
 

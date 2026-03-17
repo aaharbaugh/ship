@@ -4,6 +4,7 @@ import { cn } from '@/lib/cn';
 import {
   useFleetGraphBulkPublishReportsMutation,
   useFleetGraphPublishReportMutation,
+  useFleetGraphQueueStatusQuery,
   useFleetGraphReportsQuery,
   useFleetGraphWorkspaceScanMutation,
 } from '@/hooks/useFleetGraphReportsQuery';
@@ -16,6 +17,7 @@ const STATUS_STYLES: Record<'green' | 'yellow' | 'red', string> = {
 
 export function FleetGraphReportsPage() {
   const reportsQuery = useFleetGraphReportsQuery();
+  const queueStatusQuery = useFleetGraphQueueStatusQuery();
   const publishMutation = useFleetGraphPublishReportMutation();
   const bulkPublishMutation = useFleetGraphBulkPublishReportsMutation();
   const scanMutation = useFleetGraphWorkspaceScanMutation();
@@ -155,6 +157,34 @@ export function FleetGraphReportsPage() {
                 {scanMutation.data.projects.filter((project) => project.qualityReportId).length} reports linked
               </div>
             </div>
+          </div>
+        )}
+
+        {queueStatusQuery.data && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">FleetGraph Queue</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {queueStatusQuery.data.pendingCount} queued · every {Math.round(queueStatusQuery.data.batchIntervalMs / 60000)} min · {queueStatusQuery.data.isFlushing ? 'flush in progress' : 'idle'}
+                </div>
+              </div>
+              <div className="text-xs text-slate-500">
+                Last flush: {formatFleetGraphTimestamp(queueStatusQuery.data.lastFlushCompletedAt)}
+              </div>
+            </div>
+            {queueStatusQuery.data.pendingDocuments.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {queueStatusQuery.data.pendingDocuments.slice(0, 8).map((event) => (
+                  <span
+                    key={`${event.documentId}-${event.source}`}
+                    className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-[11px] text-slate-300"
+                  >
+                    {event.documentType ?? 'document'} · {event.source}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

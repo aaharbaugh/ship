@@ -35,6 +35,21 @@ export interface FleetGraphWorkspaceScanResult {
   }>;
 }
 
+export interface FleetGraphQueueStatus {
+  batchIntervalMs: number;
+  isFlushing: boolean;
+  pendingCount: number;
+  lastFlushStartedAt: string | null;
+  lastFlushCompletedAt: string | null;
+  pendingDocuments: Array<{
+    workspaceId: string;
+    documentId: string;
+    source: string;
+    documentType?: string | null;
+    userId?: string | null;
+  }>;
+}
+
 async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
   const response = await apiGet('/api/fleetgraph/reports');
   if (!response.ok) {
@@ -45,11 +60,29 @@ async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
   return payload.reports;
 }
 
+async function fetchFleetGraphQueueStatus(): Promise<FleetGraphQueueStatus> {
+  const response = await apiGet('/api/fleetgraph/queue-status');
+  if (!response.ok) {
+    throw new Error('Failed to fetch FleetGraph queue status');
+  }
+
+  return response.json() as Promise<FleetGraphQueueStatus>;
+}
+
 export function useFleetGraphReportsQuery() {
   return useQuery({
     queryKey: ['fleetgraph-reports'],
     queryFn: fetchFleetGraphReports,
     staleTime: 30_000,
+  });
+}
+
+export function useFleetGraphQueueStatusQuery() {
+  return useQuery({
+    queryKey: ['fleetgraph-queue-status'],
+    queryFn: fetchFleetGraphQueueStatus,
+    staleTime: 10_000,
+    refetchInterval: 15_000,
   });
 }
 
