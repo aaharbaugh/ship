@@ -131,6 +131,12 @@ export function FleetGraphReportsPage() {
               <span>{reports.length === filteredReports.length ? grouped.published.length : `${grouped.published.length} visible published`}</span>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link
+                to="/team/reviews/fleetgraph/session"
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+              >
+                Open Review Session
+              </Link>
               <button
                 type="button"
                 onClick={() => scanMutation.mutate(false)}

@@ -32,6 +32,7 @@ export interface FleetGraphReportDetail {
     qualityScore: number | null;
     qualitySummary: string | null;
     lastScoredAt: string | null;
+    directorFeedbackSentAt: string | null;
   } | null;
   targetDocuments: Array<{
     id: string;
@@ -61,6 +62,33 @@ export interface FleetGraphWorkspaceScanResult {
     mode: 'deterministic' | 'gpt-4o';
     model: string | null;
     qualityReportId: string | null;
+  }>;
+}
+
+export interface FleetGraphReviewSession {
+  generatedAt: string;
+  totalReports: number;
+  totalFindings: number;
+  redFindings: number;
+  yellowFindings: number;
+  draftReports: number;
+  publishedReports: number;
+  findings: Array<{
+    reportId: string;
+    reportTitle: string;
+    reportState: 'draft' | 'published';
+    reportQualityStatus: 'green' | 'yellow' | 'red' | null;
+    rootDocumentId: string | null;
+    rootDocumentTitle: string | null;
+    rootDocumentType: string | null;
+    focusDocumentId: string;
+    focusDocumentTitle: string;
+    focusDocumentType: string;
+    focusQualityStatus: 'green' | 'yellow' | 'red' | null;
+    focusQualityScore: number | null;
+    focusQualitySummary: string | null;
+    directorFeedbackSentAt: string | null;
+    directorResponseOptionsCount: number;
   }>;
 }
 
@@ -113,6 +141,16 @@ async function fetchFleetGraphQueueStatus(): Promise<FleetGraphQueueStatus> {
   return response.json() as Promise<FleetGraphQueueStatus>;
 }
 
+async function fetchFleetGraphReviewSession(): Promise<FleetGraphReviewSession> {
+  const response = await apiGet('/api/fleetgraph/review-session');
+  if (!response.ok) {
+    throw new Error('Failed to fetch FleetGraph review session');
+  }
+
+  const payload = (await response.json()) as { session: FleetGraphReviewSession };
+  return payload.session;
+}
+
 export function useFleetGraphReportsQuery() {
   return useQuery({
     queryKey: ['fleetgraph-reports'],
@@ -127,6 +165,14 @@ export function useFleetGraphQueueStatusQuery() {
     queryFn: fetchFleetGraphQueueStatus,
     staleTime: 10_000,
     refetchInterval: 15_000,
+  });
+}
+
+export function useFleetGraphReviewSessionQuery() {
+  return useQuery({
+    queryKey: ['fleetgraph-review-session'],
+    queryFn: fetchFleetGraphReviewSession,
+    staleTime: 30_000,
   });
 }
 
@@ -155,6 +201,7 @@ export function useFleetGraphPublishReportMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -181,6 +228,7 @@ export function useFleetGraphBulkPublishReportsMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -203,6 +251,7 @@ export function useFleetGraphWorkspaceScanMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },
@@ -236,6 +285,7 @@ export function useFleetGraphDirectorFeedbackMutation() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
       ]);
     },

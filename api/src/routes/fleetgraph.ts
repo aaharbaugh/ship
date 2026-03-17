@@ -8,7 +8,11 @@ import {
   createFleetGraphQualityReportDraft,
   publishFleetGraphQualityReport,
 } from '../services/fleetgraph/report.js';
-import { getFleetGraphReportDetail, listFleetGraphReports } from '../services/fleetgraph/reports.js';
+import {
+  getFleetGraphReportDetail,
+  getFleetGraphReviewSession,
+  listFleetGraphReports,
+} from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
@@ -72,6 +76,18 @@ router.get('/reports/:id', authMiddleware, async (req: Request, res: Response) =
   } catch (error) {
     console.error('FleetGraph report detail error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph report detail' });
+  }
+});
+
+router.get('/review-session', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const client = createRouteClient(req);
+    return res.json({
+      session: await getFleetGraphReviewSession(client),
+    });
+  } catch (error) {
+    console.error('FleetGraph review session error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph review session' });
   }
 });
 

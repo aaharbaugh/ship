@@ -34,6 +34,7 @@ export interface FleetGraphReportDetail {
     qualityScore: number | null;
     qualitySummary: string | null;
     lastScoredAt: string | null;
+    directorFeedbackSentAt: string | null;
   } | null;
   targetDocuments: Array<{
     id: string;
@@ -43,6 +44,33 @@ export interface FleetGraphReportDetail {
     qualityScore: number | null;
     qualitySummary: string | null;
     directorFeedbackSentAt: string | null;
+  }>;
+}
+
+export interface FleetGraphReviewSession {
+  generatedAt: string;
+  totalReports: number;
+  totalFindings: number;
+  redFindings: number;
+  yellowFindings: number;
+  draftReports: number;
+  publishedReports: number;
+  findings: Array<{
+    reportId: string;
+    reportTitle: string;
+    reportState: 'draft' | 'published';
+    reportQualityStatus: 'green' | 'yellow' | 'red' | null;
+    rootDocumentId: string | null;
+    rootDocumentTitle: string | null;
+    rootDocumentType: string | null;
+    focusDocumentId: string;
+    focusDocumentTitle: string;
+    focusDocumentType: string;
+    focusQualityStatus: 'green' | 'yellow' | 'red' | null;
+    focusQualityScore: number | null;
+    focusQualitySummary: string | null;
+    directorFeedbackSentAt: string | null;
+    directorResponseOptionsCount: number;
   }>;
 }
 
@@ -57,6 +85,12 @@ export async function getFleetGraphReportDetail(
   reportId: string
 ): Promise<FleetGraphReportDetail> {
   return tracedGetFleetGraphReportDetail(client, reportId);
+}
+
+export async function getFleetGraphReviewSession(
+  client: FleetGraphShipApiClient
+): Promise<FleetGraphReviewSession> {
+  return tracedGetFleetGraphReviewSession(client);
 }
 
 const tracedListFleetGraphReports = traceable(
@@ -169,6 +203,77 @@ const tracedGetFleetGraphReportDetail = traceable(
     };
   },
   fleetGraphTraceConfig('fleetgraph.get_report_detail')
+);
+
+const tracedGetFleetGraphReviewSession = traceable(
+  async function getReviewSession(
+    client: FleetGraphShipApiClient
+  ): Promise<FleetGraphReviewSession> {
+    const reports = await listFleetGraphReports(client);
+    const details = await Promise.all(
+      reports.map(async (report) => {
+        try {
+          return await getFleetGraphReportDetail(client, report.id);
+        } catch {
+          return null;
+        }
+      })
+    );
+    const findings = details
+      .filter((detail): detail is FleetGraphReportDetail => detail !== null)
+      .flatMap((detail) => {
+        const focusDocuments =
+          detail.targetDocuments.length > 0
+            ? detail.targetDocuments
+            : detail.rootDocument
+              ? [detail.rootDocument]
+              : [];
+
+        return focusDocuments.map((document) => ({
+          reportId: detail.report.id,
+          reportTitle: detail.report.title,
+          reportState: detail.report.state,
+          reportQualityStatus: detail.report.qualityStatus,
+          rootDocumentId: detail.report.rootDocumentId,
+          rootDocumentTitle: detail.report.rootDocumentTitle,
+          rootDocumentType: detail.report.rootDocumentType,
+          focusDocumentId: document.id,
+          focusDocumentTitle: document.title,
+          focusDocumentType: document.documentType,
+          focusQualityStatus: document.qualityStatus,
+          focusQualityScore: document.qualityScore,
+          focusQualitySummary: document.qualitySummary,
+          directorFeedbackSentAt: document.directorFeedbackSentAt,
+          directorResponseOptionsCount: detail.report.directorResponseOptions.length,
+        }));
+      })
+      .sort((left, right) => {
+        const severityDelta =
+          rankStatus(right.focusQualityStatus) - rankStatus(left.focusQualityStatus);
+        if (severityDelta !== 0) {
+          return severityDelta;
+        }
+
+        const draftDelta = Number(left.reportState === 'draft') - Number(right.reportState === 'draft');
+        if (draftDelta !== 0) {
+          return -draftDelta;
+        }
+
+        return left.focusDocumentTitle.localeCompare(right.focusDocumentTitle);
+      });
+
+    return {
+      generatedAt: new Date().toISOString(),
+      totalReports: reports.length,
+      totalFindings: findings.length,
+      redFindings: findings.filter((finding) => finding.focusQualityStatus === 'red').length,
+      yellowFindings: findings.filter((finding) => finding.focusQualityStatus === 'yellow').length,
+      draftReports: reports.filter((report) => report.state === 'draft').length,
+      publishedReports: reports.filter((report) => report.state === 'published').length,
+      findings,
+    };
+  },
+  fleetGraphTraceConfig('fleetgraph.get_review_session')
 );
 
 async function buildReportListItem(
@@ -303,4 +408,11 @@ function parseReportState(
   value: unknown
 ): 'draft' | 'published' {
   return value === 'published' ? 'published' : 'draft';
+}
+
+function rankStatus(status: 'green' | 'yellow' | 'red' | null): number {
+  if (status === 'red') return 3;
+  if (status === 'yellow') return 2;
+  if (status === 'green') return 1;
+  return 0;
 }
