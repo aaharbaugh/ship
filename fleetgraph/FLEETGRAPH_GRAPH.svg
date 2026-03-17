@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980" role="img" aria-labelledby="title desc">
+  <title id="title">FleetGraph Architecture</title>
+  <desc id="desc">Visual overview of FleetGraph trigger, graph traversal, scoring, persistence, and review flows.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#172033"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#020617" flood-opacity="0.45"/>
+    </filter>
+    <style>
+      .title { font: 700 34px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 500 16px ui-sans-serif, system-ui, sans-serif; fill: #94a3b8; }
+      .section { font: 700 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; letter-spacing: 0.14em; text-transform: uppercase; }
+      .node-title { font: 700 18px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .node-body { font: 500 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .small { font: 600 12px ui-sans-serif, system-ui, sans-serif; fill: #93c5fd; }
+      .chip { font: 700 11px ui-sans-serif, system-ui, sans-serif; fill: #0f172a; }
+      .edge { stroke: #7dd3fc; stroke-width: 3; fill: none; marker-end: url(#arrow); opacity: 0.9; }
+      .edge-soft { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); opacity: 0.75; }
+      .edge-label { font: 600 12px ui-sans-serif, system-ui, sans-serif; fill: #bae6fd; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="980" fill="url(#bg)"/>
+
+  <text x="70" y="70" class="title">FleetGraph</text>
+  <text x="70" y="102" class="subtitle">Current architecture: batched triggers, recursive graph fetch, deterministic + GPT-4o reasoning, persistence, reports, and batch review.</text>
+
+  <text x="90" y="155" class="section">Input Layer</text>
+  <text x="420" y="155" class="section">Graph Runtime</text>
+  <text x="840" y="155" class="section">Writeback</text>
+  <text x="1160" y="155" class="section">Review Layer</text>
+
+  <!-- Input nodes -->
+  <g filter="url(#shadow)">
+    <rect x="70" y="190" rx="22" ry="22" width="250" height="112" fill="url(#panel)" stroke="#22c55e" stroke-width="2"/>
+    <text x="95" y="225" class="node-title">Save Triggers</text>
+    <text x="95" y="248" class="node-body">Document create/update</text>
+    <text x="95" y="268" class="node-body">Content patch</text>
+    <text x="95" y="288" class="node-body">Collab idle checkpoint</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="340" rx="22" ry="22" width="250" height="112" fill="url(#panel)" stroke="#f59e0b" stroke-width="2"/>
+    <text x="95" y="375" class="node-title">Batch Queue</text>
+    <text x="95" y="398" class="node-body">4-minute flush</text>
+    <text x="95" y="418" class="node-body">Workspace-balanced</text>
+    <text x="95" y="438" class="node-body">Hash dedupe + caps</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="490" rx="22" ry="22" width="250" height="112" fill="url(#panel)" stroke="#a855f7" stroke-width="2"/>
+    <text x="95" y="525" class="node-title">Nightly Scan</text>
+    <text x="95" y="548" class="node-body">Workspace/project sweep</text>
+    <text x="95" y="568" class="node-body">Optional draft reports</text>
+    <text x="95" y="588" class="node-body">Review-session feed</text>
+  </g>
+
+  <!-- Runtime nodes -->
+  <g filter="url(#shadow)">
+    <rect x="390" y="190" rx="24" ry="24" width="300" height="130" fill="url(#panel)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="415" y="225" class="node-title">Prepare Run</text>
+    <text x="415" y="248" class="node-body">REST client only</text>
+    <text x="415" y="268" class="node-body">Root document + bounded recursive traversal</text>
+    <text x="415" y="288" class="node-body">Depth / truncation metadata</text>
+    <text x="415" y="308" class="node-body">Associations + related documents</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="390" y="370" rx="24" ry="24" width="300" height="130" fill="url(#panel)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="415" y="405" class="node-title">Graph Snapshot</text>
+    <text x="415" y="428" class="node-body">Nodes + edges</text>
+    <text x="415" y="448" class="node-body">Main path + child clusters in viewer</text>
+    <text x="415" y="468" class="node-body">Scoring payload compression</text>
+    <text x="415" y="488" class="node-body">Counts, depth, truncation</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="390" y="550" rx="24" ry="24" width="300" height="150" fill="url(#panel)" stroke="#38bdf8" stroke-width="2"/>
+    <text x="415" y="585" class="node-title">Reasoning</text>
+    <text x="415" y="608" class="node-body">Deterministic checks first</text>
+    <text x="415" y="628" class="node-body">Thin content / missing owner / readiness</text>
+    <text x="415" y="648" class="node-body">GPT-4o refinement second</text>
+    <text x="415" y="668" class="node-body">LangSmith traceable + wrapped OpenAI</text>
+    <text x="415" y="688" class="node-body">Mode + model metadata</text>
+  </g>
+
+  <!-- Writeback nodes -->
+  <g filter="url(#shadow)">
+    <rect x="810" y="230" rx="24" ry="24" width="280" height="130" fill="url(#panel)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="835" y="265" class="node-title">Persist Metadata</text>
+    <text x="835" y="288" class="node-body">quality_score / status / summary</text>
+    <text x="835" y="308" class="node-body">quality_tags / last_scored_at</text>
+    <text x="835" y="328" class="node-body">quality_report_id links</text>
+    <text x="835" y="348" class="node-body">Director feedback alert tags</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="810" y="420" rx="24" ry="24" width="280" height="150" fill="url(#panel)" stroke="#14b8a6" stroke-width="2"/>
+    <text x="835" y="455" class="node-title">Quality Reports</text>
+    <text x="835" y="478" class="node-body">Draft quality report document</text>
+    <text x="835" y="498" class="node-body">Publish confirmation workflow</text>
+    <text x="835" y="518" class="node-body">Stored director response options</text>
+    <text x="835" y="538" class="node-body">Report detail endpoint + review surface</text>
+    <text x="835" y="558" class="node-body">Batch review session feed</text>
+  </g>
+
+  <!-- Review nodes -->
+  <g filter="url(#shadow)">
+    <rect x="1140" y="190" rx="24" ry="24" width="330" height="140" fill="url(#panel)" stroke="#f97316" stroke-width="2"/>
+    <text x="1165" y="225" class="node-title">Document Insights Panel</text>
+    <text x="1165" y="248" class="node-body">Compact summary strip</text>
+    <text x="1165" y="268" class="node-body">Dark UI + reduced repetition</text>
+    <text x="1165" y="288" class="node-body">Interactive graph viewer</text>
+    <text x="1165" y="308" class="node-body">Persist / draft report actions</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1140" y="390" rx="24" ry="24" width="330" height="150" fill="url(#panel)" stroke="#f97316" stroke-width="2"/>
+    <text x="1165" y="425" class="node-title">Report Queue + Detail</text>
+    <text x="1165" y="448" class="node-body">Reports page</text>
+    <text x="1165" y="468" class="node-body">Dedicated report detail review page</text>
+    <text x="1165" y="488" class="node-body">Publish confirmations</text>
+    <text x="1165" y="508" class="node-body">Director feedback send flow</text>
+    <text x="1165" y="528" class="node-body">Linked root document / targets / live graph</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1140" y="600" rx="24" ry="24" width="330" height="160" fill="url(#panel)" stroke="#f97316" stroke-width="2"/>
+    <text x="1165" y="635" class="node-title">Batch Review Session</text>
+    <text x="1165" y="658" class="node-body">Whole chunk of findings at once</text>
+    <text x="1165" y="678" class="node-body">Red / yellow / other lanes</text>
+    <text x="1165" y="698" class="node-body">Bulk draft publish selection</text>
+    <text x="1165" y="718" class="node-body">Drill into report only when needed</text>
+    <text x="1165" y="738" class="node-body">Closer to PM batch-review workflow</text>
+  </g>
+
+  <!-- Edges -->
+  <path class="edge" d="M 320 246 C 350 246, 350 246, 390 246"/>
+  <path class="edge" d="M 320 396 C 350 396, 350 260, 390 260"/>
+  <path class="edge-soft" d="M 320 546 C 360 546, 360 280, 390 280"/>
+
+  <path class="edge" d="M 690 255 C 745 255, 745 435, 810 435"/>
+  <path class="edge" d="M 690 435 C 745 435, 745 435, 810 435"/>
+  <path class="edge" d="M 690 625 C 745 625, 745 295, 810 295"/>
+  <path class="edge-soft" d="M 690 625 C 760 625, 760 495, 810 495"/>
+
+  <path class="edge" d="M 1090 295 C 1115 295, 1115 260, 1140 260"/>
+  <path class="edge" d="M 1090 495 C 1115 495, 1115 465, 1140 465"/>
+  <path class="edge" d="M 1090 510 C 1120 510, 1120 680, 1140 680"/>
+
+  <path class="edge-soft" d="M 1470 465 C 1510 465, 1510 680, 1470 680"/>
+  <path class="edge-soft" d="M 1305 330 C 1305 350, 1305 365, 1305 390"/>
+
+  <!-- labels -->
+  <text x="725" y="285" class="edge-label">score + writeback</text>
+  <text x="1120" y="482" class="edge-label">review artifacts</text>
+  <text x="1122" y="685" class="edge-label">batch findings</text>
+
+  <!-- bottom legend -->
+  <rect x="70" y="835" width="1460" height="95" rx="22" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="95" y="870" class="section">Legend</text>
+
+  <rect x="95" y="888" width="86" height="24" rx="12" fill="#22c55e"/>
+  <text x="110" y="905" class="chip">Triggers</text>
+
+  <rect x="210" y="888" width="110" height="24" rx="12" fill="#38bdf8"/>
+  <text x="225" y="905" class="chip">Graph Runtime</text>
+
+  <rect x="350" y="888" width="96" height="24" rx="12" fill="#14b8a6"/>
+  <text x="365" y="905" class="chip">Writeback</text>
+
+  <rect x="475" y="888" width="120" height="24" rx="12" fill="#f97316"/>
+  <text x="490" y="905" class="chip">Review Surfaces</text>
+
+  <text x="640" y="905" class="node-body">Current implementation is REST-bound for FleetGraph data access, with Ship save seams acting only as trigger points.</text>
+</svg>
