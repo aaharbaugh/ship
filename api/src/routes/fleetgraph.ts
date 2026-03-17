@@ -28,9 +28,18 @@ function getInternalBaseUrl(req: Request): string {
   return `${protocol}://${host}`;
 }
 
+router.get('/documents/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    return res.json(await buildInsightsResponse(req));
+  } catch (error) {
+    console.error('FleetGraph insights error:', error);
+    return res.status(500).json({ error: 'Failed to prepare FleetGraph insights' });
+  }
+});
+
 router.get('/debug/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    return res.json(await buildDebugResponse(req));
+    return res.json(await buildInsightsResponse(req));
   } catch (error) {
     console.error('FleetGraph debug error:', error);
     return res.status(500).json({ error: 'Failed to prepare FleetGraph run' });
@@ -49,9 +58,9 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Response) => {
+router.post('/documents/:id/persist', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, analysis } = await buildDebugContext(req);
+    const { client, analysis } = await buildInsightsContext(req);
     await persistFleetGraphAnalysis(client, analysis);
 
     return res.json({
@@ -64,9 +73,57 @@ router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Resp
   }
 });
 
+router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { client, analysis } = await buildInsightsContext(req);
+    await persistFleetGraphAnalysis(client, analysis);
+
+    return res.json({
+      persisted: analysis.documents.length,
+      analysis,
+    });
+  } catch (error) {
+    console.error('FleetGraph persist error:', error);
+    return res.status(500).json({ error: 'Failed to persist FleetGraph analysis' });
+  }
+});
+
+router.post('/documents/:id/report-draft', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { client, prepared, analysis } = await buildInsightsContext(req);
+    const existingReportId =
+      typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
+        ? prepared.context.rootDocument.properties.quality_report_id
+        : null;
+
+    if (existingReportId) {
+      return res.json({
+        created: false,
+        reportId: existingReportId,
+      });
+    }
+
+    const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
+    for (const document of analysis.documents) {
+      await client.updateDocumentMetadata(document.documentId, {
+        ...document.metadata,
+        quality_report_id: report.reportId,
+      });
+    }
+
+    return res.json({
+      created: true,
+      reportId: report.reportId,
+    });
+  } catch (error) {
+    console.error('FleetGraph report draft error:', error);
+    return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
+  }
+});
+
 router.post('/debug/:id/report-draft', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, prepared, analysis } = await buildDebugContext(req);
+    const { client, prepared, analysis } = await buildInsightsContext(req);
     const existingReportId =
       typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
         ? prepared.context.rootDocument.properties.quality_report_id
@@ -131,8 +188,8 @@ router.post('/nightly-scan', authMiddleware, async (req: Request, res: Response)
   }
 });
 
-async function buildDebugResponse(req: Request) {
-  const { prepared, analysis } = await buildDebugContext(req);
+async function buildInsightsResponse(req: Request) {
+  const { prepared, analysis } = await buildInsightsContext(req);
 
   return {
     ...prepared,
@@ -140,7 +197,7 @@ async function buildDebugResponse(req: Request) {
   };
 }
 
-async function buildDebugContext(req: Request) {
+async function buildInsightsContext(req: Request) {
   const client = createRouteClient(req);
   const prepared = await prepareFleetGraphRun(client, {
     workspaceId: String(req.workspaceId),

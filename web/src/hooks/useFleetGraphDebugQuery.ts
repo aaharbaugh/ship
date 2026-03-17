@@ -15,7 +15,7 @@ export interface FleetGraphDebugDocumentAnalysis {
   }>;
 }
 
-export interface FleetGraphDebugResponse {
+export interface FleetGraphInsightsResponse {
   rootDocumentId: string;
   triggerSource: string;
   nodeIds: string[];
@@ -77,10 +77,10 @@ export const fleetGraphDebugKeys = {
   detail: (id: string) => [...fleetGraphDebugKeys.all, id] as const,
 };
 
-async function fetchFleetGraphDebug(documentId: string): Promise<FleetGraphDebugResponse> {
-  const res = await apiGet(`/api/fleetgraph/debug/${documentId}`);
+async function fetchFleetGraphInsights(documentId: string): Promise<FleetGraphInsightsResponse> {
+  const res = await apiGet(`/api/fleetgraph/documents/${documentId}`);
   if (!res.ok) {
-    const error = new Error('Failed to fetch FleetGraph debug data') as Error & { status?: number };
+    const error = new Error('Failed to fetch FleetGraph insights') as Error & { status?: number };
     error.status = res.status;
     throw error;
   }
@@ -90,7 +90,7 @@ async function fetchFleetGraphDebug(documentId: string): Promise<FleetGraphDebug
 export function useFleetGraphDebugQuery(documentId: string | undefined) {
   return useQuery({
     queryKey: fleetGraphDebugKeys.detail(documentId || ''),
-    queryFn: () => fetchFleetGraphDebug(documentId!),
+    queryFn: () => fetchFleetGraphInsights(documentId!),
     enabled: !!documentId,
     staleTime: 30_000,
   });
@@ -101,7 +101,7 @@ export function useFleetGraphPersistMutation(documentId: string | undefined) {
 
   return useMutation({
     mutationFn: async () => {
-      const res = await apiPost(`/api/fleetgraph/debug/${documentId}/persist`, {});
+      const res = await apiPost(`/api/fleetgraph/documents/${documentId}/persist`, {});
       if (!res.ok) {
         throw new Error('Failed to persist FleetGraph analysis');
       }
@@ -121,7 +121,7 @@ export function useFleetGraphReportDraftMutation(documentId: string | undefined)
 
   return useMutation({
     mutationFn: async () => {
-      const res = await apiPost(`/api/fleetgraph/debug/${documentId}/report-draft`, {});
+      const res = await apiPost(`/api/fleetgraph/documents/${documentId}/report-draft`, {});
       if (!res.ok) {
         throw new Error('Failed to create FleetGraph report draft');
       }

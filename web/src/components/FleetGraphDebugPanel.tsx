@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { FleetGraphViewer } from '@/components/FleetGraphViewer';
-import type { FleetGraphDebugResponse } from '@/hooks/useFleetGraphDebugQuery';
+import type { FleetGraphInsightsResponse } from '@/hooks/useFleetGraphDebugQuery';
 import type { FleetGraphReportListItem } from '@/hooks/useFleetGraphReportsQuery';
 
 export interface PersistedFleetGraphView {
@@ -47,7 +47,7 @@ export function FleetGraphDebugPanel({
   isPublishingReport,
   reports,
 }: {
-  data?: FleetGraphDebugResponse;
+  data?: FleetGraphInsightsResponse;
   isLoading: boolean;
   error?: Error | null;
   persisted?: PersistedFleetGraphView | null;
@@ -74,7 +74,7 @@ export function FleetGraphDebugPanel({
     return (
       <div className="border-b border-slate-800 bg-black px-4 py-3">
         <div className="mx-auto max-w-6xl text-xs text-slate-500">
-          FleetGraph debug unavailable.
+          FleetGraph insights unavailable.
         </div>
       </div>
     );
@@ -135,7 +135,7 @@ export function FleetGraphDebugPanel({
     <div className="border-b border-slate-800 bg-black px-4 py-3">
       <div className="mx-auto max-w-6xl space-y-3">
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
-          <span className="font-medium text-white">FleetGraph</span>
+          <span className="font-medium text-white">FleetGraph Insights</span>
           <span>{sourceLabel}</span>
           <span>{data.scoringPayload.documentCount} docs</span>
           <span>{data.scoringPayload.edgeCount} edges</span>
