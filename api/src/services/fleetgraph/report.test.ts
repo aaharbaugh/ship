@@ -48,6 +48,37 @@ describe('FleetGraph quality report drafting', () => {
             belongs_to: [],
           },
         ],
+        expandedDocuments: [
+          {
+            id: 'project-1',
+            workspace_id: 'ws-1',
+            document_type: 'project',
+            title: 'Project Atlas',
+            parent_id: null,
+            properties: {},
+            content: null,
+            belongs_to: [],
+          },
+          {
+            id: 'issue-1',
+            workspace_id: 'ws-1',
+            document_type: 'issue',
+            title: 'Fix onboarding path',
+            parent_id: null,
+            properties: {},
+            content: null,
+            belongs_to: [],
+          },
+        ],
+        expandedAssociations: [
+          {
+            document_id: 'issue-1',
+            related_id: 'project-1',
+            relationship_type: 'project',
+            related_title: 'Project Atlas',
+            related_document_type: 'project',
+          },
+        ],
       },
       graph: {
         rootDocumentId: 'project-1',

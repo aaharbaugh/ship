@@ -95,7 +95,7 @@ function buildQualityReportContent(
   rootSummary: string
 ): string {
   const titleById = new Map(
-    [prepared.context.rootDocument, ...prepared.context.relatedDocuments].map((document) => [
+    prepared.context.expandedDocuments.map((document) => [
       document.id,
       document.title,
     ])

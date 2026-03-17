@@ -35,33 +35,33 @@ export function buildFleetGraphSnapshot(context: FleetGraphFetchContext): FleetG
 
 const tracedBuildFleetGraphSnapshot = traceable(
   function buildSnapshot(context: FleetGraphFetchContext): FleetGraphGraphSnapshot {
-  const documentMap = new Map<string, FleetGraphDocumentRecord>();
-  documentMap.set(context.rootDocument.id, context.rootDocument);
+    const documentMap = new Map<string, FleetGraphDocumentRecord>();
 
-  for (const document of context.relatedDocuments) {
-    documentMap.set(document.id, document);
-  }
+    for (const document of context.expandedDocuments) {
+      documentMap.set(document.id, document);
+    }
 
-  const edges: FleetGraphEdgeSnapshot[] = [
-    ...buildParentEdge(context.rootDocument),
-    ...buildBelongsToEdges(context.rootDocument),
-    ...buildAssociationEdges(context.directAssociations, 'outbound'),
-    ...buildAssociationEdges(context.reverseAssociations, 'inbound'),
-  ];
+    documentMap.set(context.rootDocument.id, context.rootDocument);
 
-  return {
-    rootDocumentId: context.rootDocument.id,
-    nodes: [...documentMap.values()].map((document) => ({
-      id: document.id,
-      documentType: document.document_type,
-      title: document.title,
-      parentId: document.parent_id,
-      belongsTo: document.belongs_to ?? [],
-      content: document.content ?? null,
-      properties: document.properties,
-    })),
-    edges: dedupeEdges(edges),
-  };
+    const edges: FleetGraphEdgeSnapshot[] = [
+      ...[...documentMap.values()].flatMap((document) => buildParentEdge(document)),
+      ...[...documentMap.values()].flatMap((document) => buildBelongsToEdges(document)),
+      ...buildAssociationEdges(context.expandedAssociations),
+    ];
+
+    return {
+      rootDocumentId: context.rootDocument.id,
+      nodes: [...documentMap.values()].map((document) => ({
+        id: document.id,
+        documentType: document.document_type,
+        title: document.title,
+        parentId: document.parent_id,
+        belongsTo: document.belongs_to ?? [],
+        content: document.content ?? null,
+        properties: document.properties,
+      })),
+      edges: dedupeEdges(edges),
+    };
   },
   fleetGraphTraceConfig('fleetgraph.build_graph')
 );
@@ -91,14 +91,13 @@ function buildBelongsToEdges(document: FleetGraphDocumentRecord): FleetGraphEdge
 }
 
 function buildAssociationEdges(
-  associations: FleetGraphAssociationRecord[],
-  direction: 'outbound' | 'inbound'
+  associations: FleetGraphAssociationRecord[]
 ): FleetGraphEdgeSnapshot[] {
   return associations.map((association) => ({
-    from: direction === 'outbound' ? association.document_id : association.document_id,
-    to: direction === 'outbound' ? association.related_id : association.related_id,
+    from: association.document_id,
+    to: association.related_id,
     relationshipType: association.relationship_type,
-    direction,
+    direction: 'outbound',
   }));
 }
 
