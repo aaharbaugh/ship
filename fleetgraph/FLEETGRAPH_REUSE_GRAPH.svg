@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="1200" viewBox="0 0 1700 1200" role="img" aria-labelledby="title desc">
+  <title id="title">FleetGraph Dependency Reuse Graph</title>
+  <desc id="desc">Dependency and reuse graph showing shared FleetGraph core services reused by multiple entry points and review surfaces.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#08111f"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="7" stdDeviation="12" flood-color="#020617" flood-opacity="0.42"/>
+    </filter>
+    <style>
+      .title { font: 700 36px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 500 17px ui-sans-serif, system-ui, sans-serif; fill: #94a3b8; }
+      .cluster { font: 700 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; letter-spacing: 0.16em; text-transform: uppercase; }
+      .nodeTitle { font: 700 16px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; text-anchor: middle; }
+      .nodeFile { font: 700 10px ui-sans-serif, system-ui, sans-serif; fill: #bfdbfe; text-anchor: middle; }
+      .edge { stroke: #7dd3fc; stroke-width: 2.8; fill: none; marker-end: url(#arrow); opacity: 0.88; }
+      .edgeSoft { stroke: #64748b; stroke-width: 2.2; fill: none; marker-end: url(#arrow); opacity: 0.7; }
+      .edgeHot { stroke: #f59e0b; stroke-width: 3.4; fill: none; marker-end: url(#arrow); opacity: 0.95; }
+      .legend { font: 600 12px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+    </style>
+  </defs>
+
+  <rect width="1700" height="1200" fill="url(#bg)"/>
+
+  <text x="70" y="70" class="title">FleetGraph Dependency Reuse Graph</text>
+  <text x="70" y="102" class="subtitle">Shared cores in the middle. Entry points on the left. Report and UI consumers on the right. Hotter lines mean heavier reuse.</text>
+
+  <text x="150" y="155" class="cluster">Entry Points</text>
+  <text x="720" y="155" class="cluster">Shared Core</text>
+  <text x="1320" y="155" class="cluster">Consumers</text>
+
+  <!-- edges -->
+  <path class="edgeSoft" d="M 280 260 C 420 260, 470 260, 610 260"/>
+  <path class="edgeSoft" d="M 280 390 C 430 390, 470 280, 610 260"/>
+  <path class="edgeSoft" d="M 280 520 C 430 520, 470 300, 610 260"/>
+  <path class="edgeSoft" d="M 280 650 C 430 650, 470 320, 610 260"/>
+
+  <path class="edgeHot" d="M 760 260 C 850 260, 850 400, 760 400"/>
+  <path class="edgeHot" d="M 760 400 C 850 400, 850 540, 760 540"/>
+  <path class="edgeHot" d="M 760 540 C 850 540, 850 680, 760 680"/>
+
+  <path class="edge" d="M 760 260 C 960 260, 1090 260, 1270 260"/>
+  <path class="edge" d="M 760 400 C 960 400, 1090 400, 1270 400"/>
+  <path class="edge" d="M 760 540 C 960 540, 1090 540, 1270 540"/>
+  <path class="edge" d="M 760 680 C 960 680, 1090 680, 1270 680"/>
+
+  <path class="edgeSoft" d="M 760 540 C 980 540, 1060 820, 1270 820"/>
+  <path class="edgeSoft" d="M 760 680 C 980 680, 1060 960, 1270 960"/>
+
+  <path class="edgeSoft" d="M 1420 260 C 1500 260, 1500 820, 1420 820"/>
+  <path class="edgeSoft" d="M 1420 260 C 1510 260, 1510 960, 1420 960"/>
+  <path class="edgeSoft" d="M 1420 400 C 1500 400, 1500 960, 1420 960"/>
+  <path class="edgeSoft" d="M 1420 540 C 1500 540, 1500 820, 1420 820"/>
+  <path class="edgeSoft" d="M 1420 540 C 1510 540, 1510 1090, 1420 1090"/>
+  <path class="edgeSoft" d="M 1420 680 C 1510 680, 1510 1090, 1420 1090"/>
+
+  <!-- left -->
+  <g filter="url(#shadow)">
+    <rect x="90" y="210" rx="24" width="190" height="100" fill="#10231a" stroke="#22c55e" stroke-width="2.5"/>
+    <text x="185" y="250" class="nodeTitle">documents.ts</text>
+    <text x="185" y="272" class="nodeFile">REST saves</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="340" rx="24" width="190" height="100" fill="#1f1728" stroke="#a855f7" stroke-width="2.5"/>
+    <text x="185" y="380" class="nodeTitle">collaboration</text>
+    <text x="185" y="402" class="nodeFile">idle checkpoint</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="470" rx="24" width="190" height="100" fill="#2a1b10" stroke="#f59e0b" stroke-width="2.5"/>
+    <text x="185" y="510" class="nodeTitle">nightly-scan</text>
+    <text x="185" y="532" class="nodeFile">workspace sweep</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="90" y="600" rx="24" width="190" height="100" fill="#0f2233" stroke="#38bdf8" stroke-width="2.5"/>
+    <text x="185" y="640" class="nodeTitle">manual insights</text>
+    <text x="185" y="662" class="nodeFile">route entry</text>
+  </g>
+
+  <!-- center -->
+  <g filter="url(#shadow)">
+    <rect x="610" y="205" rx="34" width="150" height="110" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="685" y="248" class="nodeTitle">prepareRun</text>
+    <text x="685" y="270" class="nodeFile">runner.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="610" y="345" rx="34" width="150" height="110" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="685" y="388" class="nodeTitle">buildGraph</text>
+    <text x="685" y="410" class="nodeFile">graph.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="610" y="485" rx="34" width="150" height="110" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="685" y="528" class="nodeTitle">buildPayload</text>
+    <text x="685" y="550" class="nodeFile">payload.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="610" y="625" rx="34" width="150" height="110" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="685" y="668" class="nodeTitle">scoreGraph</text>
+    <text x="685" y="690" class="nodeFile">analyze + reasoning</text>
+  </g>
+
+  <!-- right -->
+  <g filter="url(#shadow)">
+    <rect x="1270" y="205" rx="24" width="150" height="110" fill="#11251f" stroke="#14b8a6" stroke-width="2.5"/>
+    <text x="1345" y="248" class="nodeTitle">persist</text>
+    <text x="1345" y="270" class="nodeFile">persist.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="345" rx="24" width="150" height="110" fill="#11251f" stroke="#14b8a6" stroke-width="2.5"/>
+    <text x="1345" y="388" class="nodeTitle">draftReport</text>
+    <text x="1345" y="410" class="nodeFile">report.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="485" rx="24" width="150" height="110" fill="#11251f" stroke="#14b8a6" stroke-width="2.5"/>
+    <text x="1345" y="528" class="nodeTitle">reportFeeds</text>
+    <text x="1345" y="550" class="nodeFile">reports.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="625" rx="24" width="150" height="110" fill="#11251f" stroke="#14b8a6" stroke-width="2.5"/>
+    <text x="1345" y="668" class="nodeTitle">directorFeedback</text>
+    <text x="1345" y="690" class="nodeFile">feedback.ts</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="765" rx="24" width="150" height="110" fill="#2a1b10" stroke="#f97316" stroke-width="2.5"/>
+    <text x="1345" y="808" class="nodeTitle">reportsPage</text>
+    <text x="1345" y="830" class="nodeFile">queue UI</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="905" rx="24" width="150" height="110" fill="#2a1b10" stroke="#f97316" stroke-width="2.5"/>
+    <text x="1345" y="948" class="nodeTitle">reportDetail</text>
+    <text x="1345" y="970" class="nodeFile">detail UI</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1270" y="1045" rx="24" width="150" height="110" fill="#2a1b10" stroke="#f97316" stroke-width="2.5"/>
+    <text x="1345" y="1088" class="nodeTitle">reviewSession</text>
+    <text x="1345" y="1110" class="nodeFile">batch UI</text>
+  </g>
+
+  <!-- annotations -->
+  <text x="865" y="242" class="legend">shared by triggers, manual, scan</text>
+  <text x="862" y="522" class="legend">single compressed payload</text>
+  <text x="854" y="672" class="legend">deterministic + GPT-4o</text>
+
+  <rect x="90" y="1080" width="520" height="78" rx="18" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="115" y="1113" class="legend">The important part: the left side is not four separate implementations. They mostly converge into the same shared core.</text>
+  <text x="115" y="1138" class="legend">If FleetGraph feels “too parallel,” it’s the diagrams more than the code. The strongest reuse lives in prepareRun → buildGraph → buildPayload → scoreGraph.</text>
+
+  <rect x="660" y="1080" width="320" height="78" rx="18" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="685" y="1113" class="legend">Hot lines</text>
+  <text x="685" y="1138" class="legend">main reused path</text>
+
+  <path class="edgeHot" d="M 825 1118 C 875 1118, 900 1118, 950 1118"/>
+  <path class="edgeSoft" d="M 825 1142 C 875 1142, 900 1142, 950 1142"/>
+
+  <text x="995" y="1113" class="legend">edge</text>
+  <text x="995" y="1138" class="legend">secondary reuse</text>
+</svg>
