@@ -6,6 +6,7 @@ import { isWorkspaceAdmin } from '../middleware/visibility.js';
 import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser } from '../collaboration/index.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent, checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { loadContentFromYjsState } from '../utils/yjsConverter.js';
+import { computeFleetGraphContentHash } from '../services/fleetgraph/hash.js';
 import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -551,6 +552,12 @@ router.patch('/:id/content', authMiddleware, async (req: Request, res: Response)
       source: 'document_content_update',
       userId,
       documentType: existing.document_type,
+      contentHash: computeFleetGraphContentHash({
+        title: existing.title,
+        content,
+        properties: newProps,
+        parentId: existing.parent_id,
+      }),
     });
 
     res.json({
@@ -649,6 +656,13 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
       source: 'document_create',
       userId: String(req.userId),
       documentType: document_type,
+      contentHash: computeFleetGraphContentHash({
+        title: newDoc.title,
+        content: content ?? null,
+        properties: (properties as Record<string, unknown> | undefined) ?? {},
+        parentId: newDoc.parent_id,
+        belongsTo: belongs_to ?? null,
+      }),
     });
 
     res.status(201).json(newDoc);
@@ -1119,17 +1133,26 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
       }
     }
 
+    // Flatten properties for backwards compatibility (match GET endpoint format)
+    const updatedDoc = result.rows[0];
+    const props = updatedDoc.properties || {};
+
     enqueueFleetGraphRun({
       workspaceId,
       documentId: id,
       source: 'document_update',
       userId,
       documentType: existing.document_type,
+      contentHash: computeFleetGraphContentHash({
+        title: updatedDoc.title,
+        content: updatedDoc.content,
+        properties: (updatedDoc.properties as Record<string, unknown> | null) ?? {},
+        parentId: updatedDoc.parent_id,
+        belongsTo: Array.isArray(data.belongs_to)
+          ? data.belongs_to.map((association) => ({ id: association.id, type: association.type }))
+          : null,
+      }),
     });
-
-    // Flatten properties for backwards compatibility (match GET endpoint format)
-    const updatedDoc = result.rows[0];
-    const props = updatedDoc.properties || {};
 
     // Get owner details for projects (owner_id is a user_id, lookup person document by user_id)
     // Return user_id as id so PersonCombobox can match correctly

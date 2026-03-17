@@ -10,6 +10,7 @@ import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extrac
 import { yjsToJson, jsonToYjs } from '../utils/yjsConverter.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
 import cookie from 'cookie';
+import { computeFleetGraphContentHash } from '../services/fleetgraph/hash.js';
 import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 const messageSync = 0;
@@ -183,6 +184,10 @@ async function persistDocument(docName: string, doc: Y.Doc) {
         source: 'collaboration_persist',
         userId: typeof createdBy === 'string' ? createdBy : null,
         documentType: typeof documentType === 'string' ? documentType : null,
+        contentHash: computeFleetGraphContentHash({
+          content,
+          properties: updatedProps as Record<string, unknown>,
+        }),
       });
     }
   } catch (err) {
