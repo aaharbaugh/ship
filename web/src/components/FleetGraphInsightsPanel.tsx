@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { FleetGraphViewer } from '@/components/FleetGraphViewer';
-import type { FleetGraphInsightsResponse } from '@/hooks/useFleetGraphDebugQuery';
+import type { FleetGraphInsightsResponse } from '@/hooks/useFleetGraphInsightsQuery';
 import type { FleetGraphReportListItem } from '@/hooks/useFleetGraphReportsQuery';
 
 export interface PersistedFleetGraphView {
@@ -34,7 +34,7 @@ const PRIORITY_STYLES: Record<'high' | 'medium' | 'low', string> = {
 const FILTER_BUTTON_BASE =
   'rounded-full border px-2.5 py-1 text-xs font-medium transition-colors';
 
-export function FleetGraphDebugPanel({
+export function FleetGraphInsightsPanel({
   data,
   isLoading,
   error,

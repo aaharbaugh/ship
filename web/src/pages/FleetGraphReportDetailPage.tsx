@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import { FleetGraphViewer } from '@/components/FleetGraphViewer';
-import { useFleetGraphDebugQuery } from '@/hooks/useFleetGraphDebugQuery';
+import { useFleetGraphInsightsQuery } from '@/hooks/useFleetGraphInsightsQuery';
 import {
   useFleetGraphDirectorFeedbackMutation,
   useFleetGraphPublishReportMutation,
@@ -21,7 +21,7 @@ export function FleetGraphReportDetailPage() {
   const publishMutation = useFleetGraphPublishReportMutation();
   const directorFeedbackMutation = useFleetGraphDirectorFeedbackMutation();
   const rootDocumentId = detailQuery.data?.rootDocument?.id ?? detailQuery.data?.report.rootDocumentId ?? undefined;
-  const insightsQuery = useFleetGraphDebugQuery(rootDocumentId);
+  const insightsQuery = useFleetGraphInsightsQuery(rootDocumentId);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(rootDocumentId);
   const [pendingAction, setPendingAction] = useState<
     | null

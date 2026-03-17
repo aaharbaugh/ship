@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost } from '@/lib/api';
 
-export interface FleetGraphDebugDocumentAnalysis {
+export interface FleetGraphInsightsDocumentAnalysis {
   documentId: string;
   documentType: string;
   qualityScore: number;
@@ -76,13 +76,13 @@ export interface FleetGraphInsightsResponse {
       rationale: string;
       document_id?: string | null;
     }>;
-    documents: FleetGraphDebugDocumentAnalysis[];
+    documents: FleetGraphInsightsDocumentAnalysis[];
   };
 }
 
-export const fleetGraphDebugKeys = {
-  all: ['fleetgraph-debug'] as const,
-  detail: (id: string) => [...fleetGraphDebugKeys.all, id] as const,
+export const fleetGraphInsightsKeys = {
+  all: ['fleetgraph-insights'] as const,
+  detail: (id: string) => [...fleetGraphInsightsKeys.all, id] as const,
 };
 
 async function fetchFleetGraphInsights(documentId: string): Promise<FleetGraphInsightsResponse> {
@@ -95,9 +95,9 @@ async function fetchFleetGraphInsights(documentId: string): Promise<FleetGraphIn
   return res.json();
 }
 
-export function useFleetGraphDebugQuery(documentId: string | undefined) {
+export function useFleetGraphInsightsQuery(documentId: string | undefined) {
   return useQuery({
-    queryKey: fleetGraphDebugKeys.detail(documentId || ''),
+    queryKey: fleetGraphInsightsKeys.detail(documentId || ''),
     queryFn: () => fetchFleetGraphInsights(documentId!),
     enabled: !!documentId,
     staleTime: 30_000,
@@ -117,7 +117,7 @@ export function useFleetGraphPersistMutation(documentId: string | undefined) {
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: fleetGraphDebugKeys.detail(documentId || '') }),
+        queryClient.invalidateQueries({ queryKey: fleetGraphInsightsKeys.detail(documentId || '') }),
         queryClient.invalidateQueries({ queryKey: ['document', documentId] }),
       ]);
     },
@@ -137,7 +137,7 @@ export function useFleetGraphReportDraftMutation(documentId: string | undefined)
     },
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: fleetGraphDebugKeys.detail(documentId || '') }),
+        queryClient.invalidateQueries({ queryKey: fleetGraphInsightsKeys.detail(documentId || '') }),
         queryClient.invalidateQueries({ queryKey: ['document', documentId] }),
         queryClient.invalidateQueries({ queryKey: ['documents'] }),
       ]);

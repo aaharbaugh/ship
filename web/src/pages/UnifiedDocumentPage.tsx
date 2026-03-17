@@ -2,17 +2,17 @@ import { useCallback, useMemo, useEffect, Suspense } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UnifiedEditor } from '@/components/UnifiedEditor';
-import { FleetGraphDebugPanel, type PersistedFleetGraphView } from '@/components/FleetGraphDebugPanel';
+import { FleetGraphInsightsPanel, type PersistedFleetGraphView } from '@/components/FleetGraphInsightsPanel';
 import type { UnifiedDocument, SidebarData } from '@/components/UnifiedEditor';
 import { useAuth } from '@/hooks/useAuth';
 import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { useProjectsQuery } from '@/hooks/useProjectsQuery';
 import {
-  useFleetGraphDebugQuery,
+  useFleetGraphInsightsQuery,
   useFleetGraphPersistMutation,
   useFleetGraphReportDraftMutation,
-} from '@/hooks/useFleetGraphDebugQuery';
+} from '@/hooks/useFleetGraphInsightsQuery';
 import {
   useFleetGraphPublishReportMutation,
   useFleetGraphReportsQuery,
@@ -69,7 +69,7 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
-  const fleetGraphDebugQuery = useFleetGraphDebugQuery(id);
+  const fleetGraphInsightsQuery = useFleetGraphInsightsQuery(id);
   const fleetGraphPersistMutation = useFleetGraphPersistMutation(id);
   const fleetGraphReportDraftMutation = useFleetGraphReportDraftMutation(id);
   const fleetGraphReportsQuery = useFleetGraphReportsQuery();
@@ -569,10 +569,10 @@ export function UnifiedDocumentPage() {
   // Non-tabbed documents render directly in editor
   return (
     <div className="flex h-full flex-col">
-      <FleetGraphDebugPanel
-        data={fleetGraphDebugQuery.data}
-        isLoading={fleetGraphDebugQuery.isLoading}
-        error={fleetGraphDebugQuery.error as Error | null}
+      <FleetGraphInsightsPanel
+        data={fleetGraphInsightsQuery.data}
+        isLoading={fleetGraphInsightsQuery.isLoading}
+        error={fleetGraphInsightsQuery.error as Error | null}
         persisted={persistedFleetGraph}
         onPersist={() => fleetGraphPersistMutation.mutate()}
         isPersisting={fleetGraphPersistMutation.isPending}
