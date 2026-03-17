@@ -8,6 +8,7 @@ export interface PersistedFleetGraphView {
   qualityScore: number;
   qualityStatus: 'green' | 'yellow' | 'red';
   qualitySummary: string;
+  qualityReportId?: string | null;
   qualityTags: Array<{
     key: string;
     label: string;
@@ -114,6 +115,7 @@ export function FleetGraphDebugPanel({
   const displayScore = persisted?.qualityScore ?? primaryDocument?.qualityScore;
   const displaySummary = persisted?.qualitySummary ?? primaryDocument?.summary;
   const displayTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
+  const qualityReportId = persisted?.qualityReportId ?? null;
   const sourceLabel = persisted
     ? 'Persisted metadata'
     : data.analysis.mode === 'gpt-4o'
@@ -135,10 +137,14 @@ export function FleetGraphDebugPanel({
                 <button
                   type="button"
                   onClick={onCreateReportDraft}
-                  disabled={isCreatingReportDraft}
+                  disabled={isCreatingReportDraft || !!qualityReportId}
                   className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isCreatingReportDraft ? 'Creating Report...' : 'Create Draft Report'}
+                  {qualityReportId
+                    ? 'Draft Report Linked'
+                    : isCreatingReportDraft
+                      ? 'Creating Report...'
+                      : 'Create Draft Report'}
                 </button>
               )}
               <button
@@ -176,6 +182,11 @@ export function FleetGraphDebugPanel({
                       {tag.label}
                     </span>
                   ))}
+                </div>
+              )}
+              {qualityReportId && (
+                <div className="text-xs text-muted">
+                  Linked report: {qualityReportId}
                 </div>
               )}
             </div>

@@ -472,6 +472,7 @@ export function UnifiedDocumentPage() {
       qualityScore,
       qualityStatus,
       qualitySummary,
+      qualityReportId: typeof properties.quality_report_id === 'string' ? properties.quality_report_id : null,
       qualityTags: Array.isArray(qualityTags)
         ? qualityTags.filter((tag): tag is PersistedFleetGraphView['qualityTags'][number] => {
             if (!tag || typeof tag !== 'object') return false;
