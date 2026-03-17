@@ -1,4 +1,5 @@
 import { traceable } from 'langsmith/traceable';
+import type { FleetGraphDirectorResponseOption } from '@ship/shared';
 import type { FleetGraphShipApiClient } from './client.js';
 import type { FleetGraphAnalysis } from './analyze.js';
 import type { FleetGraphPreparedRun } from './runner.js';
@@ -48,6 +49,7 @@ const tracedCreateFleetGraphQualityReportDraft = traceable(
         fleetgraph_report_mode: analysis.mode,
         fleetgraph_report_model: analysis.model,
         fleetgraph_generated_at: analysis.generatedAt,
+        fleetgraph_director_response_options: buildDirectorResponseOptions(prepared, analysis),
       },
     });
 
@@ -61,6 +63,53 @@ export async function publishFleetGraphQualityReport(
   reportId: string
 ): Promise<FleetGraphPublishReportResult> {
   return tracedPublishFleetGraphQualityReport(client, reportId);
+}
+
+function buildDirectorResponseOptions(
+  prepared: FleetGraphPreparedRun,
+  analysis: FleetGraphAnalysis
+): FleetGraphDirectorResponseOption[] {
+  const targetDocuments = analysis.documents
+    .filter((document) => document.qualityStatus !== 'green')
+    .sort((left, right) => compareStatus(right.qualityStatus, left.qualityStatus))
+    .slice(0, 3);
+  const titleById = new Map(
+    prepared.context.expandedDocuments.map((document) => [document.id, document.title])
+  );
+
+  if (targetDocuments.length === 0) {
+    return [
+      {
+        label: 'Acknowledge healthy graph',
+        message: `FleetGraph found this graph healthy overall. Keep execution moving and rescan if the project context changes.`,
+        target_document_id: prepared.rootDocumentId,
+      },
+    ];
+  }
+
+  const firstTarget = targetDocuments[0];
+  if (!firstTarget) {
+    return [];
+  }
+  const firstTitle = titleById.get(firstTarget.documentId) ?? firstTarget.documentId;
+
+  return [
+    {
+      label: 'Address top blocker',
+      message: `Please address the highest-risk gap in "${firstTitle}" before continuing. FleetGraph flagged it as ${firstTarget.qualityStatus}.`,
+      target_document_id: firstTarget.documentId,
+    },
+    {
+      label: 'Tighten scope and ownership',
+      message: `Please tighten ownership and expected outcomes across the flagged work before the next review pass. Start with "${firstTitle}" and any linked follow-up items.`,
+      target_document_id: firstTarget.documentId,
+    },
+    {
+      label: 'Escalate blockers this cycle',
+      message: `Please escalate the current blockers this cycle and update the affected documents with concrete next steps so the graph can return to green.`,
+      target_document_id: prepared.rootDocumentId,
+    },
+  ];
 }
 
 const tracedPublishFleetGraphQualityReport = traceable(

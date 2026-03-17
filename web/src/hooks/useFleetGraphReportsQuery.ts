@@ -13,6 +13,12 @@ export interface FleetGraphReportListItem {
   generatedAt: string | null;
   updatedAt: string | null;
   publishedAt: string | null;
+  directorResponseOptions: Array<{
+    label: string;
+    message: string;
+    targetDocumentId: string | null;
+  }>;
+  directorFeedbackSentAt: string | null;
 }
 
 export interface FleetGraphWorkspaceScanResult {
@@ -148,6 +154,38 @@ export function useFleetGraphWorkspaceScanMutation() {
       }
 
       return response.json() as Promise<FleetGraphWorkspaceScanResult>;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['document'] }),
+      ]);
+    },
+  });
+}
+
+export function useFleetGraphDirectorFeedbackMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      reportId,
+      optionIndex,
+    }: {
+      reportId: string;
+      optionIndex: number;
+    }) => {
+      const response = await apiPost(`/api/fleetgraph/reports/${reportId}/director-feedback`, {
+        optionIndex,
+      });
+      if (!response.ok) {
+        throw new Error('Failed to send FleetGraph director feedback');
+      }
+
+      return response.json() as Promise<{
+        reportId: string;
+        sentAt: string;
+      }>;
     },
     onSuccess: async () => {
       await Promise.all([

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import {
   useFleetGraphBulkPublishReportsMutation,
+  useFleetGraphDirectorFeedbackMutation,
   useFleetGraphPublishReportMutation,
   useFleetGraphQueueStatusQuery,
   useFleetGraphReportsQuery,
@@ -19,6 +20,7 @@ export function FleetGraphReportsPage() {
   const reportsQuery = useFleetGraphReportsQuery();
   const queueStatusQuery = useFleetGraphQueueStatusQuery();
   const publishMutation = useFleetGraphPublishReportMutation();
+  const directorFeedbackMutation = useFleetGraphDirectorFeedbackMutation();
   const bulkPublishMutation = useFleetGraphBulkPublishReportsMutation();
   const scanMutation = useFleetGraphWorkspaceScanMutation();
   const [stateFilter, setStateFilter] = useState<'all' | 'draft' | 'published'>('all');
@@ -299,6 +301,13 @@ export function FleetGraphReportsPage() {
                 <ReportCard
                   key={report.id}
                   report={report}
+                  onSendDirectorFeedback={(optionIndex) =>
+                    directorFeedbackMutation.mutate({
+                      reportId: report.id,
+                      optionIndex,
+                    })
+                  }
+                  isSendingDirectorFeedback={directorFeedbackMutation.isPending}
                 />
               ))}
             </div>
@@ -370,6 +379,8 @@ function ReportCard({
   onToggleSelected,
   onPublish,
   isPublishing,
+  onSendDirectorFeedback,
+  isSendingDirectorFeedback,
 }: {
   report: {
     id: string;
@@ -382,11 +393,19 @@ function ReportCard({
     qualityScore: number | null;
     generatedAt: string | null;
     publishedAt: string | null;
+    directorResponseOptions: Array<{
+      label: string;
+      message: string;
+      targetDocumentId: string | null;
+    }>;
+    directorFeedbackSentAt: string | null;
   };
   selected?: boolean;
   onToggleSelected?: () => void;
   onPublish?: () => void;
   isPublishing?: boolean;
+  onSendDirectorFeedback?: (optionIndex: number) => void;
+  isSendingDirectorFeedback?: boolean;
 }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
@@ -461,6 +480,56 @@ function ReportCard({
           )}
         </div>
       </div>
+
+      {report.state === 'published' && report.directorResponseOptions.length > 0 && (
+        <div className="mt-4 rounded-xl border border-slate-800 bg-black p-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Director Feedback Options
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                Select and send one response to the affected document context.
+              </div>
+            </div>
+            <div className="text-xs text-slate-500">
+              {report.directorFeedbackSentAt
+                ? `Last sent ${formatFleetGraphTimestamp(report.directorFeedbackSentAt)}`
+                : 'No director feedback sent yet'}
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2">
+            {report.directorResponseOptions.map((option, index) => (
+              <div
+                key={`${report.id}-${option.label}-${index}`}
+                className="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-white">{option.label}</div>
+                    <div className="mt-1 text-xs text-slate-400">{option.message}</div>
+                    {option.targetDocumentId && (
+                      <div className="mt-2 text-[11px] text-slate-500">
+                        Target document: {option.targetDocumentId}
+                      </div>
+                    )}
+                  </div>
+                  {onSendDirectorFeedback && (
+                    <button
+                      type="button"
+                      onClick={() => onSendDirectorFeedback(index)}
+                      disabled={isSendingDirectorFeedback}
+                      className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {isSendingDirectorFeedback ? 'Sending...' : 'Send Feedback'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

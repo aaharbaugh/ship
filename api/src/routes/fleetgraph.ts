@@ -12,11 +12,15 @@ import { listFleetGraphReports } from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
+import { sendFleetGraphDirectorFeedback } from '../services/fleetgraph/feedback.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
 const nightlyScanSchema = z.object({
   createDraftReports: z.boolean().optional(),
+});
+const directorFeedbackSchema = z.object({
+  optionIndex: z.number().int().min(0),
 });
 
 function getInternalBaseUrl(req: Request): string {
@@ -175,6 +179,27 @@ router.post('/reports/:id/publish', authMiddleware, async (req: Request, res: Re
   } catch (error) {
     console.error('FleetGraph report publish error:', error);
     return res.status(500).json({ error: 'Failed to publish FleetGraph report' });
+  }
+});
+
+router.post('/reports/:id/director-feedback', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
+      return res.status(403).json({ error: 'Sending FleetGraph director feedback requires workspace admin access' });
+    }
+
+    const parsed = directorFeedbackSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid FleetGraph director feedback payload', details: parsed.error.flatten() });
+    }
+
+    const client = createRouteClient(req);
+    return res.json(
+      await sendFleetGraphDirectorFeedback(client, String(req.params.id), parsed.data.optionIndex)
+    );
+  } catch (error) {
+    console.error('FleetGraph director feedback error:', error);
+    return res.status(500).json({ error: 'Failed to send FleetGraph director feedback' });
   }
 });
 

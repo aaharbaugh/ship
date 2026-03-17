@@ -14,6 +14,12 @@ export interface FleetGraphReportListItem {
   generatedAt: string | null;
   updatedAt: string | null;
   publishedAt: string | null;
+  directorResponseOptions: Array<{
+    label: string;
+    message: string;
+    targetDocumentId: string | null;
+  }>;
+  directorFeedbackSentAt: string | null;
 }
 
 export async function listFleetGraphReports(
@@ -83,6 +89,13 @@ const tracedListFleetGraphReports = traceable(
           typeof document.properties.fleetgraph_report_published_at === 'string'
             ? document.properties.fleetgraph_report_published_at
             : null,
+        directorResponseOptions: parseDirectorResponseOptions(
+          document.properties.fleetgraph_director_response_options
+        ),
+        directorFeedbackSentAt:
+          typeof document.properties.fleetgraph_director_feedback_sent_at === 'string'
+            ? document.properties.fleetgraph_director_feedback_sent_at
+            : null,
       }))
       .sort((left, right) => {
         const leftTime = Date.parse(left.updatedAt ?? left.generatedAt ?? '');
@@ -102,6 +115,45 @@ function parseQualityStatus(
   }
 
   return null;
+}
+
+function parseDirectorResponseOptions(
+  value: unknown
+): Array<{
+  label: string;
+  message: string;
+  targetDocumentId: string | null;
+}> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') {
+      return [];
+    }
+
+    const option = entry as {
+      label?: unknown;
+      message?: unknown;
+      target_document_id?: unknown;
+    };
+
+    if (typeof option.label !== 'string' || typeof option.message !== 'string') {
+      return [];
+    }
+
+    return [
+      {
+        label: option.label,
+        message: option.message,
+        targetDocumentId:
+          typeof option.target_document_id === 'string'
+            ? option.target_document_id
+            : null,
+      },
+    ];
+  });
 }
 
 function parseReportState(

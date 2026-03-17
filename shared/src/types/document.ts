@@ -107,6 +107,13 @@ export interface FleetGraphDocumentMetadata {
   quality_report_id?: string | null;
   quality_summary_hash?: string | null;
   fleetgraph_version?: string | null;
+  fleetgraph_director_response_options?: FleetGraphDirectorResponseOption[] | null;
+  fleetgraph_director_feedback?: {
+    report_id: string;
+    message: string;
+    sent_at: string;
+  } | null;
+  fleetgraph_director_feedback_sent_at?: string | null;
   [key: string]: unknown;
 }
 

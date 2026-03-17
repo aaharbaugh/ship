@@ -185,6 +185,7 @@ describe('FleetGraph quality report drafting', () => {
     expect(draft.content).toContain('Clarify onboarding acceptance criteria');
     expect(draft.content).toContain('Target: Fix onboarding path');
     expect(draft.content).toContain('Graph depth reached: 1');
+    expect(draft.metadata.fleetgraph_director_response_options).toHaveLength(3);
   });
 
   it('marks a FleetGraph quality report as published', async () => {
