@@ -39,6 +39,8 @@ export function FleetGraphDebugPanel({
   persisted,
   onPersist,
   isPersisting,
+  onCreateReportDraft,
+  isCreatingReportDraft,
 }: {
   data?: FleetGraphDebugResponse;
   isLoading: boolean;
@@ -46,6 +48,8 @@ export function FleetGraphDebugPanel({
   persisted?: PersistedFleetGraphView | null;
   onPersist?: () => void;
   isPersisting?: boolean;
+  onCreateReportDraft?: () => void;
+  isCreatingReportDraft?: boolean;
 }) {
   if (isLoading) {
     return (
@@ -126,14 +130,26 @@ export function FleetGraphDebugPanel({
           <span>{data.scoringPayload.edgeCount} edges</span>
           <span>{persisted?.lastScoredAt || data.analysis.generatedAt}</span>
           {onPersist && (
-            <button
-              type="button"
-              onClick={onPersist}
-              disabled={isPersisting}
-              className="ml-auto rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isPersisting ? 'Persisting...' : 'Persist Analysis'}
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {onCreateReportDraft && (
+                <button
+                  type="button"
+                  onClick={onCreateReportDraft}
+                  disabled={isCreatingReportDraft}
+                  className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isCreatingReportDraft ? 'Creating Report...' : 'Create Draft Report'}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onPersist}
+                disabled={isPersisting}
+                className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isPersisting ? 'Persisting...' : 'Persist Analysis'}
+              </button>
+            </div>
           )}
         </div>
 

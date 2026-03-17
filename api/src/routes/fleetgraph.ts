@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
 import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
+import { createFleetGraphQualityReportDraft } from '../services/fleetgraph/report.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 
@@ -44,6 +45,39 @@ router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Resp
   } catch (error) {
     console.error('FleetGraph persist error:', error);
     return res.status(500).json({ error: 'Failed to persist FleetGraph analysis' });
+  }
+});
+
+router.post('/debug/:id/report-draft', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { client, prepared, analysis } = await buildDebugContext(req);
+    const existingReportId =
+      typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
+        ? prepared.context.rootDocument.properties.quality_report_id
+        : null;
+
+    if (existingReportId) {
+      return res.json({
+        created: false,
+        reportId: existingReportId,
+      });
+    }
+
+    const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
+    for (const document of analysis.documents) {
+      await client.updateDocumentMetadata(document.documentId, {
+        ...document.metadata,
+        quality_report_id: report.reportId,
+      });
+    }
+
+    return res.json({
+      created: true,
+      reportId: report.reportId,
+    });
+  } catch (error) {
+    console.error('FleetGraph report draft error:', error);
+    return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
   }
 });
 

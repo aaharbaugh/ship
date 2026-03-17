@@ -115,3 +115,24 @@ export function useFleetGraphPersistMutation(documentId: string | undefined) {
     },
   });
 }
+
+export function useFleetGraphReportDraftMutation(documentId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiPost(`/api/fleetgraph/debug/${documentId}/report-draft`, {});
+      if (!res.ok) {
+        throw new Error('Failed to create FleetGraph report draft');
+      }
+      return res.json() as Promise<{ created: boolean; reportId: string }>;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: fleetGraphDebugKeys.detail(documentId || '') }),
+        queryClient.invalidateQueries({ queryKey: ['document', documentId] }),
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
+      ]);
+    },
+  });
+}
