@@ -3,8 +3,13 @@ import type { FleetGraphQualityStatus } from '@ship/shared';
 import type { FleetGraphShipApiClient } from './client.js';
 import { persistFleetGraphAnalysis } from './persist.js';
 import { analyzeFleetGraphWithReasoning } from './reasoning.js';
+import { createFleetGraphQualityReportDraft } from './report.js';
 import { prepareFleetGraphRun } from './runner.js';
 import { fleetGraphTraceConfig } from './tracing.js';
+
+export interface FleetGraphWorkspaceScanOptions {
+  createDraftReports?: boolean;
+}
 
 export interface FleetGraphWorkspaceScanProjectResult {
   documentId: string;
@@ -14,6 +19,7 @@ export interface FleetGraphWorkspaceScanProjectResult {
   remediationCount: number;
   mode: 'deterministic' | 'gpt-4o';
   model: string | null;
+  qualityReportId: string | null;
 }
 
 export interface FleetGraphWorkspaceScanResult {
@@ -29,15 +35,17 @@ export interface FleetGraphWorkspaceScanResult {
 
 export async function runFleetGraphWorkspaceScan(
   client: FleetGraphShipApiClient,
-  workspaceId: string
+  workspaceId: string,
+  options: FleetGraphWorkspaceScanOptions = {}
 ): Promise<FleetGraphWorkspaceScanResult> {
-  return tracedRunFleetGraphWorkspaceScan(client, workspaceId);
+  return tracedRunFleetGraphWorkspaceScan(client, workspaceId, options);
 }
 
 const tracedRunFleetGraphWorkspaceScan = traceable(
   async function runWorkspaceScan(
     client: FleetGraphShipApiClient,
-    workspaceId: string
+    workspaceId: string,
+    options: FleetGraphWorkspaceScanOptions
   ): Promise<FleetGraphWorkspaceScanResult> {
     const projects = await client.listDocuments({ type: 'project' });
     const results: FleetGraphWorkspaceScanProjectResult[] = [];
@@ -50,6 +58,8 @@ const tracedRunFleetGraphWorkspaceScan = traceable(
       });
       const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
       await persistFleetGraphAnalysis(client, analysis);
+      const existingReportId = extractExistingReportId(prepared.context.rootDocument.properties);
+      let qualityReportId: string | null = existingReportId;
 
       const rootAnalysis =
         analysis.documents.find((document) => document.documentId === project.id) ??
@@ -57,6 +67,22 @@ const tracedRunFleetGraphWorkspaceScan = traceable(
 
       if (!rootAnalysis) {
         continue;
+      }
+
+      if (
+        options.createDraftReports &&
+        rootAnalysis.qualityStatus !== 'green' &&
+        !existingReportId
+      ) {
+        const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
+        qualityReportId = report.reportId;
+
+        for (const document of analysis.documents) {
+          await client.updateDocumentMetadata(document.documentId, {
+            ...document.metadata,
+            quality_report_id: report.reportId,
+          });
+        }
       }
 
       results.push({
@@ -69,6 +95,7 @@ const tracedRunFleetGraphWorkspaceScan = traceable(
         ).length,
         mode: analysis.mode,
         model: analysis.model,
+        qualityReportId,
       });
     }
 
@@ -85,3 +112,7 @@ const tracedRunFleetGraphWorkspaceScan = traceable(
   },
   fleetGraphTraceConfig('fleetgraph.workspace_scan')
 );
+
+function extractExistingReportId(properties: Record<string, unknown>): string | null {
+  return typeof properties.quality_report_id === 'string' ? properties.quality_report_id : null;
+}

@@ -74,5 +74,35 @@ describe('FleetGraph workspace scan', () => {
     expect(result.totalProjects).toBe(1);
     expect(result.projects[0]?.documentId).toBe('project-1');
     expect(result.projects[0]?.qualityStatus).toBe('green');
+    expect(result.projects[0]?.qualityReportId).toBeNull();
+  });
+
+  it('creates a draft quality report for non-green projects when requested', async () => {
+    const client = createMockClient();
+    client.getDocument = vi.fn(async (documentId: string) => ({
+      id: documentId,
+      workspace_id: 'ws-1',
+      document_type: 'project',
+      title: 'Project Beta',
+      parent_id: null,
+      properties: {},
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'Thin' }],
+          },
+        ],
+      },
+      belongs_to: [],
+    }));
+
+    const result = await runFleetGraphWorkspaceScan(client, 'ws-1', {
+      createDraftReports: true,
+    });
+
+    expect(client.createQualityReportDraft).toHaveBeenCalled();
+    expect(result.projects[0]?.qualityReportId).toBe('draft-1');
   });
 });

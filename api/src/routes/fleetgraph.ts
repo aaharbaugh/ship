@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
 import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
@@ -8,6 +9,9 @@ import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
+const nightlyScanSchema = z.object({
+  createDraftReports: z.boolean().optional(),
+});
 
 function getInternalBaseUrl(req: Request): string {
   if (process.env.INTERNAL_API_URL) {
@@ -49,8 +53,13 @@ router.post('/nightly-scan', authMiddleware, async (req: Request, res: Response)
       return res.status(403).json({ error: 'FleetGraph nightly scans require workspace admin access' });
     }
 
+    const parsed = nightlyScanSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid nightly scan payload', details: parsed.error.flatten() });
+    }
+
     const client = createRouteClient(req);
-    const result = await runFleetGraphWorkspaceScan(client, String(req.workspaceId));
+    const result = await runFleetGraphWorkspaceScan(client, String(req.workspaceId), parsed.data);
     return res.json(result);
   } catch (error) {
     console.error('FleetGraph nightly scan error:', error);
