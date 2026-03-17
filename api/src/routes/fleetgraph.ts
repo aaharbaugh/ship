@@ -4,7 +4,10 @@ import { authMiddleware } from '../middleware/auth.js';
 import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
 import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
-import { createFleetGraphQualityReportDraft } from '../services/fleetgraph/report.js';
+import {
+  createFleetGraphQualityReportDraft,
+  publishFleetGraphQualityReport,
+} from '../services/fleetgraph/report.js';
 import { listFleetGraphReports } from '../services/fleetgraph/reports.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
@@ -91,6 +94,20 @@ router.post('/debug/:id/report-draft', authMiddleware, async (req: Request, res:
   } catch (error) {
     console.error('FleetGraph report draft error:', error);
     return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
+  }
+});
+
+router.post('/reports/:id/publish', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
+      return res.status(403).json({ error: 'Publishing FleetGraph reports requires workspace admin access' });
+    }
+
+    const client = createRouteClient(req);
+    return res.json(await publishFleetGraphQualityReport(client, String(req.params.id)));
+  } catch (error) {
+    console.error('FleetGraph report publish error:', error);
+    return res.status(500).json({ error: 'Failed to publish FleetGraph report' });
   }
 });
 

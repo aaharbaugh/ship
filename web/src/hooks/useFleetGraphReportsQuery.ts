@@ -1,14 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
-import { apiGet } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiGet, apiPost } from '@/lib/api';
 
 export interface FleetGraphReportListItem {
   id: string;
   title: string;
   rootDocumentId: string | null;
+  state: 'draft' | 'published';
   qualityStatus: 'green' | 'yellow' | 'red' | null;
   qualityScore: number | null;
   generatedAt: string | null;
   updatedAt: string | null;
+  publishedAt: string | null;
 }
 
 async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
@@ -26,5 +28,26 @@ export function useFleetGraphReportsQuery() {
     queryKey: ['fleetgraph-reports'],
     queryFn: fetchFleetGraphReports,
     staleTime: 30_000,
+  });
+}
+
+export function useFleetGraphPublishReportMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (reportId: string) => {
+      const response = await apiPost(`/api/fleetgraph/reports/${reportId}/publish`, {});
+      if (!response.ok) {
+        throw new Error('Failed to publish FleetGraph report');
+      }
+
+      return response.json() as Promise<{ reportId: string; publishedAt: string }>;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['document'] }),
+      ]);
+    },
   });
 }

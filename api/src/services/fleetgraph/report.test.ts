@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createFleetGraphQualityReportDraft } from './report.js';
+import {
+  createFleetGraphQualityReportDraft,
+  publishFleetGraphQualityReport,
+} from './report.js';
 import type { FleetGraphShipApiClient } from './client.js';
 import type { FleetGraphPreparedRun } from './runner.js';
 import type { FleetGraphAnalysis } from './analyze.js';
@@ -138,5 +141,41 @@ describe('FleetGraph quality report drafting', () => {
     expect(draft.content).toContain('Fix onboarding path');
     expect(draft.content).toContain('Clarify onboarding acceptance criteria');
     expect(draft.content).toContain('Target: Fix onboarding path');
+  });
+
+  it('marks a FleetGraph quality report as published', async () => {
+    const updateDocumentMetadata = vi.fn().mockResolvedValue(undefined);
+    const client = {
+      listDocuments: vi.fn(),
+      getDocument: vi.fn().mockResolvedValue({
+        id: 'report-1',
+        workspace_id: 'ws-1',
+        document_type: 'wiki',
+        title: 'FleetGraph Quality Report: Project Atlas',
+        parent_id: null,
+        properties: {
+          fleetgraph_report_type: 'quality_report',
+          fleetgraph_report_state: 'draft',
+        },
+        content: null,
+        belongs_to: [],
+      }),
+      getDocumentAssociations: vi.fn(),
+      getReverseAssociations: vi.fn(),
+      updateDocumentMetadata,
+      createQualityReportDraft: vi.fn(),
+    } satisfies FleetGraphShipApiClient;
+
+    const result = await publishFleetGraphQualityReport(client, 'report-1');
+
+    expect(result.reportId).toBe('report-1');
+    expect(typeof result.publishedAt).toBe('string');
+    expect(updateDocumentMetadata).toHaveBeenCalledWith(
+      'report-1',
+      expect.objectContaining({
+        fleetgraph_report_state: 'published',
+        fleetgraph_report_published_at: expect.any(String),
+      })
+    );
   });
 });

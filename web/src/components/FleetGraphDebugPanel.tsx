@@ -43,6 +43,8 @@ export function FleetGraphDebugPanel({
   isPersisting,
   onCreateReportDraft,
   isCreatingReportDraft,
+  onPublishReport,
+  isPublishingReport,
   reports,
 }: {
   data?: FleetGraphDebugResponse;
@@ -53,6 +55,8 @@ export function FleetGraphDebugPanel({
   isPersisting?: boolean;
   onCreateReportDraft?: () => void;
   isCreatingReportDraft?: boolean;
+  onPublishReport?: (reportId: string) => void;
+  isPublishingReport?: boolean;
   reports?: FleetGraphReportListItem[];
 }) {
   if (isLoading) {
@@ -119,6 +123,7 @@ export function FleetGraphDebugPanel({
   const displaySummary = persisted?.qualitySummary ?? primaryDocument?.summary;
   const displayTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
   const qualityReportId = persisted?.qualityReportId ?? null;
+  const linkedReport = reports?.find((report) => report.id === qualityReportId);
   const sourceLabel = persisted
     ? 'Persisted metadata'
     : data.analysis.mode === 'gpt-4o'
@@ -157,6 +162,16 @@ export function FleetGraphDebugPanel({
                 >
                   Open Draft Report
                 </a>
+              )}
+              {qualityReportId && linkedReport?.state !== 'published' && onPublishReport && (
+                <button
+                  type="button"
+                  onClick={() => onPublishReport(qualityReportId)}
+                  disabled={isPublishingReport}
+                  className="rounded-md border border-border bg-slate-900 px-2.5 py-1 text-xs font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isPublishingReport ? 'Publishing...' : 'Publish Report'}
+                </button>
               )}
               <button
                 type="button"
@@ -197,7 +212,7 @@ export function FleetGraphDebugPanel({
               )}
               {qualityReportId && (
                 <div className="text-xs text-muted">
-                  Linked report ready for review.
+                  Linked report {linkedReport?.state === 'published' ? 'published.' : 'ready for review.'}
                 </div>
               )}
             </div>
@@ -282,18 +297,25 @@ export function FleetGraphDebugPanel({
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-medium text-foreground">{report.title}</span>
                     {report.qualityStatus && typeof report.qualityScore === 'number' && (
-                      <span
-                        className={cn(
-                          'rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
-                          STATUS_STYLES[report.qualityStatus]
-                        )}
-                      >
-                        {report.qualityStatus} {Math.round(report.qualityScore * 100)}%
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] uppercase tracking-wide text-muted">
+                          {report.state}
+                        </span>
+                        <span
+                          className={cn(
+                            'rounded-full border px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide',
+                            STATUS_STYLES[report.qualityStatus]
+                          )}
+                        >
+                          {report.qualityStatus} {Math.round(report.qualityScore * 100)}%
+                        </span>
+                      </div>
                     )}
                   </div>
                   <div className="mt-1 text-xs text-muted">
-                    {report.generatedAt ?? report.updatedAt ?? 'No timestamp'}
+                    {report.state === 'published'
+                      ? report.publishedAt ?? report.updatedAt ?? 'No timestamp'
+                      : report.generatedAt ?? report.updatedAt ?? 'No timestamp'}
                   </div>
                 </a>
               ))}

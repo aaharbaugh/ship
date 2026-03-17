@@ -8,6 +8,11 @@ export interface FleetGraphDraftReportResult {
   reportId: string;
 }
 
+export interface FleetGraphPublishReportResult {
+  reportId: string;
+  publishedAt: string;
+}
+
 export async function createFleetGraphQualityReportDraft(
   client: FleetGraphShipApiClient,
   prepared: FleetGraphPreparedRun,
@@ -37,6 +42,7 @@ const tracedCreateFleetGraphQualityReportDraft = traceable(
       metadata: {
         fleetgraph_root_document_id: prepared.rootDocumentId,
         fleetgraph_trigger_source: prepared.triggerSource,
+        fleetgraph_report_state: 'draft',
         quality_status: rootAnalysis.qualityStatus,
         quality_score: rootAnalysis.qualityScore,
         fleetgraph_report_mode: analysis.mode,
@@ -48,6 +54,39 @@ const tracedCreateFleetGraphQualityReportDraft = traceable(
     return { reportId: report.id };
   },
   fleetGraphTraceConfig('fleetgraph.create_quality_report_draft')
+);
+
+export async function publishFleetGraphQualityReport(
+  client: FleetGraphShipApiClient,
+  reportId: string
+): Promise<FleetGraphPublishReportResult> {
+  return tracedPublishFleetGraphQualityReport(client, reportId);
+}
+
+const tracedPublishFleetGraphQualityReport = traceable(
+  async function publishQualityReport(
+    client: FleetGraphShipApiClient,
+    reportId: string
+  ): Promise<FleetGraphPublishReportResult> {
+    const report = await client.getDocument(reportId);
+
+    if (report.properties.fleetgraph_report_type !== 'quality_report') {
+      throw new Error('FleetGraph publish requires a quality report document');
+    }
+
+    const publishedAt = new Date().toISOString();
+    await client.updateDocumentMetadata(reportId, {
+      ...(report.properties ?? {}),
+      fleetgraph_report_state: 'published',
+      fleetgraph_report_published_at: publishedAt,
+    });
+
+    return {
+      reportId,
+      publishedAt,
+    };
+  },
+  fleetGraphTraceConfig('fleetgraph.publish_quality_report')
 );
 
 function buildQualityReportContent(
