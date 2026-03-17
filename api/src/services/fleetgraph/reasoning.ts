@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { wrapOpenAI } from 'langsmith/wrappers/openai';
 import { traceable } from 'langsmith/traceable';
 import type {
   FleetGraphAlertTag,
@@ -10,7 +11,10 @@ import {
   type FleetGraphAnalysis,
 } from './analyze.js';
 import type { FleetGraphScoringPayload } from './payload.js';
-import { fleetGraphTraceConfig } from './tracing.js';
+import {
+  fleetGraphTraceConfig,
+  fleetGraphTraceMetadata,
+} from './tracing.js';
 
 interface FleetGraphReasoningDocumentResult {
   documentId: string;
@@ -46,7 +50,16 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
     }
 
     try {
-      const client = new OpenAI({ apiKey });
+      const client = wrapOpenAI(
+        new OpenAI({ apiKey }),
+        {
+          name: 'fleetgraph.openai',
+          tags: ['fleetgraph', 'openai'],
+          metadata: fleetGraphTraceMetadata({
+            rootDocumentId: payload.rootDocumentId,
+          }),
+        }
+      );
       const response = await client.chat.completions.create({
         model: DEFAULT_MODEL,
         response_format: { type: 'json_object' },
@@ -66,6 +79,12 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
             }),
           },
         ],
+      }, {
+        langsmithExtra: {
+          name: 'fleetgraph.reasoning_completion',
+          tags: ['fleetgraph', 'reasoning'],
+          metadata: buildReasoningTraceMetadata(payload, deterministic),
+        },
       });
 
       const message = response.choices[0]?.message?.content;
@@ -83,8 +102,66 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
       return deterministic;
     }
   },
-  fleetGraphTraceConfig('fleetgraph.analyze_reasoning')
+  fleetGraphTraceConfig('fleetgraph.analyze_reasoning', {
+    getInvocationParams: (payload) => ({
+      ls_provider: 'openai',
+      ls_model_name: DEFAULT_MODEL,
+      ls_model_type: 'chat',
+      ls_stop: [],
+      ls_temperature: 0,
+    }),
+    processInputs: (inputs) => {
+      const [payload, deterministic] =
+        'args' in inputs ? inputs.args as [FleetGraphScoringPayload, FleetGraphAnalysis] : [];
+
+      if (!payload || !deterministic) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: payload.rootDocumentId,
+        documentCount: payload.documentCount,
+        edgeCount: payload.edgeCount,
+        maxDepthReached: payload.maxDepthReached,
+        truncated: payload.truncated,
+        deterministicDocumentCount: deterministic.documents.length,
+        deterministicSuggestionCount: deterministic.remediationSuggestions.length,
+      };
+    },
+    processOutputs: (outputs) => {
+      const analysis = 'mode' in outputs ? outputs as FleetGraphAnalysis : null;
+      if (!analysis) {
+        return {};
+      }
+
+      return {
+        mode: analysis.mode,
+        model: analysis.model,
+        documents: analysis.documents.length,
+        suggestions: analysis.remediationSuggestions.length,
+      };
+    },
+  })
 );
+
+function buildReasoningTraceMetadata(
+  payload: FleetGraphScoringPayload,
+  deterministic: FleetGraphAnalysis
+): Record<string, unknown> {
+  return fleetGraphTraceMetadata({
+    rootDocumentId: payload.rootDocumentId,
+    documentCount: payload.documentCount,
+    edgeCount: payload.edgeCount,
+    maxDepthReached: payload.maxDepthReached,
+    truncated: payload.truncated,
+    deterministicRedDocuments: deterministic.documents.filter(
+      (document) => document.qualityStatus === 'red'
+    ).length,
+    deterministicYellowDocuments: deterministic.documents.filter(
+      (document) => document.qualityStatus === 'yellow'
+    ).length,
+  });
+}
 
 export function mergeReasoningIntoAnalysis(
   deterministic: FleetGraphAnalysis,
