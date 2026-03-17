@@ -36,7 +36,13 @@ export interface FleetGraphReportDraft {
   metadata: Record<string, unknown>;
 }
 
+export interface FleetGraphListDocumentsParams {
+  type?: DocumentType | string;
+  parentId?: string | null;
+}
+
 export interface FleetGraphShipApiClient {
+  listDocuments(params?: FleetGraphListDocumentsParams): Promise<FleetGraphDocumentRecord[]>;
   getDocument(documentId: string): Promise<FleetGraphDocumentRecord>;
   getDocumentAssociations(documentId: string): Promise<FleetGraphAssociationRecord[]>;
   getReverseAssociations(documentId: string): Promise<FleetGraphAssociationRecord[]>;
@@ -89,6 +95,30 @@ export class FleetGraphHttpShipApiClient implements FleetGraphShipApiClient {
   constructor(config: FleetGraphShipApiClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
     this.authHeaders = config.authHeaders;
+  }
+
+  async listDocuments(
+    params: FleetGraphListDocumentsParams = {}
+  ): Promise<FleetGraphDocumentRecord[]> {
+    const search = new URLSearchParams();
+
+    if (params.type) {
+      search.set('type', params.type);
+    }
+
+    if (params.parentId !== undefined) {
+      search.set('parent_id', params.parentId ?? 'null');
+    }
+
+    const query = search.toString();
+    const response = await fetch(
+      `${this.baseUrl}/api/documents${query ? `?${query}` : ''}`,
+      {
+        headers: buildHeaders(this.authHeaders),
+      }
+    );
+
+    return parseJsonResponse<FleetGraphDocumentRecord[]>(response, 'listDocuments');
   }
 
   async getDocument(documentId: string): Promise<FleetGraphDocumentRecord> {

@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
+import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
 import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
+import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -42,6 +43,21 @@ router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Resp
   }
 });
 
+router.post('/nightly-scan', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
+      return res.status(403).json({ error: 'FleetGraph nightly scans require workspace admin access' });
+    }
+
+    const client = createRouteClient(req);
+    const result = await runFleetGraphWorkspaceScan(client, String(req.workspaceId));
+    return res.json(result);
+  } catch (error) {
+    console.error('FleetGraph nightly scan error:', error);
+    return res.status(500).json({ error: 'Failed to run FleetGraph nightly scan' });
+  }
+});
+
 async function buildDebugResponse(req: Request) {
   const { prepared, analysis } = await buildDebugContext(req);
 
@@ -52,13 +68,7 @@ async function buildDebugResponse(req: Request) {
 }
 
 async function buildDebugContext(req: Request) {
-  const cookieHeader = req.headers.cookie;
-
-  if (!cookieHeader) {
-    throw new Error('Session cookie required for FleetGraph debug access');
-  }
-
-  const client = createFleetGraphSessionClient(getInternalBaseUrl(req), cookieHeader);
+  const client = createRouteClient(req);
   const prepared = await prepareFleetGraphRun(client, {
     workspaceId: String(req.workspaceId),
     documentId: String(req.params.id),
@@ -67,6 +77,23 @@ async function buildDebugContext(req: Request) {
   const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
 
   return { client, prepared, analysis };
+}
+
+function createRouteClient(req: Request) {
+  const baseUrl = getInternalBaseUrl(req);
+  const authHeader = req.headers.authorization;
+
+  if (authHeader?.startsWith('Bearer ')) {
+    return createFleetGraphBearerClient(baseUrl, authHeader.slice(7));
+  }
+
+  const cookieHeader = req.headers.cookie;
+
+  if (!cookieHeader) {
+    throw new Error('Session cookie required for FleetGraph access');
+  }
+
+  return createFleetGraphSessionClient(baseUrl, cookieHeader);
 }
 
 export default router;

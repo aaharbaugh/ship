@@ -44,6 +44,7 @@ function createMockClient(): FleetGraphShipApiClient {
   });
 
   return {
+    listDocuments: vi.fn().mockResolvedValue([]),
     getDocument,
     getDocumentAssociations: vi.fn().mockResolvedValue([
       {
