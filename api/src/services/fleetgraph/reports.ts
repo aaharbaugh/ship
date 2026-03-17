@@ -6,6 +6,8 @@ export interface FleetGraphReportListItem {
   id: string;
   title: string;
   rootDocumentId: string | null;
+  rootDocumentTitle: string | null;
+  rootDocumentType: string | null;
   state: 'draft' | 'published';
   qualityStatus: 'green' | 'yellow' | 'red' | null;
   qualityScore: number | null;
@@ -25,15 +27,46 @@ const tracedListFleetGraphReports = traceable(
     client: FleetGraphShipApiClient
   ): Promise<FleetGraphReportListItem[]> {
     const documents = await client.listDocuments({ type: 'wiki' });
+    const reportDocs = documents.filter(
+      (document) => document.properties.fleetgraph_report_type === 'quality_report'
+    );
+    const rootIds = [...new Set(
+      reportDocs.flatMap((document) =>
+        typeof document.properties.fleetgraph_root_document_id === 'string'
+          ? [document.properties.fleetgraph_root_document_id]
+          : []
+      )
+    )];
+    const rootDocuments = await Promise.all(
+      rootIds.map(async (rootId) => {
+        try {
+          return await client.getDocument(rootId);
+        } catch {
+          return null;
+        }
+      })
+    );
+    const rootById = new Map(
+      rootDocuments
+        .filter((document): document is NonNullable<typeof document> => document !== null)
+        .map((document) => [document.id, document])
+    );
 
-    return documents
-      .filter((document) => document.properties.fleetgraph_report_type === 'quality_report')
+    return reportDocs
       .map((document) => ({
         id: document.id,
         title: document.title,
         rootDocumentId:
           typeof document.properties.fleetgraph_root_document_id === 'string'
             ? document.properties.fleetgraph_root_document_id
+            : null,
+        rootDocumentTitle:
+          typeof document.properties.fleetgraph_root_document_id === 'string'
+            ? rootById.get(document.properties.fleetgraph_root_document_id)?.title ?? null
+            : null,
+        rootDocumentType:
+          typeof document.properties.fleetgraph_root_document_id === 'string'
+            ? rootById.get(document.properties.fleetgraph_root_document_id)?.document_type ?? null
             : null,
         state: parseReportState(document.properties.fleetgraph_report_state),
         qualityStatus: parseQualityStatus(document.properties.quality_status),

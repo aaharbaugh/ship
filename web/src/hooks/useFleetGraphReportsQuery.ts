@@ -5,6 +5,8 @@ export interface FleetGraphReportListItem {
   id: string;
   title: string;
   rootDocumentId: string | null;
+  rootDocumentTitle: string | null;
+  rootDocumentType: string | null;
   state: 'draft' | 'published';
   qualityStatus: 'green' | 'yellow' | 'red' | null;
   qualityScore: number | null;
@@ -42,6 +44,31 @@ export function useFleetGraphPublishReportMutation() {
       }
 
       return response.json() as Promise<{ reportId: string; publishedAt: string }>;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['document'] }),
+      ]);
+    },
+  });
+}
+
+export function useFleetGraphBulkPublishReportsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (reportIds: string[]) => {
+      return Promise.all(
+        reportIds.map(async (reportId) => {
+          const response = await apiPost(`/api/fleetgraph/reports/${reportId}/publish`, {});
+          if (!response.ok) {
+            throw new Error(`Failed to publish FleetGraph report ${reportId}`);
+          }
+
+          return response.json() as Promise<{ reportId: string; publishedAt: string }>;
+        })
+      );
     },
     onSuccess: async () => {
       await Promise.all([

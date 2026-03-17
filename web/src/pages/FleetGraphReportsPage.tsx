@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
 import {
+  useFleetGraphBulkPublishReportsMutation,
   useFleetGraphPublishReportMutation,
   useFleetGraphReportsQuery,
 } from '@/hooks/useFleetGraphReportsQuery';
@@ -15,9 +16,11 @@ const STATUS_STYLES: Record<'green' | 'yellow' | 'red', string> = {
 export function FleetGraphReportsPage() {
   const reportsQuery = useFleetGraphReportsQuery();
   const publishMutation = useFleetGraphPublishReportMutation();
+  const bulkPublishMutation = useFleetGraphBulkPublishReportsMutation();
   const [stateFilter, setStateFilter] = useState<'all' | 'draft' | 'published'>('all');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [search, setSearch] = useState('');
+  const [selectedDraftIds, setSelectedDraftIds] = useState<string[]>([]);
 
   const reports = reportsQuery.data ?? [];
   const filteredReports = useMemo(() => {
@@ -58,6 +61,18 @@ export function FleetGraphReportsPage() {
       published: source.filter((report) => report.state === 'published'),
     };
   }, [filteredReports, reports]);
+
+  const selectableDraftIds = useMemo(
+    () => grouped.drafts.map((report) => report.id),
+    [grouped.drafts]
+  );
+  const allVisibleDraftsSelected =
+    selectableDraftIds.length > 0 &&
+    selectableDraftIds.every((reportId) => selectedDraftIds.includes(reportId));
+
+  useEffect(() => {
+    setSelectedDraftIds((current) => current.filter((reportId) => reports.some((report) => report.id === reportId && report.state === 'draft')));
+  }, [reports]);
 
   if (reportsQuery.isLoading) {
     return (
@@ -131,12 +146,37 @@ export function FleetGraphReportsPage() {
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
-              Draft Reports
-            </h2>
-            <span className="text-xs text-slate-500">
-              Publish after PM review
-            </span>
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
+                Draft Reports
+              </h2>
+              <span className="text-xs text-slate-500">
+                Publish after PM review
+              </span>
+            </div>
+            {grouped.drafts.length > 0 && (
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedDraftIds((current) =>
+                      allVisibleDraftsSelected ? current.filter((id) => !selectableDraftIds.includes(id)) : [...new Set([...current, ...selectableDraftIds])]
+                    )
+                  }
+                  className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+                >
+                  {allVisibleDraftsSelected ? 'Clear Visible' : 'Select Visible'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => bulkPublishMutation.mutate(selectedDraftIds)}
+                  disabled={selectedDraftIds.length === 0 || bulkPublishMutation.isPending}
+                  className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {bulkPublishMutation.isPending ? 'Publishing Selected...' : `Publish Selected (${selectedDraftIds.length})`}
+                </button>
+              </div>
+            )}
           </div>
           {grouped.drafts.length === 0 ? (
             <EmptyState message={filteredReports.length === 0 ? 'No reports match the current filters.' : 'No FleetGraph draft reports yet.'} />
@@ -146,6 +186,14 @@ export function FleetGraphReportsPage() {
                 <ReportCard
                   key={report.id}
                   report={report}
+                  selected={selectedDraftIds.includes(report.id)}
+                  onToggleSelected={() =>
+                    setSelectedDraftIds((current) =>
+                      current.includes(report.id)
+                        ? current.filter((id) => id !== report.id)
+                        : [...current, report.id]
+                    )
+                  }
                   onPublish={() => publishMutation.mutate(report.id)}
                   isPublishing={publishMutation.isPending}
                 />
@@ -238,6 +286,8 @@ function FilterGroup({
 
 function ReportCard({
   report,
+  selected,
+  onToggleSelected,
   onPublish,
   isPublishing,
 }: {
@@ -245,12 +295,16 @@ function ReportCard({
     id: string;
     title: string;
     rootDocumentId: string | null;
+    rootDocumentTitle: string | null;
+    rootDocumentType: string | null;
     state: 'draft' | 'published';
     qualityStatus: 'green' | 'yellow' | 'red' | null;
     qualityScore: number | null;
     generatedAt: string | null;
     publishedAt: string | null;
   };
+  selected?: boolean;
+  onToggleSelected?: () => void;
   onPublish?: () => void;
   isPublishing?: boolean;
 }) {
@@ -259,6 +313,20 @@ function ReportCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            {report.state === 'draft' && onToggleSelected && (
+              <button
+                type="button"
+                onClick={onToggleSelected}
+                className={cn(
+                  'flex h-5 w-5 items-center justify-center rounded border text-[10px] font-bold transition-colors',
+                  selected
+                    ? 'border-white bg-white text-black'
+                    : 'border-slate-700 bg-black text-slate-400 hover:bg-slate-900'
+                )}
+              >
+                {selected ? '✓' : ''}
+              </button>
+            )}
             <h3 className="text-base font-semibold text-white">{report.title}</h3>
             <span className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
               {report.state}
@@ -275,9 +343,14 @@ function ReportCard({
             )}
           </div>
           <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-400">
-            <span>Generated: {report.generatedAt ?? 'Unknown'}</span>
-            {report.publishedAt && <span>Published: {report.publishedAt}</span>}
-            {report.rootDocumentId && <span>Root document linked</span>}
+            <span>Generated: {formatFleetGraphTimestamp(report.generatedAt)}</span>
+            {report.publishedAt && <span>Published: {formatFleetGraphTimestamp(report.publishedAt)}</span>}
+            {report.rootDocumentTitle && (
+              <span>
+                Root: {report.rootDocumentTitle}
+                {report.rootDocumentType ? ` (${report.rootDocumentType})` : ''}
+              </span>
+            )}
           </div>
         </div>
 
@@ -310,6 +383,24 @@ function ReportCard({
       </div>
     </div>
   );
+}
+
+function formatFleetGraphTimestamp(value: string | null): string {
+  if (!value) {
+    return 'Unknown';
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }
 
 function EmptyState({ message }: { message: string }) {
