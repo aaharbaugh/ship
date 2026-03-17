@@ -147,6 +147,14 @@ export function FleetGraphDebugPanel({
                       : 'Create Draft Report'}
                 </button>
               )}
+              {qualityReportId && (
+                <a
+                  href={`/documents/${qualityReportId}`}
+                  className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-slate-100"
+                >
+                  Open Draft Report
+                </a>
+              )}
               <button
                 type="button"
                 onClick={onPersist}
@@ -186,7 +194,7 @@ export function FleetGraphDebugPanel({
               )}
               {qualityReportId && (
                 <div className="text-xs text-muted">
-                  Linked report: {qualityReportId}
+                  Linked report ready for review.
                 </div>
               )}
             </div>
