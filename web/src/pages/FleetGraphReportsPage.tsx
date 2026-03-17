@@ -5,6 +5,7 @@ import {
   useFleetGraphBulkPublishReportsMutation,
   useFleetGraphPublishReportMutation,
   useFleetGraphReportsQuery,
+  useFleetGraphWorkspaceScanMutation,
 } from '@/hooks/useFleetGraphReportsQuery';
 
 const STATUS_STYLES: Record<'green' | 'yellow' | 'red', string> = {
@@ -17,6 +18,7 @@ export function FleetGraphReportsPage() {
   const reportsQuery = useFleetGraphReportsQuery();
   const publishMutation = useFleetGraphPublishReportMutation();
   const bulkPublishMutation = useFleetGraphBulkPublishReportsMutation();
+  const scanMutation = useFleetGraphWorkspaceScanMutation();
   const [stateFilter, setStateFilter] = useState<'all' | 'draft' | 'published'>('all');
   const [severityFilter, setSeverityFilter] = useState<'all' | 'red' | 'yellow' | 'green'>('all');
   const [search, setSearch] = useState('');
@@ -106,10 +108,30 @@ export function FleetGraphReportsPage() {
               and jump directly into the linked project documents.
             </p>
           </div>
-          <div className="flex gap-3 text-xs text-slate-500">
-            <span>{grouped.total} total</span>
-            <span>{reports.length === filteredReports.length ? grouped.drafts.length : `${grouped.drafts.length} visible drafts`}</span>
-            <span>{reports.length === filteredReports.length ? grouped.published.length : `${grouped.published.length} visible published`}</span>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex gap-3 text-xs text-slate-500">
+              <span>{grouped.total} total</span>
+              <span>{reports.length === filteredReports.length ? grouped.drafts.length : `${grouped.drafts.length} visible drafts`}</span>
+              <span>{reports.length === filteredReports.length ? grouped.published.length : `${grouped.published.length} visible published`}</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => scanMutation.mutate(false)}
+                disabled={scanMutation.isPending}
+                className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {scanMutation.isPending ? 'Scanning...' : 'Run Fresh Scan'}
+              </button>
+              <button
+                type="button"
+                onClick={() => scanMutation.mutate(true)}
+                disabled={scanMutation.isPending}
+                className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {scanMutation.isPending ? 'Scanning...' : 'Scan + Draft Reports'}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -119,6 +141,22 @@ export function FleetGraphReportsPage() {
           <SummaryCard label="Yellow Reports" value={grouped.yellow} tone="yellow" />
           <SummaryCard label="Published" value={reports.filter((report) => report.state === 'published').length} tone="green" />
         </div>
+
+        {scanMutation.data && (
+          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-medium text-white">Latest FleetGraph Scan</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  {formatFleetGraphTimestamp(scanMutation.data.scannedAt)} · {scanMutation.data.totalProjects} projects · {scanMutation.data.redProjects} red · {scanMutation.data.yellowProjects} yellow · {scanMutation.data.greenProjects} green
+                </div>
+              </div>
+              <div className="text-xs text-slate-500">
+                {scanMutation.data.projects.filter((project) => project.qualityReportId).length} reports linked
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
           <div className="flex flex-wrap items-center gap-3">

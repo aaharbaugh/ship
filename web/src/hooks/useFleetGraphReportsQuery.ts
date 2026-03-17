@@ -15,6 +15,26 @@ export interface FleetGraphReportListItem {
   publishedAt: string | null;
 }
 
+export interface FleetGraphWorkspaceScanResult {
+  workspaceId: string;
+  scannedAt: string;
+  source: 'nightly_scan';
+  totalProjects: number;
+  greenProjects: number;
+  yellowProjects: number;
+  redProjects: number;
+  projects: Array<{
+    documentId: string;
+    title: string;
+    qualityStatus: 'green' | 'yellow' | 'red';
+    qualityScore: number;
+    remediationCount: number;
+    mode: 'deterministic' | 'gpt-4o';
+    model: string | null;
+    qualityReportId: string | null;
+  }>;
+}
+
 async function fetchFleetGraphReports(): Promise<FleetGraphReportListItem[]> {
   const response = await apiGet('/api/fleetgraph/reports');
   if (!response.ok) {
@@ -69,6 +89,27 @@ export function useFleetGraphBulkPublishReportsMutation() {
           return response.json() as Promise<{ reportId: string; publishedAt: string }>;
         })
       );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['document'] }),
+      ]);
+    },
+  });
+}
+
+export function useFleetGraphWorkspaceScanMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (createDraftReports: boolean) => {
+      const response = await apiPost('/api/fleetgraph/nightly-scan', { createDraftReports });
+      if (!response.ok) {
+        throw new Error('Failed to run FleetGraph workspace scan');
+      }
+
+      return response.json() as Promise<FleetGraphWorkspaceScanResult>;
     },
     onSuccess: async () => {
       await Promise.all([
