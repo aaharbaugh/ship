@@ -110,7 +110,11 @@ export function FleetGraphDebugPanel({
   const displayScore = persisted?.qualityScore ?? primaryDocument?.qualityScore;
   const displaySummary = persisted?.qualitySummary ?? primaryDocument?.summary;
   const displayTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
-  const sourceLabel = persisted ? 'Persisted metadata' : 'Live debug analysis';
+  const sourceLabel = persisted
+    ? 'Persisted metadata'
+    : data.analysis.mode === 'gpt-4o'
+      ? `Live ${data.analysis.model ?? 'gpt-4o'} analysis`
+      : 'Live deterministic analysis';
 
   return (
     <div className="border-b border-border bg-slate-50/70 px-4 py-3">

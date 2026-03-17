@@ -103,10 +103,13 @@ importers:
         version: 8.1.0
       langsmith:
         specifier: ^0.5.10
-        version: 0.5.10(ws@8.19.0)
+        version: 0.5.10(openai@6.31.0(ws@8.19.0)(zod@3.25.76))(ws@8.19.0)
       lib0:
         specifier: ^0.2.99
         version: 0.2.117
+      openai:
+        specifier: ^6.31.0
+        version: 6.31.0(ws@8.19.0)(zod@3.25.76)
       openid-client:
         specifier: ^6.8.1
         version: 6.8.1
@@ -3892,6 +3895,18 @@ packages:
 
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
+
+  openai@6.31.0:
+    resolution: {integrity: sha512-iqEn3QY1NnVrDOynUWA2Fjs04gzZ0m7fbwR9xZVFmcN1cqQwslMQM2sjQBNkTVFK/rrSvV78SXiBgU+Pyqz1Aw==}
+    hasBin: true
+    peerDependencies:
+      ws: ^8.18.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      ws:
+        optional: true
+      zod:
+        optional: true
 
   openapi3-ts@4.5.0:
     resolution: {integrity: sha512-jaL+HgTq2Gj5jRcfdutgRGLosCy/hT8sQf6VOy+P+g36cZOjI1iukdPnijC+4CmeRzg/jEllJUboEic2FhxhtQ==}
@@ -8789,7 +8804,7 @@ snapshots:
 
   keyboardevent-key-polyfill@1.1.0: {}
 
-  langsmith@0.5.10(ws@8.19.0):
+  langsmith@0.5.10(openai@6.31.0(ws@8.19.0)(zod@3.25.76))(ws@8.19.0):
     dependencies:
       '@types/uuid': 10.0.0
       chalk: 5.6.2
@@ -8798,6 +8813,7 @@ snapshots:
       semver: 7.7.4
       uuid: 10.0.0
     optionalDependencies:
+      openai: 6.31.0(ws@8.19.0)(zod@3.25.76)
       ws: 8.19.0
 
   lazystream@1.0.1:
@@ -9074,6 +9090,11 @@ snapshots:
   once@1.4.0:
     dependencies:
       wrappy: 1.0.2
+
+  openai@6.31.0(ws@8.19.0)(zod@3.25.76):
+    optionalDependencies:
+      ws: 8.19.0
+      zod: 3.25.76
 
   openapi3-ts@4.5.0:
     dependencies:

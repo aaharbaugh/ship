@@ -1,7 +1,8 @@
 import { traceable } from 'langsmith/traceable';
-import { analyzeFleetGraphPayload, type FleetGraphDeterministicAnalysis } from './analyze.js';
+import type { FleetGraphAnalysis } from './analyze.js';
 import { createFleetGraphBearerClient } from './client.js';
 import { persistFleetGraphAnalysis } from './persist.js';
+import { analyzeFleetGraphWithReasoning } from './reasoning.js';
 import { prepareFleetGraphRun, type FleetGraphPreparedRun } from './runner.js';
 import { fleetGraphTraceConfig } from './tracing.js';
 import type { FleetGraphTriggerEvent } from './triggers.js';
@@ -10,7 +11,7 @@ export interface FleetGraphExecutionResult {
   executed: boolean;
   reason?: 'missing_config';
   prepared?: FleetGraphPreparedRun;
-  analysis?: FleetGraphDeterministicAnalysis;
+  analysis?: FleetGraphAnalysis;
 }
 
 export async function executeFleetGraphTrigger(
@@ -43,13 +44,15 @@ const tracedExecuteFleetGraphTrigger = traceable(
       documentId: event.documentId,
       source: event.source,
     });
-    const analysis = analyzeFleetGraphPayload(prepared.scoringPayload);
+    const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
     await persistFleetGraphAnalysis(client, analysis);
 
     console.info('[FleetGraph] Execution complete', {
       workspaceId: event.workspaceId,
       documentId: event.documentId,
       source: event.source,
+      mode: analysis.mode,
+      model: analysis.model,
       documents: analysis.documents.length,
       suggestions: analysis.remediationSuggestions.length,
     });

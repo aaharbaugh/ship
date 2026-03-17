@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
-import { analyzeFleetGraphPayload } from '../services/fleetgraph/analyze.js';
 import { createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
+import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
 import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
 
 type RouterType = ReturnType<typeof Router>;
@@ -64,7 +64,7 @@ async function buildDebugContext(req: Request) {
     documentId: String(req.params.id),
     source: 'manual',
   });
-  const analysis = analyzeFleetGraphPayload(prepared.scoringPayload);
+  const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
 
   return { client, prepared, analysis };
 }

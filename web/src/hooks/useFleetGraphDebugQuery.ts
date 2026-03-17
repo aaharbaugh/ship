@@ -60,6 +60,8 @@ export interface FleetGraphDebugResponse {
   analysis: {
     generatedAt: string;
     rootDocumentId: string;
+    mode: 'deterministic' | 'gpt-4o';
+    model: string | null;
     remediationSuggestions: Array<{
       title: string;
       priority: 'high' | 'medium' | 'low';

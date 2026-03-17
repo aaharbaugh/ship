@@ -17,26 +17,32 @@ export interface FleetGraphDocumentAnalysis {
   metadata: FleetGraphDocumentMetadata;
 }
 
-export interface FleetGraphDeterministicAnalysis {
+export interface FleetGraphAnalysis {
   generatedAt: string;
   rootDocumentId: string;
+  mode: 'deterministic' | 'gpt-4o';
+  model: string | null;
   remediationSuggestions: FleetGraphRemediationSuggestion[];
   documents: FleetGraphDocumentAnalysis[];
 }
 
+export type FleetGraphDeterministicAnalysis = FleetGraphAnalysis;
+
 export function analyzeFleetGraphPayload(
   payload: FleetGraphScoringPayload
-): FleetGraphDeterministicAnalysis {
+): FleetGraphAnalysis {
   return tracedAnalyzeFleetGraphPayload(payload);
 }
 
 const tracedAnalyzeFleetGraphPayload = traceable(
-  function analyzePayload(payload: FleetGraphScoringPayload): FleetGraphDeterministicAnalysis {
+  function analyzePayload(payload: FleetGraphScoringPayload): FleetGraphAnalysis {
   const documents = payload.documents.map(analyzeDocument);
 
   return {
     generatedAt: new Date().toISOString(),
     rootDocumentId: payload.rootDocumentId,
+    mode: 'deterministic',
+    model: null,
     remediationSuggestions: buildRemediationSuggestions(documents),
     documents,
   };
