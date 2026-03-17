@@ -8,6 +8,8 @@ describe('FleetGraph reasoning merge', () => {
       rootDocumentId: 'issue-1',
       documentCount: 1,
       edgeCount: 0,
+      maxDepthReached: 0,
+      truncated: false,
       documents: [
         {
           id: 'issue-1',

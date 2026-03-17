@@ -27,6 +27,12 @@ export interface FleetGraphGraphSnapshot {
   rootDocumentId: string;
   nodes: FleetGraphNodeSnapshot[];
   edges: FleetGraphEdgeSnapshot[];
+  metadata: {
+    maxDepthReached: number;
+    truncated: boolean;
+    depthLimit: number;
+    documentLimit: number;
+  };
 }
 
 export function buildFleetGraphSnapshot(context: FleetGraphFetchContext): FleetGraphGraphSnapshot {
@@ -61,6 +67,12 @@ const tracedBuildFleetGraphSnapshot = traceable(
         properties: document.properties,
       })),
       edges: dedupeEdges(edges),
+      metadata: {
+        maxDepthReached: context.maxDepthReached,
+        truncated: context.truncated,
+        depthLimit: context.depthLimit,
+        documentLimit: context.documentLimit,
+      },
     };
   },
   fleetGraphTraceConfig('fleetgraph.build_graph')

@@ -21,6 +21,12 @@ export interface FleetGraphInsightsResponse {
   nodeIds: string[];
   graph: {
     rootDocumentId: string;
+    metadata: {
+      maxDepthReached: number;
+      truncated: boolean;
+      depthLimit: number;
+      documentLimit: number;
+    };
     nodes: Array<{
       id: string;
       documentType: string;
@@ -44,6 +50,8 @@ export interface FleetGraphInsightsResponse {
     rootDocumentId: string;
     documentCount: number;
     edgeCount: number;
+    maxDepthReached: number;
+    truncated: boolean;
     documents: Array<{
       id: string;
       documentType: string;

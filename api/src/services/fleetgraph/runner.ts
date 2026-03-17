@@ -23,6 +23,10 @@ export interface FleetGraphFetchContext {
   relatedDocuments: FleetGraphDocumentRecord[];
   expandedDocuments: FleetGraphDocumentRecord[];
   expandedAssociations: FleetGraphAssociationRecord[];
+  maxDepthReached: number;
+  truncated: boolean;
+  depthLimit: number;
+  documentLimit: number;
 }
 
 export interface FleetGraphPreparedRun extends FleetGraphRunPreview {
@@ -62,6 +66,10 @@ const tracedPrepareFleetGraphRun = traceable(
       relatedDocuments,
       expandedDocuments: traversal.documents,
       expandedAssociations: traversal.associations,
+      maxDepthReached: traversal.maxDepthReached,
+      truncated: traversal.truncated,
+      depthLimit: MAX_GRAPH_DEPTH,
+      documentLimit: MAX_GRAPH_DOCUMENTS,
     });
 
     return {
@@ -75,6 +83,10 @@ const tracedPrepareFleetGraphRun = traceable(
         relatedDocuments,
         expandedDocuments: traversal.documents,
         expandedAssociations: traversal.associations,
+        maxDepthReached: traversal.maxDepthReached,
+        truncated: traversal.truncated,
+        depthLimit: MAX_GRAPH_DEPTH,
+        documentLimit: MAX_GRAPH_DOCUMENTS,
       },
       graph,
       scoringPayload: buildFleetGraphScoringPayload(graph),
@@ -105,6 +117,8 @@ async function expandFleetGraphTraversal(
   rootDocument: FleetGraphDocumentRecord;
   documents: FleetGraphDocumentRecord[];
   associations: FleetGraphAssociationRecord[];
+  maxDepthReached: number;
+  truncated: boolean;
 }> {
   const documentMap = new Map<string, FleetGraphDocumentRecord>();
   const associationMap = new Map<string, FleetGraphAssociationRecord>();
@@ -114,6 +128,8 @@ async function expandFleetGraphTraversal(
   const queued = new Set<string>([rootDocumentId]);
   const rootDocument = await client.getDocument(rootDocumentId);
   documentMap.set(rootDocument.id, rootDocument);
+  let maxDepthReached = 0;
+  let truncated = false;
 
   while (queue.length > 0 && documentMap.size < MAX_GRAPH_DOCUMENTS) {
     const current = queue.shift();
@@ -124,6 +140,7 @@ async function expandFleetGraphTraversal(
     const currentDocument =
       documentMap.get(current.documentId) ?? (await client.getDocument(current.documentId));
     documentMap.set(currentDocument.id, currentDocument);
+    maxDepthReached = Math.max(maxDepthReached, current.depth);
 
     const [directAssociations, reverseAssociations] = await Promise.all([
       client.getDocumentAssociations(currentDocument.id),
@@ -161,6 +178,10 @@ async function expandFleetGraphTraversal(
         .map((documentId) => client.getDocument(documentId))
     );
 
+    if (nextDocuments.length < nextIds.length) {
+      truncated = true;
+    }
+
     for (const document of nextDocuments) {
       documentMap.set(document.id, document);
       queue.push({ documentId: document.id, depth: current.depth + 1 });
@@ -168,10 +189,16 @@ async function expandFleetGraphTraversal(
     }
   }
 
+  if (queue.length > 0) {
+    truncated = true;
+  }
+
   return {
     rootDocument,
     documents: [...documentMap.values()],
     associations: [...associationMap.values()],
+    maxDepthReached,
+    truncated,
   };
 }
 

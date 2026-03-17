@@ -7,6 +7,8 @@ describe('FleetGraph deterministic analyzer', () => {
       rootDocumentId: 'doc-1',
       documentCount: 2,
       edgeCount: 1,
+      maxDepthReached: 1,
+      truncated: false,
       documents: [
         {
           id: 'doc-1',

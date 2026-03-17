@@ -124,6 +124,10 @@ function buildQualityReportContent(
     `Green documents: ${scoredDocuments.length - redDocuments.length - yellowDocuments.length}`,
     `Connected documents reviewed: ${prepared.graph.nodes.length}`,
     `Relationships traversed: ${prepared.graph.edges.length}`,
+    `Graph depth reached: ${prepared.graph.metadata.maxDepthReached}`,
+    prepared.graph.metadata.truncated
+      ? `Traversal hit limits: yes (depth ${prepared.graph.metadata.depthLimit}, docs ${prepared.graph.metadata.documentLimit})`
+      : 'Traversal hit limits: no',
   ].join('\n');
   const priorityBlock = buildPriorityBlock('Immediate attention', redDocuments);
   const watchBlock = buildPriorityBlock('Watch list', yellowDocuments);

@@ -139,6 +139,12 @@ export function FleetGraphDebugPanel({
           <span>{sourceLabel}</span>
           <span>{data.scoringPayload.documentCount} docs</span>
           <span>{data.scoringPayload.edgeCount} edges</span>
+          <span>depth {data.graph.metadata.maxDepthReached}</span>
+          {data.graph.metadata.truncated && (
+            <span>
+              truncated at {data.graph.metadata.documentLimit} docs / depth {data.graph.metadata.depthLimit}
+            </span>
+          )}
           <span>{persisted?.lastScoredAt || data.analysis.generatedAt}</span>
           <button
             type="button"
@@ -221,6 +227,11 @@ export function FleetGraphDebugPanel({
               {qualityReportId && (
                 <div className="text-xs text-slate-400">
                   Linked report {linkedReport?.state === 'published' ? 'published.' : 'ready for review.'}
+                </div>
+              )}
+              {data.graph.metadata.truncated && (
+                <div className="text-xs text-yellow-300">
+                  Traversal hit configured graph limits, so this view is a bounded slice of the project graph.
                 </div>
               )}
             </div>

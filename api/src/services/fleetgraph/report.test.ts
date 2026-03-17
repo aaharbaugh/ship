@@ -79,9 +79,19 @@ describe('FleetGraph quality report drafting', () => {
             related_document_type: 'project',
           },
         ],
+        maxDepthReached: 1,
+        truncated: false,
+        depthLimit: 2,
+        documentLimit: 40,
       },
       graph: {
         rootDocumentId: 'project-1',
+        metadata: {
+          maxDepthReached: 1,
+          truncated: false,
+          depthLimit: 2,
+          documentLimit: 40,
+        },
         nodes: [
           {
             id: 'project-1',
@@ -115,6 +125,8 @@ describe('FleetGraph quality report drafting', () => {
         rootDocumentId: 'project-1',
         documentCount: 2,
         edgeCount: 1,
+        maxDepthReached: 1,
+        truncated: false,
         documents: [],
         edges: [],
       },
@@ -172,6 +184,7 @@ describe('FleetGraph quality report drafting', () => {
     expect(draft.content).toContain('Fix onboarding path');
     expect(draft.content).toContain('Clarify onboarding acceptance criteria');
     expect(draft.content).toContain('Target: Fix onboarding path');
+    expect(draft.content).toContain('Graph depth reached: 1');
   });
 
   it('marks a FleetGraph quality report as published', async () => {

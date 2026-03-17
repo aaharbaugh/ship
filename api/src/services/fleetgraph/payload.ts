@@ -27,6 +27,8 @@ export interface FleetGraphScoringPayload {
   rootDocumentId: string;
   documentCount: number;
   edgeCount: number;
+  maxDepthReached: number;
+  truncated: boolean;
   documents: FleetGraphScoringDocument[];
   edges: FleetGraphScoringEdge[];
 }
@@ -43,6 +45,8 @@ const tracedBuildFleetGraphScoringPayload = traceable(
     rootDocumentId: graph.rootDocumentId,
     documentCount: graph.nodes.length,
     edgeCount: graph.edges.length,
+    maxDepthReached: graph.metadata.maxDepthReached,
+    truncated: graph.metadata.truncated,
     documents: graph.nodes.map(toScoringDocument),
     edges: graph.edges.map((edge) => ({
       from: edge.from,

@@ -211,7 +211,11 @@ describe('FleetGraph runner', () => {
       'standup-1',
     ]);
     expect(result.context.expandedAssociations).toHaveLength(3);
+    expect(result.context.maxDepthReached).toBe(2);
+    expect(result.context.truncated).toBe(false);
     expect(result.graph.rootDocumentId).toBe('doc-1');
+    expect(result.graph.metadata.maxDepthReached).toBe(2);
+    expect(result.graph.metadata.truncated).toBe(false);
     expect(result.graph.nodes.map((node) => node.id).sort()).toEqual([
       'doc-1',
       'issue-1',
@@ -225,6 +229,8 @@ describe('FleetGraph runner', () => {
     expect(result.graph.edges.some((edge) => edge.relationshipType === 'blocked_by')).toBe(true);
     expect(result.scoringPayload.rootDocumentId).toBe('doc-1');
     expect(result.scoringPayload.documentCount).toBe(6);
+    expect(result.scoringPayload.maxDepthReached).toBe(2);
+    expect(result.scoringPayload.truncated).toBe(false);
     expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.ownerId).toBe('owner-1');
     expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.summaryText)
       .toContain('Project alpha needs acceptance criteria.');
