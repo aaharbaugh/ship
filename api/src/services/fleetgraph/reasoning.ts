@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { wrapOpenAI } from 'langsmith/wrappers/openai';
 import { traceable } from 'langsmith/traceable';
+import { z } from 'zod';
 import type {
   FleetGraphAlertTag,
   FleetGraphDocumentMetadata,
@@ -20,8 +21,11 @@ interface FleetGraphReasoningDocumentResult {
   documentId: string;
   qualityScore?: number;
   qualityStatus?: 'green' | 'yellow' | 'red';
+  confidence?: 'low' | 'medium' | 'high';
   summary?: string;
+  mainIssues?: string[];
   tags?: FleetGraphAlertTag[];
+  suggestions?: FleetGraphRemediationSuggestion[];
 }
 
 interface FleetGraphReasoningResponse {
@@ -46,6 +50,40 @@ interface FleetGraphCompactReasoningInput {
   truncated: boolean;
   documents: FleetGraphCompactReasoningDocumentInput[];
 }
+
+const reasoningTagSchema = z.object({
+  key: z.string().min(1),
+  label: z.string().min(1),
+  severity: z.enum(['high', 'medium', 'low']),
+  source: z.string().optional().nullable(),
+});
+
+const reasoningSuggestionSchema = z.object({
+  title: z.string().min(1),
+  priority: z.enum(['high', 'medium', 'low']),
+  rationale: z.string().min(1),
+  document_id: z.string().optional().nullable(),
+});
+
+const reasoningDocumentSchema = z.object({
+  documentId: z.string().min(1),
+  assessment: z.object({
+    qualityStatus: z.enum(['green', 'yellow', 'red']).optional(),
+    qualityScore: z.number().min(0).max(1).optional(),
+    confidence: z.enum(['low', 'medium', 'high']).optional(),
+  }).optional(),
+  analysis: z.object({
+    summary: z.string().min(1).optional(),
+    mainIssues: z.array(z.string().min(1)).max(5).optional(),
+  }).optional(),
+  tags: z.array(reasoningTagSchema).max(6).optional(),
+  suggestions: z.array(reasoningSuggestionSchema).max(3).optional(),
+});
+
+const reasoningResponseSchema = z.object({
+  documents: z.array(reasoningDocumentSchema).max(40).optional(),
+  remediationSuggestions: z.array(reasoningSuggestionSchema).max(5).optional(),
+});
 
 const DEFAULT_MODEL = process.env.FLEETGRAPH_OPENAI_MODEL || 'gpt-4o';
 
@@ -85,13 +123,13 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
           {
             role: 'system',
             content:
-              'You are FleetGraph, a document quality analyst. Return strict JSON only. Focus on the quality, coherence, and actionability of the provided text. Preserve deterministic structural findings unless the text strongly justifies extra caution. Keep summaries concise, tags short, and suggestions high-signal.',
+              'You are FleetGraph, a document quality analyst. Return strict JSON only. Focus on the quality, coherence, and actionability of the provided text. Preserve deterministic structural findings unless the text strongly justifies extra caution. Use the exact schema requested. Keep summaries concise, main issues concrete, tags short, and suggestions high-signal.',
           },
           {
             role: 'user',
             content: JSON.stringify({
               task:
-                'Review only the provided document text and deterministic hints. For each document, return optional overrides for qualityScore (0-1), qualityStatus, summary, and tags when the text quality suggests a change. Do not restate structural issues unless the text supports them. Add up to 5 remediationSuggestions.',
+                'Review only the provided document text and deterministic hints. Return JSON with { documents, remediationSuggestions }. For each document, use { documentId, assessment, analysis, tags, suggestions }. assessment may include qualityStatus, qualityScore, confidence. analysis may include summary and mainIssues. Add tags only when the text supports them. Add per-document suggestions and up to 5 global remediationSuggestions.',
               documents: buildCompactReasoningInput(payload, deterministic),
             }),
           },
@@ -238,9 +276,7 @@ export function mergeReasoningIntoAnalysis(
       override.qualityStatus,
       tags
     );
-    const summary = typeof override.summary === 'string' && override.summary.trim().length > 0
-      ? override.summary.trim()
-      : document.summary;
+    const summary = buildMergedSummary(document.summary, override.summary, override.mainIssues);
 
     return {
       ...document,
@@ -259,19 +295,29 @@ export function mergeReasoningIntoAnalysis(
     model,
     remediationSuggestions: mergeSuggestions(
       deterministic.remediationSuggestions,
-      reasoning.remediationSuggestions ?? []
+      [
+        ...(reasoning.remediationSuggestions ?? []),
+        ...collectPerDocumentSuggestions(reasoning.documents ?? []),
+      ]
     ),
     documents,
   };
 }
 
 function parseReasoningResponse(content: string): FleetGraphReasoningResponse {
-  const parsed = JSON.parse(content) as FleetGraphReasoningResponse;
+  const parsed = reasoningResponseSchema.parse(JSON.parse(content));
   return {
-    documents: Array.isArray(parsed.documents) ? parsed.documents : [],
-    remediationSuggestions: Array.isArray(parsed.remediationSuggestions)
-      ? parsed.remediationSuggestions
-      : [],
+    documents: (parsed.documents ?? []).map((document) => ({
+      documentId: document.documentId,
+      qualityScore: document.assessment?.qualityScore,
+      qualityStatus: document.assessment?.qualityStatus,
+      confidence: document.assessment?.confidence,
+      summary: document.analysis?.summary,
+      mainIssues: document.analysis?.mainIssues,
+      tags: document.tags,
+      suggestions: document.suggestions,
+    })),
+    remediationSuggestions: parsed.remediationSuggestions ?? [],
   };
 }
 
@@ -311,6 +357,17 @@ function mergeSuggestions(
   return [...merged.values()].slice(0, 10);
 }
 
+function collectPerDocumentSuggestions(
+  documents: FleetGraphReasoningDocumentResult[]
+): FleetGraphRemediationSuggestion[] {
+  return documents.flatMap((document) =>
+    (document.suggestions ?? []).map((suggestion) => ({
+      ...suggestion,
+      document_id: suggestion.document_id ?? document.documentId,
+    }))
+  );
+}
+
 function worsenStatus(
   deterministic: 'green' | 'yellow' | 'red',
   override: 'green' | 'yellow' | 'red' | undefined,
@@ -348,4 +405,29 @@ function toMetadata(
     last_scored_at: new Date().toISOString(),
     fleetgraph_version: `${model}-v1`,
   };
+}
+
+function buildMergedSummary(
+  deterministicSummary: string,
+  reasoningSummary: string | undefined,
+  mainIssues: string[] | undefined
+): string {
+  const cleanReasoningSummary =
+    typeof reasoningSummary === 'string' && reasoningSummary.trim().length > 0
+      ? reasoningSummary.trim()
+      : null;
+  const cleanIssues = (mainIssues ?? [])
+    .map((issue) => issue.trim())
+    .filter((issue) => issue.length > 0)
+    .slice(0, 3);
+
+  if (cleanReasoningSummary && cleanIssues.length > 0) {
+    return `${cleanReasoningSummary} Key issues: ${cleanIssues.join('; ')}.`;
+  }
+
+  if (cleanReasoningSummary) {
+    return cleanReasoningSummary;
+  }
+
+  return deterministicSummary;
 }

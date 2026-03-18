@@ -36,11 +36,19 @@ describe('FleetGraph reasoning merge', () => {
             qualityScore: 0.92,
             qualityStatus: 'green',
             summary: 'This issue needs explicit acceptance criteria before work starts.',
+            mainIssues: ['Expected outcomes are underspecified'],
             tags: [
               {
                 key: 'missing_scope',
                 label: 'Missing scope',
                 severity: 'medium',
+              },
+            ],
+            suggestions: [
+              {
+                title: 'Write concrete acceptance criteria',
+                priority: 'high',
+                rationale: 'Turn the work into executable completion conditions.',
               },
             ],
           },
