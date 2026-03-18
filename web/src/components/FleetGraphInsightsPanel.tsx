@@ -147,7 +147,7 @@ export function FleetGraphInsightsPanel({
 
     return lines;
   }, [connectedEdges.length, selectedGraphNode, selectedScoringDocument?.ownerId]);
-  const selectedSummaryText = selectedScoringDocument?.summaryText?.trim() ?? '';
+  const selectedSummaryText = normalizeFleetGraphText(selectedScoringDocument?.summaryText);
   const shouldShowSelectedSummaryText =
     selectedSummaryText.length > 0 &&
     normalizeFleetGraphText(selectedSummaryText) !==
@@ -425,7 +425,9 @@ export function FleetGraphInsightsPanel({
             {!isRootSelection && shouldShowSelectedSummaryText && (
               <div className="mt-3">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-400">Source Text</div>
-                <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-400">{selectedSummaryText}</p>
+                <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-400">
+                  {selectedScoringDocument?.summaryText ?? ''}
+                </p>
               </div>
             )}
           </div>
@@ -458,6 +460,10 @@ function buildConciseSuggestions(
   }).slice(0, 3);
 }
 
-function normalizeFleetGraphText(value: string): string {
+function normalizeFleetGraphText(value: unknown): string {
+  if (typeof value !== 'string') {
+    return '';
+  }
+
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
