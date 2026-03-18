@@ -44,7 +44,13 @@ services:
       DATABASE_URL: postgres://ship:ship_dev_password@postgres:5432/ship_dev
       SESSION_SECRET: local-dev-session-secret-not-for-production
       CORS_ORIGIN: http://localhost:5173
-      SHIP_API_TOKEN: ship_662789132b750a25f64f170e09840856893e81ab6906b042ab1d9073e7381257
+      SHIP_API_TOKEN: ${SHIP_API_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      FLEETGRAPH_OPENAI_MODEL: gpt-4o-mini
+      APP_BASE_URL: http://localhost:3000
+      LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_PROJECT: fleetgraph-dev
     depends_on:
       postgres:
         condition: service_healthy
