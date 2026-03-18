@@ -370,3 +370,27 @@ Supporting diagrams in this folder:
 The most useful diagram for dependency overlap is:
 
 - `FLEETGRAPH_REUSE_GRAPH.svg`
+
+## Tests And Evals
+
+Automated test coverage now exists for:
+
+- deterministic analysis
+- graph preparation
+- reasoning merge safeguards
+- workspace scan behavior
+- quality report drafting and publishing
+- director feedback writeback
+- queued trigger batching and dedupe
+- deployment readiness status
+- deterministic eval corpus regression checks
+
+Eval documentation:
+
+- `EVALS.md`
+
+Still missing for a fuller MVP hardening pass:
+
+- route-level integration coverage for FleetGraph endpoints
+- frontend test coverage for FleetGraph review surfaces
+- GPT-4o evals using captured LangSmith traces

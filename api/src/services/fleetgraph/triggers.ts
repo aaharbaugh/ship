@@ -254,3 +254,16 @@ function ensureFleetGraphBatchProcessor(): void {
 
   batchInterval.unref?.();
 }
+
+export function resetFleetGraphQueueForTests(): void {
+  pendingByDocument.clear();
+  lastHashByDocument.clear();
+  isFlushing = false;
+  lastFlushStartedAt = null;
+  lastFlushCompletedAt = null;
+
+  if (batchInterval) {
+    clearInterval(batchInterval);
+    batchInterval = null;
+  }
+}
