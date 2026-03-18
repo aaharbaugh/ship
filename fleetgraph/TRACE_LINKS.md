@@ -6,14 +6,14 @@ Use this file to capture the two required LangSmith execution paths for MVP subm
 
 - Path: document edit -> FleetGraph queue -> batch flush -> analysis -> persist
 - Suggested document: active issue or wiki with linked work
-- LangSmith link:
+- LangSmith link: https://smith.langchain.com/public/39b784d1-7d09-4af0-b692-f55aa3bfd8fe/r
 - Notes:
 
 ## Trace 2: Nightly scan execution
 
 - Path: `pnpm fleetgraph:nightly-scan` or `POST /api/fleetgraph/nightly-scan`
 - Suggested workspace: one with at least one red or yellow project
-- LangSmith link:
+- LangSmith link: https://smith.langchain.com/public/cad8a96c-2624-4553-a391-b79a47cc0fb7/r
 - Notes:
 
 ## Capture Checklist
