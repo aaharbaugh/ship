@@ -188,12 +188,14 @@ export function createFleetGraphBearerClient(baseUrl: string, apiToken: string):
 
 export function createFleetGraphSessionClient(
   baseUrl: string,
-  cookieHeader: string
+  cookieHeader: string,
+  csrfToken?: string | null
 ): FleetGraphShipApiClient {
   return new FleetGraphHttpShipApiClient({
     baseUrl,
     authHeaders: {
       Cookie: cookieHeader,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
   });
 }

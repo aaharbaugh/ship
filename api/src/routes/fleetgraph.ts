@@ -295,12 +295,19 @@ function createRouteClient(req: Request) {
   }
 
   const cookieHeader = req.headers.cookie;
+  const csrfTokenHeader = req.headers['x-csrf-token'];
+  const csrfToken =
+    typeof csrfTokenHeader === 'string'
+      ? csrfTokenHeader
+      : Array.isArray(csrfTokenHeader)
+        ? csrfTokenHeader[0]
+        : null;
 
   if (!cookieHeader) {
     throw new Error('Session cookie required for FleetGraph access');
   }
 
-  return createFleetGraphSessionClient(baseUrl, cookieHeader);
+  return createFleetGraphSessionClient(baseUrl, cookieHeader, csrfToken);
 }
 
 export default router;
