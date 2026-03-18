@@ -29,6 +29,24 @@ interface FleetGraphReasoningResponse {
   remediationSuggestions?: FleetGraphRemediationSuggestion[];
 }
 
+interface FleetGraphCompactReasoningDocumentInput {
+  documentId: string;
+  documentType: string;
+  title: string;
+  text: string;
+  currentStatus: 'green' | 'yellow' | 'red';
+  currentScore: number;
+  deterministicTagKeys: string[];
+}
+
+interface FleetGraphCompactReasoningInput {
+  rootDocumentId: string;
+  documentCount: number;
+  maxDepthReached: number;
+  truncated: boolean;
+  documents: FleetGraphCompactReasoningDocumentInput[];
+}
+
 const DEFAULT_MODEL = process.env.FLEETGRAPH_OPENAI_MODEL || 'gpt-4o';
 
 export async function analyzeFleetGraphWithReasoning(
@@ -67,15 +85,14 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
           {
             role: 'system',
             content:
-              'You are FleetGraph, a project-graph quality analyst. Return strict JSON only. Preserve deterministic findings, refine quality scoring conservatively, and suggest the highest-value remediation steps.',
+              'You are FleetGraph, a document quality analyst. Return strict JSON only. Focus on the quality, coherence, and actionability of the provided text. Preserve deterministic structural findings unless the text strongly justifies extra caution. Keep summaries concise, tags short, and suggestions high-signal.',
           },
           {
             role: 'user',
             content: JSON.stringify({
               task:
-                'Review the project graph payload and deterministic findings. For each document, return optional overrides for qualityScore (0-1), qualityStatus, summary, and tags. Only include documents present in the payload. Keep tags concise and actionable. Add up to 5 remediationSuggestions.',
-              payload,
-              deterministic,
+                'Review only the provided document text and deterministic hints. For each document, return optional overrides for qualityScore (0-1), qualityStatus, summary, and tags when the text quality suggests a change. Do not restate structural issues unless the text supports them. Add up to 5 remediationSuggestions.',
+              documents: buildCompactReasoningInput(payload, deterministic),
             }),
           },
         ],
@@ -118,12 +135,15 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
         return {};
       }
 
+      const compact = buildCompactReasoningInput(payload, deterministic);
+
       return {
         rootDocumentId: payload.rootDocumentId,
         documentCount: payload.documentCount,
-        edgeCount: payload.edgeCount,
         maxDepthReached: payload.maxDepthReached,
         truncated: payload.truncated,
+        reasoningDocumentCount: compact.documents.length,
+        emptyTextDocuments: compact.documents.filter((document) => document.text.length === 0).length,
         deterministicDocumentCount: deterministic.documents.length,
         deterministicSuggestionCount: deterministic.remediationSuggestions.length,
       };
@@ -148,12 +168,14 @@ function buildReasoningTraceMetadata(
   payload: FleetGraphScoringPayload,
   deterministic: FleetGraphAnalysis
 ): Record<string, unknown> {
+  const compact = buildCompactReasoningInput(payload, deterministic);
   return fleetGraphTraceMetadata({
     rootDocumentId: payload.rootDocumentId,
     documentCount: payload.documentCount,
     edgeCount: payload.edgeCount,
     maxDepthReached: payload.maxDepthReached,
     truncated: payload.truncated,
+    reasoningDocumentCount: compact.documents.length,
     deterministicRedDocuments: deterministic.documents.filter(
       (document) => document.qualityStatus === 'red'
     ).length,
@@ -161,6 +183,35 @@ function buildReasoningTraceMetadata(
       (document) => document.qualityStatus === 'yellow'
     ).length,
   });
+}
+
+function buildCompactReasoningInput(
+  payload: FleetGraphScoringPayload,
+  deterministic: FleetGraphAnalysis
+): FleetGraphCompactReasoningInput {
+  const deterministicById = new Map(
+    deterministic.documents.map((document) => [document.documentId, document])
+  );
+
+  return {
+    rootDocumentId: payload.rootDocumentId,
+    documentCount: payload.documentCount,
+    maxDepthReached: payload.maxDepthReached,
+    truncated: payload.truncated,
+    documents: payload.documents.map((document) => {
+      const deterministicDocument = deterministicById.get(document.id);
+
+      return {
+        documentId: document.id,
+        documentType: document.documentType,
+        title: document.title,
+        text: document.summaryText.slice(0, 1200),
+        currentStatus: deterministicDocument?.qualityStatus ?? 'yellow',
+        currentScore: deterministicDocument?.qualityScore ?? 0.5,
+        deterministicTagKeys: (deterministicDocument?.tags ?? []).map((tag) => tag.key),
+      };
+    }),
+  };
 }
 
 export function mergeReasoningIntoAnalysis(
