@@ -1,46 +1,43 @@
 import { Router, Request, Response } from 'express';
-import { z } from 'zod';
 import { authMiddleware } from '../middleware/auth.js';
-import { createFleetGraphBearerClient, createFleetGraphSessionClient } from '../services/fleetgraph/client.js';
-import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
-import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
 import {
-  createFleetGraphQualityReportDraft,
-  publishFleetGraphQualityReport,
-} from '../services/fleetgraph/report.js';
-import {
-  getFleetGraphReportDetail,
-  getFleetGraphReviewSession,
-  listFleetGraphReports,
-} from '../services/fleetgraph/reports.js';
-import { prepareFleetGraphRun } from '../services/fleetgraph/runner.js';
-import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
-import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
-import { sendFleetGraphDirectorFeedback } from '../services/fleetgraph/feedback.js';
-import { getFleetGraphReadinessStatus } from '../services/fleetgraph/readiness.js';
+  buildInsightsResponse,
+  createReportDraftHandler,
+  deleteReportHandler,
+  directorFeedbackHandler,
+  getQueueStatusHandler,
+  getReadinessHandler,
+  getReportDetailHandler,
+  getReportsHandler,
+  getReviewSessionHandler,
+  nightlyScanHandler,
+  persistInsightsHandler,
+  publishReportHandler,
+  type FleetGraphRouteContext,
+} from './fleetgraph-handlers.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
-const nightlyScanSchema = z.object({
-  createDraftReports: z.boolean().optional(),
-});
-const directorFeedbackSchema = z.object({
-  optionIndex: z.number().int().min(0),
-});
 
-function getInternalBaseUrl(req: Request): string {
-  if (process.env.INTERNAL_API_URL) {
-    return process.env.INTERNAL_API_URL.replace(/\/$/, '');
-  }
-
-  const protocol = req.protocol;
-  const host = req.get('host');
-  return `${protocol}://${host}`;
+function toContext(req: Request): FleetGraphRouteContext {
+  return {
+    workspaceId: req.workspaceId ? String(req.workspaceId) : null,
+    workspaceRole: req.workspaceRole ?? null,
+    isApiToken: req.isApiToken ?? false,
+    isSuperAdmin: req.isSuperAdmin ?? false,
+    headers: req.headers,
+    params: Object.fromEntries(
+      Object.entries(req.params).map(([key, value]) => [key, value ? String(value) : undefined])
+    ),
+    body: req.body,
+    protocol: req.protocol,
+    host: req.get('host') ?? undefined,
+  };
 }
 
 router.get('/documents/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    return res.json(await buildInsightsResponse(req));
+    return res.json(await buildInsightsResponse(toContext(req)));
   } catch (error) {
     console.error('FleetGraph insights error:', error);
     return res.status(500).json({ error: 'Failed to prepare FleetGraph insights' });
@@ -49,7 +46,7 @@ router.get('/documents/:id', authMiddleware, async (req: Request, res: Response)
 
 router.get('/debug/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    return res.json(await buildInsightsResponse(req));
+    return res.json(await buildInsightsResponse(toContext(req)));
   } catch (error) {
     console.error('FleetGraph debug error:', error);
     return res.status(500).json({ error: 'Failed to prepare FleetGraph run' });
@@ -58,10 +55,8 @@ router.get('/debug/:id', authMiddleware, async (req: Request, res: Response) => 
 
 router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const client = createRouteClient(req);
-    return res.json({
-      reports: await listFleetGraphReports(client),
-    });
+    const result = await getReportsHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph report list error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph reports' });
@@ -70,10 +65,8 @@ router.get('/reports', authMiddleware, async (req: Request, res: Response) => {
 
 router.get('/reports/:id', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const client = createRouteClient(req);
-    return res.json({
-      report: await getFleetGraphReportDetail(client, String(req.params.id)),
-    });
+    const result = await getReportDetailHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph report detail error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph report detail' });
@@ -82,10 +75,8 @@ router.get('/reports/:id', authMiddleware, async (req: Request, res: Response) =
 
 router.get('/review-session', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const client = createRouteClient(req);
-    return res.json({
-      session: await getFleetGraphReviewSession(client),
-    });
+    const result = await getReviewSessionHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph review session error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph review session' });
@@ -94,7 +85,8 @@ router.get('/review-session', authMiddleware, async (req: Request, res: Response
 
 router.get('/queue-status', authMiddleware, async (_req: Request, res: Response) => {
   try {
-    return res.json(getFleetGraphQueueStatus());
+    const result = await getQueueStatusHandler();
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph queue status error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph queue status' });
@@ -103,11 +95,8 @@ router.get('/queue-status', authMiddleware, async (_req: Request, res: Response)
 
 router.get('/readiness', authMiddleware, async (req: Request, res: Response) => {
   try {
-    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
-      return res.status(403).json({ error: 'FleetGraph readiness requires workspace admin access' });
-    }
-
-    return res.json(getFleetGraphReadinessStatus());
+    const result = await getReadinessHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph readiness error:', error);
     return res.status(500).json({ error: 'Failed to load FleetGraph readiness' });
@@ -116,13 +105,8 @@ router.get('/readiness', authMiddleware, async (req: Request, res: Response) => 
 
 router.post('/documents/:id/persist', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, analysis } = await buildInsightsContext(req);
-    await persistFleetGraphAnalysis(client, analysis);
-
-    return res.json({
-      persisted: analysis.documents.length,
-      analysis,
-    });
+    const result = await persistInsightsHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph persist error:', error);
     return res.status(500).json({ error: 'Failed to persist FleetGraph analysis' });
@@ -131,13 +115,8 @@ router.post('/documents/:id/persist', authMiddleware, async (req: Request, res: 
 
 router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, analysis } = await buildInsightsContext(req);
-    await persistFleetGraphAnalysis(client, analysis);
-
-    return res.json({
-      persisted: analysis.documents.length,
-      analysis,
-    });
+    const result = await persistInsightsHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph persist error:', error);
     return res.status(500).json({ error: 'Failed to persist FleetGraph analysis' });
@@ -146,31 +125,8 @@ router.post('/debug/:id/persist', authMiddleware, async (req: Request, res: Resp
 
 router.post('/documents/:id/report-draft', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, prepared, analysis } = await buildInsightsContext(req);
-    const existingReportId =
-      typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
-        ? prepared.context.rootDocument.properties.quality_report_id
-        : null;
-
-    if (existingReportId) {
-      return res.json({
-        created: false,
-        reportId: existingReportId,
-      });
-    }
-
-    const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
-    for (const document of analysis.documents) {
-      await client.updateDocumentMetadata(document.documentId, {
-        ...document.metadata,
-        quality_report_id: report.reportId,
-      });
-    }
-
-    return res.json({
-      created: true,
-      reportId: report.reportId,
-    });
+    const result = await createReportDraftHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph report draft error:', error);
     return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
@@ -179,31 +135,8 @@ router.post('/documents/:id/report-draft', authMiddleware, async (req: Request, 
 
 router.post('/debug/:id/report-draft', authMiddleware, async (req: Request, res: Response) => {
   try {
-    const { client, prepared, analysis } = await buildInsightsContext(req);
-    const existingReportId =
-      typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
-        ? prepared.context.rootDocument.properties.quality_report_id
-        : null;
-
-    if (existingReportId) {
-      return res.json({
-        created: false,
-        reportId: existingReportId,
-      });
-    }
-
-    const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
-    for (const document of analysis.documents) {
-      await client.updateDocumentMetadata(document.documentId, {
-        ...document.metadata,
-        quality_report_id: report.reportId,
-      });
-    }
-
-    return res.json({
-      created: true,
-      reportId: report.reportId,
-    });
+    const result = await createReportDraftHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph report draft error:', error);
     return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
@@ -212,33 +145,28 @@ router.post('/debug/:id/report-draft', authMiddleware, async (req: Request, res:
 
 router.post('/reports/:id/publish', authMiddleware, async (req: Request, res: Response) => {
   try {
-    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
-      return res.status(403).json({ error: 'Publishing FleetGraph reports requires workspace admin access' });
-    }
-
-    const client = createRouteClient(req);
-    return res.json(await publishFleetGraphQualityReport(client, String(req.params.id)));
+    const result = await publishReportHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph report publish error:', error);
     return res.status(500).json({ error: 'Failed to publish FleetGraph report' });
   }
 });
 
+router.delete('/reports/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await deleteReportHandler(toContext(req));
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('FleetGraph report delete error:', error);
+    return res.status(500).json({ error: 'Failed to delete FleetGraph report' });
+  }
+});
+
 router.post('/reports/:id/director-feedback', authMiddleware, async (req: Request, res: Response) => {
   try {
-    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
-      return res.status(403).json({ error: 'Sending FleetGraph director feedback requires workspace admin access' });
-    }
-
-    const parsed = directorFeedbackSchema.safeParse(req.body ?? {});
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Invalid FleetGraph director feedback payload', details: parsed.error.flatten() });
-    }
-
-    const client = createRouteClient(req);
-    return res.json(
-      await sendFleetGraphDirectorFeedback(client, String(req.params.id), parsed.data.optionIndex)
-    );
+    const result = await directorFeedbackHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph director feedback error:', error);
     return res.status(500).json({ error: 'Failed to send FleetGraph director feedback' });
@@ -247,67 +175,12 @@ router.post('/reports/:id/director-feedback', authMiddleware, async (req: Reques
 
 router.post('/nightly-scan', authMiddleware, async (req: Request, res: Response) => {
   try {
-    if (!req.isApiToken && !req.isSuperAdmin && req.workspaceRole !== 'admin') {
-      return res.status(403).json({ error: 'FleetGraph nightly scans require workspace admin access' });
-    }
-
-    const parsed = nightlyScanSchema.safeParse(req.body ?? {});
-    if (!parsed.success) {
-      return res.status(400).json({ error: 'Invalid nightly scan payload', details: parsed.error.flatten() });
-    }
-
-    const client = createRouteClient(req);
-    const result = await runFleetGraphWorkspaceScan(client, String(req.workspaceId), parsed.data);
-    return res.json(result);
+    const result = await nightlyScanHandler(toContext(req));
+    return res.status(result.status).json(result.body);
   } catch (error) {
     console.error('FleetGraph nightly scan error:', error);
     return res.status(500).json({ error: 'Failed to run FleetGraph nightly scan' });
   }
 });
-
-async function buildInsightsResponse(req: Request) {
-  const { prepared, analysis } = await buildInsightsContext(req);
-
-  return {
-    ...prepared,
-    analysis,
-  };
-}
-
-async function buildInsightsContext(req: Request) {
-  const client = createRouteClient(req);
-  const prepared = await prepareFleetGraphRun(client, {
-    workspaceId: String(req.workspaceId),
-    documentId: String(req.params.id),
-    source: 'manual',
-  });
-  const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
-
-  return { client, prepared, analysis };
-}
-
-function createRouteClient(req: Request) {
-  const baseUrl = getInternalBaseUrl(req);
-  const authHeader = req.headers.authorization;
-
-  if (authHeader?.startsWith('Bearer ')) {
-    return createFleetGraphBearerClient(baseUrl, authHeader.slice(7));
-  }
-
-  const cookieHeader = req.headers.cookie;
-  const csrfTokenHeader = req.headers['x-csrf-token'];
-  const csrfToken =
-    typeof csrfTokenHeader === 'string'
-      ? csrfTokenHeader
-      : Array.isArray(csrfTokenHeader)
-        ? csrfTokenHeader[0]
-        : null;
-
-  if (!cookieHeader) {
-    throw new Error('Session cookie required for FleetGraph access');
-  }
-
-  return createFleetGraphSessionClient(baseUrl, cookieHeader, csrfToken);
-}
 
 export default router;

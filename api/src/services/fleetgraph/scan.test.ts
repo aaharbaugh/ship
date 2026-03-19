@@ -58,7 +58,9 @@ function createMockClient(): FleetGraphShipApiClient {
     getDocumentAssociations: vi.fn().mockResolvedValue([]),
     getReverseAssociations: vi.fn().mockResolvedValue([]),
     updateDocumentMetadata: vi.fn().mockResolvedValue(undefined),
+    deleteDocument: vi.fn().mockResolvedValue(undefined),
     createQualityReportDraft: vi.fn().mockResolvedValue({ id: 'draft-1' }),
+    updateQualityReportDraft: vi.fn().mockResolvedValue(undefined),
   };
 }
 

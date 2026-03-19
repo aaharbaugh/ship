@@ -49,7 +49,9 @@ export interface FleetGraphShipApiClient {
   getDocumentAssociations(documentId: string): Promise<FleetGraphAssociationRecord[]>;
   getReverseAssociations(documentId: string): Promise<FleetGraphAssociationRecord[]>;
   updateDocumentMetadata(documentId: string, metadata: FleetGraphDocumentMetadata): Promise<void>;
+  deleteDocument(documentId: string): Promise<void>;
   createQualityReportDraft(draft: FleetGraphReportDraft): Promise<{ id: string }>;
+  updateQualityReportDraft(reportId: string, draft: FleetGraphReportDraft): Promise<void>;
 }
 
 export interface FleetGraphShipApiClientConfig {
@@ -157,6 +159,20 @@ export class FleetGraphHttpShipApiClient implements FleetGraphShipApiClient {
     await parseJsonResponse<Record<string, unknown>>(response, `updateDocumentMetadata(${documentId})`);
   }
 
+  async deleteDocument(documentId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/documents/${documentId}`, {
+      method: 'DELETE',
+      headers: buildHeaders(this.authHeaders),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `deleteDocument(${documentId}) failed (${response.status}): ${text.slice(0, 300)}`
+      );
+    }
+  }
+
   async createQualityReportDraft(draft: FleetGraphReportDraft): Promise<{ id: string }> {
     const response = await fetch(`${this.baseUrl}/api/documents`, {
       method: 'POST',
@@ -174,6 +190,24 @@ export class FleetGraphHttpShipApiClient implements FleetGraphShipApiClient {
     });
 
     return parseJsonResponse<{ id: string }>(response, 'createQualityReportDraft');
+  }
+
+  async updateQualityReportDraft(reportId: string, draft: FleetGraphReportDraft): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/api/documents/${reportId}`, {
+      method: 'PATCH',
+      headers: buildHeaders(this.authHeaders),
+      body: JSON.stringify({
+        title: draft.title,
+        content: toTiptapDoc(draft.content),
+        properties: {
+          ...draft.metadata,
+          fleetgraph_report_type: 'quality_report',
+          project_id: draft.projectId ?? null,
+        },
+      }),
+    });
+
+    await parseJsonResponse<Record<string, unknown>>(response, `updateQualityReportDraft(${reportId})`);
   }
 }
 

@@ -24,20 +24,21 @@ function getApiPort(): number {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   const apiPort = getApiPort();
+  const apiTarget = process.env.API_PROXY_TARGET || env.VITE_DEV_PROXY_TARGET || `http://localhost:${apiPort}`;
 
   // Proxy configuration shared between dev and preview servers
   const proxyConfig = {
     '/api': {
-      target: `http://localhost:${apiPort}`,
+      target: apiTarget,
       changeOrigin: true,
     },
     '/collaboration': {
-      target: `http://localhost:${apiPort}`,
+      target: apiTarget,
       changeOrigin: true,
       ws: true,
     },
     '/events': {
-      target: `http://localhost:${apiPort}`,
+      target: apiTarget,
       changeOrigin: true,
       ws: true,
     },

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useEffect, Suspense } from 'react';
+import { useCallback, useMemo, useEffect, Suspense, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UnifiedEditor } from '@/components/UnifiedEditor';
@@ -14,7 +14,6 @@ import {
   useFleetGraphReportDraftMutation,
 } from '@/hooks/useFleetGraphInsightsQuery';
 import {
-  useFleetGraphPublishReportMutation,
   useFleetGraphReportsQuery,
 } from '@/hooks/useFleetGraphReportsQuery';
 import { useDocumentConversion } from '@/hooks/useDocumentConversion';
@@ -42,6 +41,7 @@ import {
 export function UnifiedDocumentPage() {
   const { id, '*': wildcardPath } = useParams<{ id: string; '*'?: string }>();
   const navigate = useNavigate();
+  const [fleetGraphLiveRequested, setFleetGraphLiveRequested] = useState(false);
 
   // Parse wildcard path into tab and nested path
   // Example: /documents/abc/sprints/xyz -> wildcardPath = "sprints/xyz" -> tab = "sprints", nestedPath = "xyz"
@@ -69,11 +69,10 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
-  const fleetGraphInsightsQuery = useFleetGraphInsightsQuery(id);
+  const fleetGraphInsightsQuery = useFleetGraphInsightsQuery(id, fleetGraphLiveRequested);
   const fleetGraphPersistMutation = useFleetGraphPersistMutation(id);
   const fleetGraphReportDraftMutation = useFleetGraphReportDraftMutation(id);
   const fleetGraphReportsQuery = useFleetGraphReportsQuery();
-  const fleetGraphPublishReportMutation = useFleetGraphPublishReportMutation();
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -494,6 +493,10 @@ export function UnifiedDocumentPage() {
     };
   }, [document?.properties]);
 
+  useEffect(() => {
+    setFleetGraphLiveRequested(false);
+  }, [id]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -568,34 +571,43 @@ export function UnifiedDocumentPage() {
 
   // Non-tabbed documents render directly in editor
   return (
-    <div className="flex h-full flex-col">
-      <FleetGraphInsightsPanel
-        data={fleetGraphInsightsQuery.data}
-        isLoading={fleetGraphInsightsQuery.isLoading}
-        error={fleetGraphInsightsQuery.error as Error | null}
-        persisted={persistedFleetGraph}
-        onPersist={() => fleetGraphPersistMutation.mutate()}
-        isPersisting={fleetGraphPersistMutation.isPending}
-        onCreateReportDraft={() => fleetGraphReportDraftMutation.mutate()}
-        isCreatingReportDraft={fleetGraphReportDraftMutation.isPending}
-        onPublishReport={(reportId) => fleetGraphPublishReportMutation.mutate(reportId)}
-        isPublishingReport={fleetGraphPublishReportMutation.isPending}
-        reports={fleetGraphReportsQuery.data}
+    <div className="min-h-0 flex-1">
+      <UnifiedEditor
+        document={unifiedDocument}
+        sidebarData={sidebarData}
+        onUpdate={handleUpdate}
+        onTypeChange={handleTypeChange}
+        onDocumentConverted={handleDocumentConverted}
+        onBack={hideBackButton ? undefined : handleBack}
+        backLabel={hideBackButton ? undefined : backLabel}
+        onDelete={handleDelete}
+        showTypeSelector={true}
+        titleSuffix={standupAuthorName}
+        headerBadge={
+          <FleetGraphInsightsPanel
+            data={fleetGraphInsightsQuery.data}
+            isLoading={fleetGraphInsightsQuery.isLoading}
+            error={fleetGraphInsightsQuery.error as Error | null}
+            persisted={persistedFleetGraph}
+            liveAnalysisRequested={fleetGraphLiveRequested}
+            onRequestLiveAnalysis={() => setFleetGraphLiveRequested(true)}
+            onPersist={() => fleetGraphPersistMutation.mutate()}
+            isPersisting={fleetGraphPersistMutation.isPending}
+            onCreateReportDraft={() =>
+              fleetGraphReportDraftMutation.mutate(undefined, {
+                onSuccess: (result) => {
+                  if (result?.reportId) {
+                    navigate(`/team/reviews/fleetgraph/${result.reportId}`);
+                  }
+                },
+              })
+            }
+            onOpenReport={(reportId) => navigate(`/team/reviews/fleetgraph/${reportId}`)}
+            isCreatingReportDraft={fleetGraphReportDraftMutation.isPending}
+            reports={fleetGraphReportsQuery.data}
+          />
+        }
       />
-      <div className="min-h-0 flex-1">
-        <UnifiedEditor
-          document={unifiedDocument}
-          sidebarData={sidebarData}
-          onUpdate={handleUpdate}
-          onTypeChange={handleTypeChange}
-          onDocumentConverted={handleDocumentConverted}
-          onBack={hideBackButton ? undefined : handleBack}
-          backLabel={hideBackButton ? undefined : backLabel}
-          onDelete={handleDelete}
-          showTypeSelector={true}
-          titleSuffix={standupAuthorName}
-        />
-      </div>
     </div>
   );
 }

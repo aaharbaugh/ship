@@ -42,7 +42,6 @@ const UnifiedDocumentPage = lazy(async () => ({ default: (await import('@/pages/
 const StatusOverviewPage = lazy(async () => ({ default: (await import('@/pages/StatusOverviewPage')).StatusOverviewPage }));
 const ReviewsPage = lazy(async () => ({ default: (await import('@/pages/ReviewsPage')).ReviewsPage }));
 const FleetGraphReportsPage = lazy(async () => ({ default: (await import('@/pages/FleetGraphReportsPage')).FleetGraphReportsPage }));
-const FleetGraphReviewSessionPage = lazy(async () => ({ default: (await import('@/pages/FleetGraphReviewSessionPage')).FleetGraphReviewSessionPage }));
 const FleetGraphReportDetailPage = lazy(async () => ({ default: (await import('@/pages/FleetGraphReportDetailPage')).FleetGraphReportDetailPage }));
 const OrgChartPage = lazy(async () => ({ default: (await import('@/pages/OrgChartPage')).OrgChartPage }));
 const InviteAcceptPage = lazy(async () => ({ default: (await import('@/pages/InviteAccept')).InviteAcceptPage }));
@@ -251,7 +250,6 @@ function AppRoutes() {
         <Route path="team/status" element={<StatusOverviewPage />} />
         <Route path="team/reviews" element={<ReviewsPage />} />
         <Route path="team/reviews/fleetgraph" element={<FleetGraphReportsPage />} />
-        <Route path="team/reviews/fleetgraph/session" element={<FleetGraphReviewSessionPage />} />
         <Route path="team/reviews/fleetgraph/:id" element={<FleetGraphReportDetailPage />} />
         <Route path="team/org-chart" element={<OrgChartPage />} />
         {/* Person profile stays in Teams context - no redirect to /documents */}

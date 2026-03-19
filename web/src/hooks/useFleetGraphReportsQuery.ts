@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiDelete, apiGet, apiPost } from '@/lib/api';
 
 export interface FleetGraphReportListItem {
   id: string;
@@ -277,6 +277,32 @@ export function useFleetGraphBulkPublishReportsMutation() {
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
         queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
         queryClient.invalidateQueries({ queryKey: ['document'] }),
+      ]);
+    },
+  });
+}
+
+export function useFleetGraphBulkDeleteReportsMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (reportIds: string[]) => {
+      return Promise.all(
+        reportIds.map(async (reportId) => {
+          const response = await apiDelete(`/api/fleetgraph/reports/${reportId}`);
+          if (!response.ok) {
+            throw new Error(`Failed to delete FleetGraph report ${reportId}`);
+          }
+        })
+      );
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+        queryClient.invalidateQueries({ queryKey: ['fleetgraph-review-session'] }),
+        queryClient.invalidateQueries({ queryKey: ['document'] }),
+        queryClient.invalidateQueries({ queryKey: ['documents'] }),
       ]);
     },
   });

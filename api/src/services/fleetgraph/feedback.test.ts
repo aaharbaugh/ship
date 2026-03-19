@@ -47,7 +47,9 @@ describe('FleetGraph director feedback', () => {
       getDocumentAssociations: vi.fn(),
       getReverseAssociations: vi.fn(),
       updateDocumentMetadata,
+      deleteDocument: vi.fn(),
       createQualityReportDraft: vi.fn(),
+      updateQualityReportDraft: vi.fn(),
     } satisfies FleetGraphShipApiClient;
 
     const result = await sendFleetGraphDirectorFeedback(client, 'report-1', 0);

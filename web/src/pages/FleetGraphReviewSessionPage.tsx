@@ -51,8 +51,7 @@ export function FleetGraphReviewSessionPage() {
           </div>
           <h1 className="mt-2 text-3xl font-semibold text-white">Review Session</h1>
           <p className="mt-2 max-w-3xl text-sm text-slate-400">
-            Review the current FleetGraph batch as one working set. Triage high-risk findings,
-            publish ready drafts in bulk, and only drill into a report when you need the full context.
+            Review the current FleetGraph batch as one working set. Triage the highest-risk findings first, then publish the drafts that are ready.
           </p>
         </div>
 
@@ -61,7 +60,7 @@ export function FleetGraphReviewSessionPage() {
             to="/team/reviews/fleetgraph"
             className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
           >
-            Open Report Queue
+            Back To Queue
           </Link>
           <button
             type="button"
@@ -74,7 +73,7 @@ export function FleetGraphReviewSessionPage() {
             }
             className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
           >
-            {allDraftsSelected ? 'Clear Draft Selection' : 'Select All Draft Reports'}
+            {allDraftsSelected ? 'Clear Selection' : 'Select Drafts'}
           </button>
           <button
             type="button"
@@ -89,19 +88,14 @@ export function FleetGraphReviewSessionPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-6">
-        <SummaryCard label="Reports" value={String(sessionQuery.data.totalReports)} />
-        <SummaryCard label="Findings" value={String(sessionQuery.data.totalFindings)} />
-        <SummaryCard label="Red" value={String(sessionQuery.data.redFindings)} tone="red" />
-        <SummaryCard label="Yellow" value={String(sessionQuery.data.yellowFindings)} tone="yellow" />
-        <SummaryCard label="Drafts" value={String(sessionQuery.data.draftReports)} />
-        <SummaryCard label="Published" value={String(sessionQuery.data.publishedReports)} tone="green" />
+      <div className="text-sm text-slate-400">
+        {sessionQuery.data.totalReports} reports · {sessionQuery.data.totalFindings} findings · {sessionQuery.data.redFindings} red · {sessionQuery.data.yellowFindings} yellow
       </div>
 
       <section className="grid gap-4 xl:grid-cols-3">
         <FindingLane
           title="Red Findings"
-          subtitle="Highest-risk items across the current review chunk."
+          subtitle="Highest-risk items."
           findings={grouped.red}
           selectedReportIds={selectedReportIds}
           onToggleReportId={(reportId) =>
@@ -114,7 +108,7 @@ export function FleetGraphReviewSessionPage() {
         />
         <FindingLane
           title="Yellow Findings"
-          subtitle="Needs tightening, but not yet at critical risk."
+          subtitle="Needs tightening."
           findings={grouped.yellow}
           selectedReportIds={selectedReportIds}
           onToggleReportId={(reportId) =>
@@ -127,7 +121,7 @@ export function FleetGraphReviewSessionPage() {
         />
         <FindingLane
           title="Other Findings"
-          subtitle="Lower-signal items that still belong in the batch."
+          subtitle="Everything else."
           findings={grouped.other}
           selectedReportIds={selectedReportIds}
           onToggleReportId={(reportId) =>
@@ -239,13 +233,7 @@ function FindingLane({
                     to={`/team/reviews/fleetgraph/${finding.reportId}`}
                     className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
                   >
-                    Review
-                  </Link>
-                  <Link
-                    to={`/documents/${finding.focusDocumentId}`}
-                    className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
-                  >
-                    Open Doc
+                    Open
                   </Link>
                 </div>
               </div>
@@ -277,32 +265,6 @@ function StatusBadge({
     >
       {status} {Math.round(score * 100)}%
     </span>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: 'red' | 'yellow' | 'green';
-}) {
-  const toneClass =
-    tone === 'red'
-      ? 'border-red-500/30 bg-red-500/10 text-red-200'
-      : tone === 'yellow'
-        ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-200'
-        : tone === 'green'
-          ? 'border-green-500/30 bg-green-500/10 text-green-200'
-          : 'border-slate-800 bg-slate-950 text-white';
-
-  return (
-    <div className={cn('rounded-2xl border p-4 shadow-sm shadow-black/30', toneClass)}>
-      <div className="text-xs font-medium uppercase tracking-wide opacity-80">{label}</div>
-      <div className="mt-2 text-2xl font-semibold">{value}</div>
-    </div>
   );
 }
 

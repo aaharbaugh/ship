@@ -95,11 +95,14 @@ async function fetchFleetGraphInsights(documentId: string): Promise<FleetGraphIn
   return res.json();
 }
 
-export function useFleetGraphInsightsQuery(documentId: string | undefined) {
+export function useFleetGraphInsightsQuery(
+  documentId: string | undefined,
+  enabled = true
+) {
   return useQuery({
     queryKey: fleetGraphInsightsKeys.detail(documentId || ''),
     queryFn: () => fetchFleetGraphInsights(documentId!),
-    enabled: !!documentId,
+    enabled: enabled && !!documentId,
     staleTime: 30_000,
   });
 }
@@ -133,7 +136,7 @@ export function useFleetGraphReportDraftMutation(documentId: string | undefined)
       if (!res.ok) {
         throw new Error('Failed to create FleetGraph report draft');
       }
-      return res.json() as Promise<{ created: boolean; reportId: string }>;
+      return res.json() as Promise<{ created: boolean; updated: boolean; reportId: string }>;
     },
     onSuccess: async () => {
       await Promise.all([

@@ -181,6 +181,7 @@ export function AppLayout() {
   const isMyWeekPage = location.pathname.startsWith('/my-week');
   const isWeeklyDoc = currentDocumentType === 'weekly_plan' || currentDocumentType === 'weekly_retro';
   const isStandup = currentDocumentType === 'standup';
+  const isFleetGraphReportsRoute = location.pathname.startsWith('/team/reviews/fleetgraph');
   const hideLeftSidebar = isMyWeekPage || isWeeklyDoc || isStandup;
 
   // Get the active document ID from URL - works for /documents/:id and legacy routes
@@ -358,6 +359,12 @@ export function AppLayout() {
               label="Dashboard"
               active={activeMode === 'dashboard'}
               onClick={() => handleModeClick('dashboard')}
+            />
+            <RailIcon
+              icon={<LightbulbIcon />}
+              label="FleetGraph Reports"
+              active={isFleetGraphReportsRoute}
+              onClick={() => navigate('/team/reviews/fleetgraph')}
             />
             <RailIcon
               icon={<DocsIcon />}
@@ -1774,6 +1781,14 @@ function DashboardIcon() {
   return (
     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v5a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
+    </svg>
+  );
+}
+
+function LightbulbIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 18h6M10 22h4M8.5 14.5A6.5 6.5 0 1115.5 14.5c-.63.62-1.13 1.11-1.45 1.55-.31.44-.55.91-.72 1.45h-2.66c-.17-.54-.41-1.01-.72-1.45-.32-.44-.82-.93-1.45-1.55z" />
     </svg>
   );
 }

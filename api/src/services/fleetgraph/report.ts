@@ -14,12 +14,26 @@ export interface FleetGraphPublishReportResult {
   publishedAt: string;
 }
 
+export interface FleetGraphDeleteReportResult {
+  reportId: string;
+  clearedDocumentIds: string[];
+}
+
 export async function createFleetGraphQualityReportDraft(
   client: FleetGraphShipApiClient,
   prepared: FleetGraphPreparedRun,
   analysis: FleetGraphAnalysis
 ): Promise<FleetGraphDraftReportResult> {
   return tracedCreateFleetGraphQualityReportDraft(client, prepared, analysis);
+}
+
+export async function updateFleetGraphQualityReportDraft(
+  client: FleetGraphShipApiClient,
+  reportId: string,
+  prepared: FleetGraphPreparedRun,
+  analysis: FleetGraphAnalysis
+): Promise<FleetGraphDraftReportResult> {
+  return tracedUpdateFleetGraphQualityReportDraft(client, reportId, prepared, analysis);
 }
 
 const tracedCreateFleetGraphQualityReportDraft = traceable(
@@ -58,11 +72,55 @@ const tracedCreateFleetGraphQualityReportDraft = traceable(
   fleetGraphTraceConfig('fleetgraph.create_quality_report_draft')
 );
 
+const tracedUpdateFleetGraphQualityReportDraft = traceable(
+  async function updateQualityReportDraft(
+    client: FleetGraphShipApiClient,
+    reportId: string,
+    prepared: FleetGraphPreparedRun,
+    analysis: FleetGraphAnalysis
+  ): Promise<FleetGraphDraftReportResult> {
+    const rootAnalysis =
+      analysis.documents.find((document) => document.documentId === prepared.rootDocumentId) ??
+      analysis.documents[0];
+
+    if (!rootAnalysis) {
+      throw new Error('Cannot update FleetGraph quality report draft without a root document analysis');
+    }
+
+    await client.updateQualityReportDraft(reportId, {
+      title: `FleetGraph Quality Report: ${prepared.context.rootDocument.title}`,
+      content: buildQualityReportContent(prepared, analysis, rootAnalysis.summary),
+      projectId: prepared.rootDocumentId,
+      metadata: {
+        fleetgraph_root_document_id: prepared.rootDocumentId,
+        fleetgraph_trigger_source: prepared.triggerSource,
+        fleetgraph_report_state: 'draft',
+        quality_status: rootAnalysis.qualityStatus,
+        quality_score: rootAnalysis.qualityScore,
+        fleetgraph_report_mode: analysis.mode,
+        fleetgraph_report_model: analysis.model,
+        fleetgraph_generated_at: analysis.generatedAt,
+        fleetgraph_director_response_options: buildDirectorResponseOptions(prepared, analysis),
+      },
+    });
+
+    return { reportId };
+  },
+  fleetGraphTraceConfig('fleetgraph.update_quality_report_draft')
+);
+
 export async function publishFleetGraphQualityReport(
   client: FleetGraphShipApiClient,
   reportId: string
 ): Promise<FleetGraphPublishReportResult> {
   return tracedPublishFleetGraphQualityReport(client, reportId);
+}
+
+export async function deleteFleetGraphQualityReport(
+  client: FleetGraphShipApiClient,
+  reportId: string
+): Promise<FleetGraphDeleteReportResult> {
+  return tracedDeleteFleetGraphQualityReport(client, reportId);
 }
 
 function buildDirectorResponseOptions(
@@ -136,6 +194,39 @@ const tracedPublishFleetGraphQualityReport = traceable(
     };
   },
   fleetGraphTraceConfig('fleetgraph.publish_quality_report')
+);
+
+const tracedDeleteFleetGraphQualityReport = traceable(
+  async function deleteQualityReport(
+    client: FleetGraphShipApiClient,
+    reportId: string
+  ): Promise<FleetGraphDeleteReportResult> {
+    const report = await client.getDocument(reportId);
+
+    if (report.properties.fleetgraph_report_type !== 'quality_report') {
+      throw new Error('FleetGraph delete requires a quality report document');
+    }
+
+    const documents = await client.listDocuments();
+    const linkedDocuments = documents.filter(
+      (document) => document.properties.quality_report_id === reportId
+    );
+
+    for (const document of linkedDocuments) {
+      const nextMetadata = { ...(document.properties ?? {}) };
+      delete nextMetadata.quality_report_id;
+
+      await client.updateDocumentMetadata(document.id, nextMetadata);
+    }
+
+    await client.deleteDocument(reportId);
+
+    return {
+      reportId,
+      clearedDocumentIds: linkedDocuments.map((document) => document.id),
+    };
+  },
+  fleetGraphTraceConfig('fleetgraph.delete_quality_report')
 );
 
 function buildQualityReportContent(

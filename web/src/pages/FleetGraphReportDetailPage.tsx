@@ -20,8 +20,9 @@ export function FleetGraphReportDetailPage() {
   const detailQuery = useFleetGraphReportDetailQuery(id);
   const publishMutation = useFleetGraphPublishReportMutation();
   const directorFeedbackMutation = useFleetGraphDirectorFeedbackMutation();
+  const [liveSnapshotRequested, setLiveSnapshotRequested] = useState(false);
   const rootDocumentId = detailQuery.data?.rootDocument?.id ?? detailQuery.data?.report.rootDocumentId ?? undefined;
-  const insightsQuery = useFleetGraphInsightsQuery(rootDocumentId);
+  const insightsQuery = useFleetGraphInsightsQuery(rootDocumentId, liveSnapshotRequested);
   const [selectedNodeId, setSelectedNodeId] = useState<string | undefined>(rootDocumentId);
   const [pendingAction, setPendingAction] = useState<
     | null
@@ -41,6 +42,10 @@ export function FleetGraphReportDetailPage() {
       setSelectedNodeId((current) => current ?? rootDocumentId);
     }
   }, [rootDocumentId]);
+
+  useEffect(() => {
+    setLiveSnapshotRequested(false);
+  }, [id]);
 
   const report = detailQuery.data?.report;
   const graph = insightsQuery.data?.graph;
@@ -83,6 +88,11 @@ export function FleetGraphReportDetailPage() {
             </span>
             <span>Generated {formatFleetGraphTimestamp(report.generatedAt)}</span>
             {report.publishedAt && <span>Published {formatFleetGraphTimestamp(report.publishedAt)}</span>}
+            {report.rootDocumentId && (
+              <Link to={`/documents/${report.rootDocumentId}`} className="text-white underline underline-offset-4 hover:text-slate-200">
+                Open root document
+              </Link>
+            )}
           </div>
         </div>
 
@@ -93,20 +103,6 @@ export function FleetGraphReportDetailPage() {
           >
             Back To Queue
           </Link>
-          <Link
-            to={`/documents/${report.id}`}
-            className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
-          >
-            Open Raw Report Doc
-          </Link>
-          {report.rootDocumentId && (
-            <Link
-              to={`/documents/${report.rootDocumentId}`}
-              className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
-            >
-              Open Root Document
-            </Link>
-          )}
           {report.state === 'draft' && (
             <button
               type="button"
@@ -125,21 +121,9 @@ export function FleetGraphReportDetailPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <SummaryCard label="Report State" value={report.state} />
-        <SummaryCard label="Root Doc" value={report.rootDocumentTitle ?? 'Unknown'} />
-        <SummaryCard
-          label="Target Docs"
-          value={String(detailQuery.data.targetDocuments.length)}
-        />
-        <SummaryCard
-          label="Director Feedback"
-          value={
-            report.directorFeedbackSentAt
-              ? formatFleetGraphTimestamp(report.directorFeedbackSentAt)
-              : 'Not sent'
-          }
-        />
+      <div className="text-sm text-slate-400">
+        Root: {report.rootDocumentTitle ?? 'Unknown'} · {detailQuery.data.targetDocuments.length} target document{detailQuery.data.targetDocuments.length === 1 ? '' : 's'}
+        {report.directorFeedbackSentAt ? ` · feedback sent ${formatFleetGraphTimestamp(report.directorFeedbackSentAt)}` : ''}
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
@@ -252,7 +236,7 @@ export function FleetGraphReportDetailPage() {
                           }
                           className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
                         >
-                          Send Feedback
+                          Send
                         </button>
                       )}
                     </div>
@@ -266,7 +250,20 @@ export function FleetGraphReportDetailPage() {
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <PanelCard title="Live Graph Snapshot">
-          {insightsQuery.isLoading ? (
+          {!liveSnapshotRequested ? (
+            <div className="space-y-3">
+              <div className="text-sm text-slate-500">
+                This report already includes persisted FleetGraph findings. Load a fresh snapshot only if you want to recompute the current graph.
+              </div>
+              <button
+                type="button"
+                onClick={() => setLiveSnapshotRequested(true)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+              >
+                Load Live Snapshot
+              </button>
+            </div>
+          ) : insightsQuery.isLoading ? (
             <div className="text-sm text-slate-500">Loading live FleetGraph insights...</div>
           ) : graph ? (
             <div className="space-y-4">
@@ -289,7 +286,11 @@ export function FleetGraphReportDetailPage() {
         </PanelCard>
 
         <PanelCard title="Live Findings">
-          {selectedNode && selectedAnalysis ? (
+          {!liveSnapshotRequested ? (
+            <div className="text-sm text-slate-500">
+              Live findings are available after you load a fresh snapshot.
+            </div>
+          ) : selectedNode && selectedAnalysis ? (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm font-medium text-white">{selectedNode.title}</div>
@@ -400,15 +401,6 @@ function PanelCard({
       <h2 className="text-sm font-semibold uppercase tracking-wide text-white">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
-  );
-}
-
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 shadow-sm shadow-black/30">
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className="mt-2 text-lg font-semibold text-white">{value}</div>
-    </div>
   );
 }
 
