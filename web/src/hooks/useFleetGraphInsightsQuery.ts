@@ -81,6 +81,16 @@ export interface FleetGraphInsightsResponse {
   };
 }
 
+export interface FleetGraphChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface FleetGraphChatResponse {
+  answer: string;
+  suggestedPrompts: string[];
+}
+
 export const fleetGraphInsightsKeys = {
   all: ['fleetgraph-insights'] as const,
   detail: (id: string) => [...fleetGraphInsightsKeys.all, id] as const,
@@ -145,6 +155,27 @@ export function useFleetGraphReportDraftMutation(documentId: string | undefined)
         queryClient.invalidateQueries({ queryKey: ['document', documentId] }),
         queryClient.invalidateQueries({ queryKey: ['documents'] }),
       ]);
+    },
+  });
+}
+
+export function useFleetGraphChatMutation(documentId: string | undefined) {
+  return useMutation({
+    mutationFn: async ({
+      question,
+      history,
+    }: {
+      question: string;
+      history: FleetGraphChatMessage[];
+    }) => {
+      const res = await apiPost(`/api/fleetgraph/documents/${documentId}/chat`, {
+        question,
+        history,
+      });
+      if (!res.ok) {
+        throw new Error('Failed to answer FleetGraph question');
+      }
+      return res.json() as Promise<FleetGraphChatResponse>;
     },
   });
 }

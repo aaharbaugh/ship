@@ -22,6 +22,7 @@ import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
 import { sendFleetGraphDirectorFeedback } from '../services/fleetgraph/feedback.js';
 import { getFleetGraphReadinessStatus } from '../services/fleetgraph/readiness.js';
+import { answerFleetGraphQuestion, type FleetGraphChatMessage } from '../services/fleetgraph/chat.js';
 
 const nightlyScanSchema = z.object({
   createDraftReports: z.boolean().optional(),
@@ -29,6 +30,16 @@ const nightlyScanSchema = z.object({
 
 const directorFeedbackSchema = z.object({
   optionIndex: z.number().int().min(0),
+});
+
+const chatRequestSchema = z.object({
+  question: z.string().trim().min(1).max(2000),
+  history: z.array(
+    z.object({
+      role: z.enum(['user', 'assistant']),
+      content: z.string().trim().min(1).max(4000),
+    })
+  ).max(12).optional(),
 });
 
 export interface FleetGraphRouteContext {
@@ -204,6 +215,23 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
     updated: false,
     reportId: report.reportId,
   });
+}
+
+export async function chatHandler(context: FleetGraphRouteContext) {
+  const parsed = chatRequestSchema.safeParse(context.body ?? {});
+  if (!parsed.success) {
+    return error(400, 'Invalid FleetGraph chat payload', parsed.error.flatten());
+  }
+
+  const { prepared, analysis } = await buildInsightsContext(context);
+  return ok(
+    await answerFleetGraphQuestion(
+      prepared,
+      analysis,
+      parsed.data.question,
+      (parsed.data.history ?? []) as FleetGraphChatMessage[]
+    )
+  );
 }
 
 export async function publishReportHandler(context: FleetGraphRouteContext) {

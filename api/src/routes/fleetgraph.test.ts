@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => {
     getFleetGraphQueueStatus: vi.fn(),
     sendFleetGraphDirectorFeedback: vi.fn(),
     getFleetGraphReadinessStatus: vi.fn(),
+    answerFleetGraphQuestion: vi.fn(),
   };
 });
 
@@ -87,7 +88,12 @@ vi.mock('../services/fleetgraph/readiness.js', () => ({
   getFleetGraphReadinessStatus: mocks.getFleetGraphReadinessStatus,
 }));
 
+vi.mock('../services/fleetgraph/chat.js', () => ({
+  answerFleetGraphQuestion: mocks.answerFleetGraphQuestion,
+}));
+
 import {
+  chatHandler,
   createReportDraftHandler,
   deleteReportHandler,
   directorFeedbackHandler,
@@ -228,6 +234,10 @@ describe('FleetGraph route handlers', () => {
     mocks.updateFleetGraphQualityReportDraft.mockResolvedValue({
       reportId: 'report-existing',
     });
+    mocks.answerFleetGraphQuestion.mockResolvedValue({
+      answer: 'Start by tightening the acceptance criteria.',
+      suggestedPrompts: ['What should I fix first?'],
+    });
 
     const response = await createReportDraftHandler(
       createContext({
@@ -278,6 +288,57 @@ describe('FleetGraph route handlers', () => {
     expect(response.body).toEqual({
       reportId: 'report-1',
       clearedDocumentIds: ['project-1'],
+    });
+  });
+
+  it('answers a contextual FleetGraph chat question', async () => {
+    mocks.prepareFleetGraphRun.mockResolvedValue({
+      rootDocumentId: 'project-1',
+      triggerSource: 'manual',
+      graph: {
+        nodes: [],
+        edges: [],
+        metadata: {
+          maxDepthReached: 1,
+          truncated: false,
+          depthLimit: 3,
+          documentLimit: 25,
+        },
+      },
+      scoringPayload: { documents: [] },
+      context: {
+        rootDocument: {
+          id: 'project-1',
+          title: 'Project Alpha',
+          properties: {},
+        },
+      },
+    });
+    mocks.analyzeFleetGraphWithReasoning.mockResolvedValue({
+      generatedAt: '2026-03-18T02:00:00.000Z',
+      rootDocumentId: 'project-1',
+      mode: 'deterministic',
+      model: null,
+      executiveSummary: 'Project Alpha is not ready to execute yet.',
+      remediationSuggestions: [],
+      documents: [],
+    });
+
+    const response = await chatHandler(
+      createContext({
+        params: { id: 'project-1' },
+        body: {
+          question: 'What should I fix first?',
+          history: [],
+        },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.answerFleetGraphQuestion).toHaveBeenCalledTimes(1);
+    expect(response.body).toEqual({
+      answer: 'Start by tightening the acceptance criteria.',
+      suggestedPrompts: ['What should I fix first?'],
     });
   });
 

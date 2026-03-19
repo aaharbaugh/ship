@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import {
   buildInsightsResponse,
+  chatHandler,
   createReportDraftHandler,
   deleteReportHandler,
   directorFeedbackHandler,
@@ -130,6 +131,16 @@ router.post('/documents/:id/report-draft', authMiddleware, async (req: Request, 
   } catch (error) {
     console.error('FleetGraph report draft error:', error);
     return res.status(500).json({ error: 'Failed to create FleetGraph quality report draft' });
+  }
+});
+
+router.post('/documents/:id/chat', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await chatHandler(toContext(req));
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('FleetGraph chat error:', error);
+    return res.status(500).json({ error: 'Failed to answer FleetGraph question' });
   }
 });
 

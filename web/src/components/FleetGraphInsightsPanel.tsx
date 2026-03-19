@@ -1,7 +1,11 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
-import type { FleetGraphInsightsResponse } from '@/hooks/useFleetGraphInsightsQuery';
+import {
+  useFleetGraphChatMutation,
+  type FleetGraphChatMessage,
+  type FleetGraphInsightsResponse,
+} from '@/hooks/useFleetGraphInsightsQuery';
 import type { FleetGraphReportListItem } from '@/hooks/useFleetGraphReportsQuery';
 
 export interface PersistedFleetGraphView {
@@ -31,6 +35,7 @@ const STATUS_DOT_STYLES: Record<'green' | 'yellow' | 'red', string> = {
 };
 
 export function FleetGraphInsightsPanel({
+  documentId,
   data,
   isLoading,
   error,
@@ -44,6 +49,7 @@ export function FleetGraphInsightsPanel({
   isCreatingReportDraft,
   reports,
 }: {
+  documentId: string;
   data?: FleetGraphInsightsResponse;
   isLoading: boolean;
   error?: Error | null;
@@ -58,6 +64,10 @@ export function FleetGraphInsightsPanel({
   reports?: FleetGraphReportListItem[];
 }) {
   const [open, setOpen] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [messages, setMessages] = useState<FleetGraphChatMessage[]>([]);
+  const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const chatMutation = useFleetGraphChatMutation(documentId);
   const qualityReportId = persisted?.qualityReportId ?? null;
   const linkedReport = reports?.find((report) => report.id === qualityReportId);
   const primaryDocument =
@@ -100,6 +110,54 @@ export function FleetGraphInsightsPanel({
           ? 'Creating Report...'
           : 'Create Report'
         : null;
+
+  useEffect(() => {
+    setMessages([]);
+    setChatInput('');
+    setSuggestedPrompts(
+      data
+        ? getSeedPrompts(data)
+        : ['What is the biggest risk here?', 'What should I fix first?', 'Is this ready to execute?']
+    );
+  }, [documentId, data]);
+
+  const submitChatQuestion = (question: string) => {
+    const trimmed = question.trim();
+    if (!trimmed || chatMutation.isPending) {
+      return;
+    }
+
+    const nextHistory = [...messages, { role: 'user' as const, content: trimmed }];
+    setMessages(nextHistory);
+    setChatInput('');
+
+    chatMutation.mutate(
+      {
+        question: trimmed,
+        history: messages.slice(-5),
+      },
+      {
+        onSuccess: (result) => {
+          setMessages((current) => [
+            ...current,
+            { role: 'assistant', content: result.answer },
+          ]);
+          if (result.suggestedPrompts.length > 0) {
+            setSuggestedPrompts(result.suggestedPrompts);
+          }
+        },
+        onError: () => {
+          setMessages((current) => [
+            ...current,
+            {
+              role: 'assistant',
+              content: 'FleetGraph could not answer that right now. Try rerunning the review or asking a narrower question.',
+            },
+          ]);
+        },
+      }
+    );
+  };
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -238,6 +296,76 @@ export function FleetGraphInsightsPanel({
             </div>
           )}
 
+          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Ask FleetGraph
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestedPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => submitChatQuestion(prompt)}
+                  disabled={chatMutation.isPending}
+                  className="rounded-full border border-slate-700 bg-black px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 space-y-3">
+              {messages.length === 0 ? (
+                <div className="rounded-lg border border-slate-800 bg-black p-3 text-xs leading-5 text-slate-500">
+                  Ask what is blocking execution, what to fix first, or whether this document is ready to move.
+                </div>
+              ) : (
+                messages.map((message, index) => (
+                  <div
+                    key={`${message.role}-${index}`}
+                    className={cn(
+                      'rounded-lg border p-3 text-sm leading-6',
+                      message.role === 'user'
+                        ? 'border-slate-700 bg-black text-slate-100'
+                        : 'border-slate-800 bg-slate-900 text-slate-200'
+                    )}
+                  >
+                    <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">
+                      {message.role === 'user' ? 'You' : 'FleetGraph'}
+                    </div>
+                    <div>{message.content}</div>
+                  </div>
+                ))
+              )}
+              {chatMutation.isPending && (
+                <div className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-slate-400">
+                  FleetGraph is reviewing the current context...
+                </div>
+              )}
+            </div>
+            <form
+              className="mt-3 flex gap-2"
+              onSubmit={(event) => {
+                event.preventDefault();
+                submitChatQuestion(chatInput);
+              }}
+            >
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(event) => setChatInput(event.target.value)}
+                placeholder="Ask about risks, readiness, or next steps"
+                className="h-10 flex-1 rounded-md border border-slate-800 bg-black px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-600"
+              />
+              <button
+                type="submit"
+                disabled={chatMutation.isPending || chatInput.trim().length === 0}
+                className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+
           <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500">
             <div>
               {error
@@ -261,6 +389,17 @@ export function FleetGraphInsightsPanel({
       </Dialog.Portal>
     </Dialog.Root>
   );
+}
+
+function getSeedPrompts(data: FleetGraphInsightsResponse): string[] {
+  const rootDocument = data.graph.nodes.find((node) => node.id === data.rootDocumentId);
+  const typeLabel = rootDocument?.documentType ?? 'document';
+
+  return [
+    `What is the biggest risk in this ${typeLabel}?`,
+    'What should I fix first?',
+    'Is this ready to execute?',
+  ];
 }
 
 function buildConciseSuggestions(

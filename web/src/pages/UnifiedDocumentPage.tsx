@@ -585,6 +585,7 @@ export function UnifiedDocumentPage() {
         titleSuffix={standupAuthorName}
         headerBadge={
           <FleetGraphInsightsPanel
+            documentId={id!}
             data={fleetGraphInsightsQuery.data}
             isLoading={fleetGraphInsightsQuery.isLoading}
             error={fleetGraphInsightsQuery.error as Error | null}

@@ -16,6 +16,7 @@ Current MVP status:
 - LangSmith tracing is wired into the runtime and GPT-4o reasoning path.
 - On-demand report refresh now updates the report artifact and root linkage without rewriting metadata across the full scanned subtree.
 - PM-facing outputs now include an executive summary for the scanned graph in addition to per-document findings.
+- The document-level FleetGraph popup now includes embedded contextual chat tied to the current document view.
 
 ## MVP Checklist
 
@@ -44,6 +45,7 @@ For the current on-demand UX, FleetGraph is primarily positioned as a contextual
 - it scans the nearby work graph
 - it produces one executive summary plus supporting findings
 - it can refresh or draft a report for that root context
+- it includes an embedded chat surface for document-scoped follow-up questions like risk, readiness, and next steps
 
 For MVP, FleetGraph is allowed to:
 
