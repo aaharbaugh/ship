@@ -68,6 +68,7 @@ vi.mock('@/hooks/useFleetGraphInsightsQuery', () => ({
         rootDocumentId: 'project-1',
         mode: 'deterministic',
         model: null,
+        executiveSummary: 'Project Alpha is not ready to execute because key work is still underspecified.',
         remediationSuggestions: [],
         documents: [
           {
@@ -106,6 +107,7 @@ vi.mock('@/hooks/useFleetGraphReportsQuery', () => ({
         state: 'published',
         qualityStatus: 'red',
         qualityScore: 0.45,
+        executiveSummary: 'Project Alpha is not ready to execute because key work is still underspecified.',
         generatedAt: '2026-03-18T04:00:00.000Z',
         updatedAt: '2026-03-18T04:10:00.000Z',
         publishedAt: '2026-03-18T04:15:00.000Z',
@@ -174,6 +176,8 @@ describe('FleetGraphReportDetailPage', () => {
     renderPage();
 
     expect(screen.getByText('FleetGraph Quality Report: Project Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Executive Summary')).toBeInTheDocument();
+    expect(screen.getByText('Project Alpha is not ready to execute because key work is still underspecified.')).toBeInTheDocument();
     expect(screen.getByText('Report Narrative')).toBeInTheDocument();
     expect(screen.getByText('Linked Targets')).toBeInTheDocument();
     expect(screen.getByText('Director Responses')).toBeInTheDocument();

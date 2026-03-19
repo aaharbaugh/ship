@@ -70,6 +70,7 @@ export interface FleetGraphInsightsResponse {
     rootDocumentId: string;
     mode: 'deterministic' | 'gpt-4o';
     model: string | null;
+    executiveSummary: string;
     remediationSuggestions: Array<{
       title: string;
       priority: 'high' | 'medium' | 'low';

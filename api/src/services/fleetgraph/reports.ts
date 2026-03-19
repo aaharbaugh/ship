@@ -12,6 +12,7 @@ export interface FleetGraphReportListItem {
   state: 'draft' | 'published';
   qualityStatus: 'green' | 'yellow' | 'red' | null;
   qualityScore: number | null;
+  executiveSummary: string | null;
   generatedAt: string | null;
   updatedAt: string | null;
   publishedAt: string | null;
@@ -144,6 +145,10 @@ const tracedListFleetGraphReports = traceable(
         qualityScore:
           typeof document.properties.quality_score === 'number'
             ? document.properties.quality_score
+            : null,
+        executiveSummary:
+          typeof document.properties.fleetgraph_executive_summary === 'string'
+            ? document.properties.fleetgraph_executive_summary
             : null,
         generatedAt:
           typeof document.properties.fleetgraph_generated_at === 'string'
@@ -297,6 +302,10 @@ async function buildReportListItem(
     qualityScore:
       typeof document.properties.quality_score === 'number'
         ? document.properties.quality_score
+        : null,
+    executiveSummary:
+      typeof document.properties.fleetgraph_executive_summary === 'string'
+        ? document.properties.fleetgraph_executive_summary
         : null,
     generatedAt:
       typeof document.properties.fleetgraph_generated_at === 'string'

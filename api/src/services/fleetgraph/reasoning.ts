@@ -29,6 +29,7 @@ interface FleetGraphReasoningDocumentResult {
 }
 
 interface FleetGraphReasoningResponse {
+  executiveSummary?: string;
   documents?: FleetGraphReasoningDocumentResult[];
   remediationSuggestions?: FleetGraphRemediationSuggestion[];
 }
@@ -81,6 +82,7 @@ const reasoningDocumentSchema = z.object({
 });
 
 const reasoningResponseSchema = z.object({
+  executiveSummary: z.string().min(1).optional(),
   documents: z.array(reasoningDocumentSchema).max(40).optional(),
   remediationSuggestions: z.array(reasoningSuggestionSchema).max(5).optional(),
 });
@@ -129,7 +131,7 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
             role: 'user',
             content: JSON.stringify({
               task:
-                'Review the provided document text for execution readiness. Return JSON with { documents, remediationSuggestions }. For each document, decide whether a PM would consider it ready to act on. Use PM-style language: what is missing, why it blocks execution, and what should be added next. Use { documentId, assessment, analysis, tags, suggestions }. assessment may include qualityStatus, qualityScore, confidence. analysis may include summary and mainIssues. Do not invent details. Do not add owner-related findings unless owner data is explicitly part of the input. Add tags only when the text or deterministic hints clearly support them. Add per-document suggestions and up to 5 global remediationSuggestions focused on the highest-leverage recurring fixes across the set.',
+                'Review the provided document text for execution readiness. Return JSON with { executiveSummary, documents, remediationSuggestions }. executiveSummary should be a concise PM-level read on the whole scanned graph: what is going wrong overall, why it matters, and what the team should do next. For each document, decide whether a PM would consider it ready to act on. Use PM-style language: what is missing, why it blocks execution, and what should be added next. Use { documentId, assessment, analysis, tags, suggestions }. assessment may include qualityStatus, qualityScore, confidence. analysis may include summary and mainIssues. Do not invent details. Do not add owner-related findings unless owner data is explicitly part of the input. Add tags only when the text or deterministic hints clearly support them. Add per-document suggestions and up to 5 global remediationSuggestions focused on the highest-leverage recurring fixes across the set.',
               documents: buildCompactReasoningInput(payload, deterministic),
             }),
           },
@@ -293,6 +295,10 @@ export function mergeReasoningIntoAnalysis(
     rootDocumentId: deterministic.rootDocumentId,
     mode: 'gpt-4o',
     model,
+    executiveSummary:
+      typeof reasoning.executiveSummary === 'string' && reasoning.executiveSummary.trim().length > 0
+        ? reasoning.executiveSummary.trim()
+        : deterministic.executiveSummary,
     remediationSuggestions: mergeSuggestions(
       deterministic.remediationSuggestions,
       [
@@ -307,6 +313,7 @@ export function mergeReasoningIntoAnalysis(
 function parseReasoningResponse(content: string): FleetGraphReasoningResponse {
   const parsed = reasoningResponseSchema.parse(JSON.parse(content));
   return {
+    executiveSummary: parsed.executiveSummary,
     documents: (parsed.documents ?? []).map((document) => ({
       documentId: document.documentId,
       qualityScore: document.assessment?.qualityScore,

@@ -167,6 +167,7 @@ describe('FleetGraph route handlers', () => {
         state: 'draft',
         qualityStatus: 'red',
         qualityScore: 0.42,
+        executiveSummary: 'Project Alpha is not ready to execute yet.',
         generatedAt: '2026-03-18T01:00:00.000Z',
         updatedAt: '2026-03-18T01:05:00.000Z',
         publishedAt: null,

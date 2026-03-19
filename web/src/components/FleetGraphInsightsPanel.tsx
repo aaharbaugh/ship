@@ -65,7 +65,11 @@ export function FleetGraphInsightsPanel({
     data?.analysis.documents[0];
   const displayStatus = persisted?.qualityStatus ?? primaryDocument?.qualityStatus ?? null;
   const displayScore = persisted?.qualityScore ?? primaryDocument?.qualityScore ?? null;
-  const rawSummary = persisted?.qualitySummary ?? primaryDocument?.summary ?? null;
+  const rawSummary =
+    data?.analysis.executiveSummary ??
+    persisted?.qualitySummary ??
+    primaryDocument?.summary ??
+    null;
   const displaySummary = sanitizeFleetGraphSummary(rawSummary, displayStatus);
   const rawTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
   const displayTags = useMemo(

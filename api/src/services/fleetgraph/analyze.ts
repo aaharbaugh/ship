@@ -22,6 +22,7 @@ export interface FleetGraphAnalysis {
   rootDocumentId: string;
   mode: 'deterministic' | 'gpt-4o';
   model: string | null;
+  executiveSummary: string;
   remediationSuggestions: FleetGraphRemediationSuggestion[];
   documents: FleetGraphDocumentAnalysis[];
 }
@@ -43,6 +44,7 @@ const tracedAnalyzeFleetGraphPayload = traceable(
     rootDocumentId: payload.rootDocumentId,
     mode: 'deterministic',
     model: null,
+    executiveSummary: buildExecutiveSummary(payload, documents),
     remediationSuggestions: buildRemediationSuggestions(documents),
     documents,
   };
@@ -132,6 +134,26 @@ function buildRemediationSuggestions(
       }))
     )
     .slice(0, 10);
+}
+
+function buildExecutiveSummary(
+  payload: FleetGraphScoringPayload,
+  documents: FleetGraphDocumentAnalysis[]
+): string {
+  const redDocuments = documents.filter((document) => document.qualityStatus === 'red');
+  const yellowDocuments = documents.filter((document) => document.qualityStatus === 'yellow');
+  const rootDocument = documents.find((document) => document.documentId === payload.rootDocumentId);
+
+  if (redDocuments.length === 0 && yellowDocuments.length === 0) {
+    return 'This part of the project looks ready to execute. No major readiness gaps were detected in the current graph.';
+  }
+
+  if (redDocuments.length > 0) {
+    const primaryGap = redDocuments[0]?.tags[0]?.label.toLowerCase() ?? 'readiness gaps';
+    return `This graph is not ready to execute yet. ${redDocuments.length} document${redDocuments.length === 1 ? '' : 's'} need immediate attention, starting with ${primaryGap}${rootDocument ? ` around the root ${rootDocument.documentType}` : ''}.`;
+  }
+
+  return `This graph is partially ready, but still needs cleanup before execution. ${yellowDocuments.length} document${yellowDocuments.length === 1 ? '' : 's'} need follow-up to tighten scope, clarity, or ownership.`;
 }
 
 function makeTag(

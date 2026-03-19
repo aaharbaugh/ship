@@ -181,12 +181,10 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
       prepared,
       analysis
     );
-    for (const document of analysis.documents) {
-      await client.updateDocumentMetadata(document.documentId, {
-        ...document.metadata,
-        quality_report_id: report.reportId,
-      });
-    }
+    await client.updateDocumentMetadata(prepared.rootDocumentId, {
+      ...(prepared.context.rootDocument.properties ?? {}),
+      quality_report_id: report.reportId,
+    });
 
     return ok({
       created: false,
@@ -196,12 +194,10 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
   }
 
   const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
-  for (const document of analysis.documents) {
-    await client.updateDocumentMetadata(document.documentId, {
-      ...document.metadata,
-      quality_report_id: report.reportId,
-    });
-  }
+  await client.updateDocumentMetadata(prepared.rootDocumentId, {
+    ...(prepared.context.rootDocument.properties ?? {}),
+    quality_report_id: report.reportId,
+  });
 
   return ok({
     created: true,

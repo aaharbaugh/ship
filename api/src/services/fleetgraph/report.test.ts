@@ -141,6 +141,7 @@ describe('FleetGraph quality report drafting', () => {
       rootDocumentId: 'project-1',
       mode: 'gpt-4o',
       model: 'gpt-4o',
+      executiveSummary: 'Project Atlas is not ready to execute until the highest-risk gaps are clarified.',
       remediationSuggestions: [
         {
           title: 'Clarify onboarding acceptance criteria',
@@ -184,6 +185,8 @@ describe('FleetGraph quality report drafting', () => {
     const draft = createQualityReportDraft.mock.calls[0]?.[0];
     expect(draft.title).toContain('Project Atlas');
     expect(draft.content).toContain('## Health Snapshot');
+    expect(draft.content).toContain('## Executive Summary');
+    expect(draft.content).toContain('Project Atlas is not ready to execute until the highest-risk gaps are clarified.');
     expect(draft.content).toContain('## Priority Findings');
     expect(draft.content).toContain('Fix onboarding path');
     expect(draft.content).toContain('Clarify onboarding acceptance criteria');
@@ -205,6 +208,7 @@ describe('FleetGraph quality report drafting', () => {
         properties: {
           fleetgraph_report_type: 'quality_report',
           fleetgraph_report_state: 'draft',
+          fleetgraph_executive_summary: 'Project Atlas is not ready to execute yet.',
         },
         content: null,
         belongs_to: [],
@@ -306,6 +310,7 @@ describe('FleetGraph quality report drafting', () => {
       rootDocumentId: 'project-1',
       mode: 'gpt-4o',
       model: 'gpt-4o',
+      executiveSummary: 'Project Atlas is partially ready but still needs a tighter execution plan.',
       remediationSuggestions: [],
       documents: [
         {

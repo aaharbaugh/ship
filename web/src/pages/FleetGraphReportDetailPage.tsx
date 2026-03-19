@@ -130,6 +130,17 @@ export function FleetGraphReportDetailPage() {
         <section className="rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-sm shadow-black/30">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
+              Executive Summary
+            </h2>
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-200">
+            {report.executiveSummary ?? detailQuery.data.rootDocument?.qualitySummary ?? 'No executive summary captured yet.'}
+          </p>
+        </section>
+
+        <section className="rounded-2xl border border-slate-800 bg-slate-950 p-5 shadow-sm shadow-black/30">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-white">
               Report Narrative
             </h2>
             <span className="text-xs text-slate-500">
@@ -292,6 +303,9 @@ export function FleetGraphReportDetailPage() {
             </div>
           ) : selectedNode && selectedAnalysis ? (
             <div className="space-y-3">
+              <div className="rounded-xl border border-slate-800 bg-black px-3 py-3 text-xs leading-5 text-slate-400">
+                {liveAnalysis?.executiveSummary ?? 'No executive summary available for this live snapshot.'}
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="text-sm font-medium text-white">{selectedNode.title}</div>
                 <span className="text-[11px] uppercase tracking-wide text-slate-500">

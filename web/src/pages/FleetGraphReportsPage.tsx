@@ -472,6 +472,7 @@ function ReportCard({
     state: 'draft' | 'published';
     qualityStatus: 'green' | 'yellow' | 'red' | null;
     qualityScore: number | null;
+    executiveSummary: string | null;
     generatedAt: string | null;
     publishedAt: string | null;
     directorResponseOptions: Array<{
@@ -532,6 +533,11 @@ function ReportCard({
               </span>
             )}
           </div>
+          {report.executiveSummary && (
+            <p className="mt-3 max-w-3xl text-sm text-slate-300">
+              {report.executiveSummary}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

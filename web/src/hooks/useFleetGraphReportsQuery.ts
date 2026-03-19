@@ -10,6 +10,7 @@ export interface FleetGraphReportListItem {
   state: 'draft' | 'published';
   qualityStatus: 'green' | 'yellow' | 'red' | null;
   qualityScore: number | null;
+  executiveSummary: string | null;
   generatedAt: string | null;
   updatedAt: string | null;
   publishedAt: string | null;

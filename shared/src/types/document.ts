@@ -103,6 +103,7 @@ export interface FleetGraphDocumentMetadata {
   quality_status?: FleetGraphQualityStatus | null;
   quality_summary?: string | null;
   quality_tags?: FleetGraphAlertTag[] | null;
+  fleetgraph_executive_summary?: string | null;
   last_scored_at?: string | null;
   quality_report_id?: string | null;
   quality_summary_hash?: string | null;
