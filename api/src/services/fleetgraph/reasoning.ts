@@ -310,8 +310,9 @@ export function mergeReasoningIntoAnalysis(
   };
 }
 
-function parseReasoningResponse(content: string): FleetGraphReasoningResponse {
-  const parsed = reasoningResponseSchema.parse(JSON.parse(content));
+export function parseReasoningResponse(content: string): FleetGraphReasoningResponse {
+  const normalized = normalizeReasoningResponse(JSON.parse(content));
+  const parsed = reasoningResponseSchema.parse(normalized);
   return {
     executiveSummary: parsed.executiveSummary,
     documents: (parsed.documents ?? []).map((document) => ({
@@ -326,6 +327,209 @@ function parseReasoningResponse(content: string): FleetGraphReasoningResponse {
     })),
     remediationSuggestions: parsed.remediationSuggestions ?? [],
   };
+}
+
+function normalizeReasoningResponse(value: unknown): unknown {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const response = value as Record<string, unknown>;
+
+  return {
+    ...response,
+    executiveSummary:
+      typeof response.executiveSummary === 'string' ? response.executiveSummary.trim() : response.executiveSummary,
+    documents: Array.isArray(response.documents)
+      ? response.documents.map((document) => normalizeReasoningDocument(document))
+      : response.documents,
+    remediationSuggestions: normalizeSuggestions(response.remediationSuggestions),
+  };
+}
+
+function normalizeReasoningDocument(value: unknown): unknown {
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const document = value as Record<string, unknown>;
+  const assessment =
+    document.assessment && typeof document.assessment === 'object'
+      ? document.assessment as Record<string, unknown>
+      : undefined;
+  const analysis =
+    document.analysis && typeof document.analysis === 'object'
+      ? document.analysis as Record<string, unknown>
+      : undefined;
+
+  return {
+    ...document,
+    assessment: assessment
+      ? {
+          ...assessment,
+          qualityScore: normalizeQualityScore(assessment.qualityScore),
+          confidence: normalizeConfidence(assessment.confidence),
+        }
+      : document.assessment,
+    analysis: analysis
+      ? {
+          ...analysis,
+          mainIssues: normalizeMainIssues(analysis.mainIssues),
+        }
+      : document.analysis,
+    tags: normalizeTags(document.tags),
+    suggestions: normalizeSuggestions(document.suggestions),
+  };
+}
+
+function normalizeQualityScore(value: unknown): unknown {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return value;
+  }
+
+  if (value > 1 && value <= 100) {
+    return Number((value / 100).toFixed(2));
+  }
+
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeConfidence(value: unknown): unknown {
+  if (value === 'low' || value === 'medium' || value === 'high') {
+    return value;
+  }
+
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return value;
+  }
+
+  if (value >= 0.75) return 'high';
+  if (value >= 0.4) return 'medium';
+  return 'low';
+}
+
+function normalizeMainIssues(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+      .filter((entry) => entry.length > 0)
+      .slice(0, 5);
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .split(/\n|;|•|-/)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+      .slice(0, 5);
+  }
+
+  return value;
+}
+
+function normalizeTags(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return value
+    .map((tag) => {
+      if (tag && typeof tag === 'object') {
+        return tag;
+      }
+
+      if (typeof tag !== 'string') {
+        return null;
+      }
+
+      const label = tag.trim();
+      if (!label) {
+        return null;
+      }
+
+      return {
+        key: toSnakeCase(label),
+        label,
+        severity: inferSeverity(label),
+      };
+    })
+    .filter((tag): tag is Record<string, unknown> => tag !== null)
+    .slice(0, 6);
+}
+
+function normalizeSuggestions(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return value
+    .map((suggestion) => {
+      if (suggestion && typeof suggestion === 'object') {
+        const objectSuggestion = suggestion as Record<string, unknown>;
+        return {
+          ...objectSuggestion,
+          priority:
+            objectSuggestion.priority === 'high' ||
+            objectSuggestion.priority === 'medium' ||
+            objectSuggestion.priority === 'low'
+              ? objectSuggestion.priority
+              : 'medium',
+          rationale:
+            typeof objectSuggestion.rationale === 'string' && objectSuggestion.rationale.trim().length > 0
+              ? objectSuggestion.rationale.trim()
+              : typeof objectSuggestion.title === 'string'
+                ? objectSuggestion.title.trim()
+                : 'Clarify the next step.',
+        };
+      }
+
+      if (typeof suggestion !== 'string') {
+        return null;
+      }
+
+      const title = suggestion.trim();
+      if (!title) {
+        return null;
+      }
+
+      return {
+        title,
+        priority: 'medium',
+        rationale: title,
+      };
+    })
+    .filter((suggestion) => suggestion !== null);
+}
+
+function inferSeverity(label: string): 'high' | 'medium' | 'low' {
+  const normalized = label.toLowerCase();
+  if (
+    normalized.includes('block') ||
+    normalized.includes('missing') ||
+    normalized.includes('risk') ||
+    normalized.includes('critical')
+  ) {
+    return 'high';
+  }
+
+  if (
+    normalized.includes('unclear') ||
+    normalized.includes('thin') ||
+    normalized.includes('scope')
+  ) {
+    return 'medium';
+  }
+
+  return 'low';
+}
+
+function toSnakeCase(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
 }
 
 function mergeTags(
