@@ -131,7 +131,7 @@ export function FleetGraphReportsPage() {
               FleetGraph Reports
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Review recent FleetGraph reports, publish what is ready, and only open the full detail view when you need more context.
+              Review recent PM-style FleetGraph reports, publish what is ready, and open the full detail view only when you need deeper context.
             </p>
           </div>
           <div className="flex flex-col items-end gap-2">
@@ -154,7 +154,7 @@ export function FleetGraphReportsPage() {
                 disabled={scanMutation.isPending}
                 className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {scanMutation.isPending ? 'Scanning...' : 'Run Scan'}
+                {scanMutation.isPending ? 'Scanning...' : 'Run Workspace Scan'}
               </button>
               {readinessQuery.data && (
                 <>

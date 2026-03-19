@@ -172,7 +172,7 @@ describe('FleetGraphReportDetailPage', () => {
     directorFeedbackMutate.mockReset();
   });
 
-  it('renders the report narrative and loads the live graph snapshot on demand', () => {
+  it('renders the report narrative and loads the fresh graph review on demand', () => {
     renderPage();
 
     expect(screen.getByText('FleetGraph Quality Report: Project Alpha')).toBeInTheDocument();
@@ -181,11 +181,11 @@ describe('FleetGraphReportDetailPage', () => {
     expect(screen.getByText('Report Narrative')).toBeInTheDocument();
     expect(screen.getByText('Linked Targets')).toBeInTheDocument();
     expect(screen.getByText('Director Responses')).toBeInTheDocument();
-    expect(screen.getByText('Live Graph Snapshot')).toBeInTheDocument();
+    expect(screen.getByText('Fresh Graph Review')).toBeInTheDocument();
     expect(screen.getByText('Issue Missing Acceptance Criteria')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load Live Snapshot' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Fresh Review' }));
     expect(screen.getByTestId('fleetgraph-viewer')).toHaveTextContent('viewer:2');
   });
 });

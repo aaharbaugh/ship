@@ -14,6 +14,8 @@ Current MVP status:
   - publishing quality reports
   - sending director feedback
 - LangSmith tracing is wired into the runtime and GPT-4o reasoning path.
+- On-demand report refresh now updates the report artifact and root linkage without rewriting metadata across the full scanned subtree.
+- PM-facing outputs now include an executive summary for the scanned graph in addition to per-document findings.
 
 ## MVP Checklist
 
@@ -35,6 +37,13 @@ Current gaps for external MVP completion:
 ## Agent Responsibility
 
 FleetGraph is responsible for proactively evaluating the quality of connected Ship work graphs and surfacing actionable issues before they become project execution problems.
+
+For the current on-demand UX, FleetGraph is primarily positioned as a contextual PM review tool:
+
+- it starts from the document the user is looking at
+- it scans the nearby work graph
+- it produces one executive summary plus supporting findings
+- it can refresh or draft a report for that root context
 
 For MVP, FleetGraph is allowed to:
 

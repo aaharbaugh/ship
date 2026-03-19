@@ -129,7 +129,7 @@ export function FleetGraphInsightsPanel({
                 FleetGraph
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-slate-400">
-                Quick quality check and report actions for this document.
+                Quick PM review and report actions for this document.
               </Dialog.Description>
             </div>
             <Dialog.Close className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white hover:bg-slate-900">
@@ -208,7 +208,7 @@ export function FleetGraphInsightsPanel({
                     disabled={Boolean(liveAnalysisRequested || isLoading)}
                     className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isLoading || liveAnalysisRequested ? 'Loading Analysis...' : 'Run Live Analysis'}
+                    {isLoading || liveAnalysisRequested ? 'Running Review...' : 'Run Fresh Review'}
                   </button>
                 )}
               </div>

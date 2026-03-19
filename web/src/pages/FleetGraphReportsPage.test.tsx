@@ -221,7 +221,7 @@ describe('FleetGraphReportsPage', () => {
     renderPage();
 
     fireEvent.click(screen.getByText('FleetGraph Diagnostics'));
-    fireEvent.click(screen.getByRole('button', { name: 'Run Scan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Workspace Scan' }));
 
     expect(scanMutate).toHaveBeenNthCalledWith(1, false);
   });

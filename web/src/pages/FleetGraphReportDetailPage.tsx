@@ -260,22 +260,22 @@ export function FleetGraphReportDetailPage() {
       </div>
 
       <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <PanelCard title="Live Graph Snapshot">
+        <PanelCard title="Fresh Graph Review">
           {!liveSnapshotRequested ? (
             <div className="space-y-3">
               <div className="text-sm text-slate-500">
-                This report already includes persisted FleetGraph findings. Load a fresh snapshot only if you want to recompute the current graph.
+                This report already includes saved FleetGraph findings. Run a fresh review only if you want to recompute the current graph.
               </div>
               <button
                 type="button"
                 onClick={() => setLiveSnapshotRequested(true)}
                 className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
               >
-                Load Live Snapshot
+                Run Fresh Review
               </button>
             </div>
           ) : insightsQuery.isLoading ? (
-            <div className="text-sm text-slate-500">Loading live FleetGraph insights...</div>
+            <div className="text-sm text-slate-500">Running a fresh FleetGraph review...</div>
           ) : graph ? (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-3 text-xs text-slate-500">
@@ -292,14 +292,14 @@ export function FleetGraphReportDetailPage() {
               />
             </div>
           ) : (
-            <div className="text-sm text-slate-500">Live graph snapshot unavailable for this report.</div>
+            <div className="text-sm text-slate-500">Fresh graph review unavailable for this report.</div>
           )}
         </PanelCard>
 
-        <PanelCard title="Live Findings">
+        <PanelCard title="Fresh Findings">
           {!liveSnapshotRequested ? (
             <div className="text-sm text-slate-500">
-              Live findings are available after you load a fresh snapshot.
+              Fresh findings are available after you run a fresh review.
             </div>
           ) : selectedNode && selectedAnalysis ? (
             <div className="space-y-3">
