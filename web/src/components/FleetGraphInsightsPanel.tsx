@@ -1,12 +1,10 @@
-import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import {
   useFleetGraphChatMutation,
   type FleetGraphChatMessage,
   type FleetGraphInsightsResponse,
 } from '@/hooks/useFleetGraphInsightsQuery';
-import type { FleetGraphReportListItem } from '@/hooks/useFleetGraphReportsQuery';
 
 export interface PersistedFleetGraphView {
   qualityScore: number;
@@ -41,13 +39,8 @@ export function FleetGraphInsightsPanel({
   error,
   persisted,
   liveAnalysisRequested,
-  onRequestLiveAnalysis,
-  onPersist,
-  isPersisting,
-  onCreateReportDraft,
-  onOpenReport,
-  isCreatingReportDraft,
-  reports,
+  onRunReview,
+  isRunningReview,
 }: {
   documentId: string;
   data?: FleetGraphInsightsResponse;
@@ -55,21 +48,15 @@ export function FleetGraphInsightsPanel({
   error?: Error | null;
   persisted?: PersistedFleetGraphView | null;
   liveAnalysisRequested?: boolean;
-  onRequestLiveAnalysis?: () => void;
-  onPersist?: () => void;
-  isPersisting?: boolean;
-  onCreateReportDraft?: () => void;
-  onOpenReport?: (reportId: string) => void;
-  isCreatingReportDraft?: boolean;
-  reports?: FleetGraphReportListItem[];
+  onRunReview?: () => void;
+  isRunningReview?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState<FleetGraphChatMessage[]>([]);
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
+  const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatMutation = useFleetGraphChatMutation(documentId);
-  const qualityReportId = persisted?.qualityReportId ?? null;
-  const linkedReport = reports?.find((report) => report.id === qualityReportId);
   const primaryDocument =
     data?.analysis.documents.find((document) => document.documentId === data.rootDocumentId) ??
     data?.analysis.documents[0];
@@ -81,35 +68,31 @@ export function FleetGraphInsightsPanel({
     primaryDocument?.summary ??
     null;
   const displaySummary = sanitizeFleetGraphSummary(rawSummary, displayStatus);
-  const rawTags = persisted?.qualityTags ?? primaryDocument?.tags ?? [];
-  const displayTags = useMemo(
-    () => filterRedundantTags(rawTags, displaySummary),
-    [rawTags, displaySummary]
+  const updatedAt = persisted?.lastScoredAt || data?.analysis.generatedAt;
+  const scopeSummary = data ? buildScopeSummary(data) : null;
+  const uncertaintySummary = data ? buildUncertaintySummary(data) : null;
+  const evidencePoints = useMemo(
+    () =>
+      buildEvidencePoints({
+        tags: primaryDocument?.tags ?? [],
+        suggestions: data?.analysis.remediationSuggestions ?? [],
+        summary: displaySummary,
+      }),
+    [primaryDocument?.tags, data?.analysis.remediationSuggestions, displaySummary]
   );
-  const conciseSuggestions = useMemo(
-    () => (data ? buildConciseSuggestions(data.analysis.remediationSuggestions, displayTags) : []),
-    [data, displayTags]
+  const reviewBrief = useMemo(
+    () => buildReviewBrief({ summary: displaySummary, status: displayStatus }),
+    [displaySummary, displayStatus]
   );
 
   const statusLabel =
     displayStatus === 'green'
-      ? 'Done'
+      ? 'Clear to run'
       : displayStatus === 'yellow'
-        ? 'Needs small corrections'
+        ? 'Tighten plan'
         : displayStatus === 'red'
-          ? 'Needs work'
+          ? 'Fix blockers'
           : 'Unavailable';
-
-  const actionLabel =
-    qualityReportId && onCreateReportDraft
-      ? isCreatingReportDraft
-        ? 'Updating Report...'
-        : 'Update Report'
-      : onCreateReportDraft
-        ? isCreatingReportDraft
-          ? 'Creating Report...'
-          : 'Create Report'
-        : null;
 
   useEffect(() => {
     setMessages([]);
@@ -121,9 +104,43 @@ export function FleetGraphInsightsPanel({
     );
   }, [documentId, data]);
 
+  useEffect(() => {
+    const container = chatScrollRef.current;
+    const end = chatEndRef.current;
+
+    if (!container || !end) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      end.scrollIntoView({ block: 'end' });
+      container.scrollTop = container.scrollHeight;
+    });
+  }, [messages, chatMutation.isPending]);
+
   const submitChatQuestion = (question: string) => {
     const trimmed = question.trim();
     if (!trimmed || chatMutation.isPending) {
+      return;
+    }
+
+    const command = findChatToolAction(toolActions, trimmed);
+    if (command) {
+      setChatInput('');
+      runToolAction(command, trimmed);
+      return;
+    }
+
+    if (trimmed.startsWith('/')) {
+      setMessages((current) => [
+        ...current,
+        { role: 'user', content: trimmed },
+        {
+          role: 'assistant',
+          content: `FleetGraph does not recognize ${trimmed}. Try ${toolActions.map((action) => action.command).join(', ')}.`,
+        },
+      ]);
+      setChatInput('');
       return;
     }
 
@@ -159,191 +176,195 @@ export function FleetGraphInsightsPanel({
     );
   };
 
+  const runToolAction = (action: ChatToolAction, commandOverride?: string) => {
+    if (chatMutation.isPending || action.pending) {
+      return;
+    }
+
+    setMessages((current) => [
+      ...current,
+      { role: 'user', content: commandOverride ?? action.command },
+      {
+        role: 'assistant',
+        content: action.unavailableReason ?? action.feedback,
+      },
+    ]);
+
+    if (!action.unavailableReason) {
+      action.onClick?.();
+    }
+  };
+
+  const toolActions = getChatToolActions({
+    canRunReview: Boolean(onRunReview),
+    onRunReview,
+    runReviewPending: Boolean(isRunningReview || liveAnalysisRequested || isLoading),
+  });
+
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
-        <button
-          type="button"
-          className="flex h-7 items-center gap-2 rounded-full border border-slate-700 bg-black px-2.5 text-xs text-white hover:bg-slate-900"
-          aria-label="Open FleetGraph"
-          title="Open FleetGraph"
-        >
-          <LightbulbIcon className="h-3.5 w-3.5" />
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full',
-              displayStatus ? STATUS_DOT_STYLES[displayStatus] : 'bg-slate-500'
-            )}
-          />
-        </button>
-      </Dialog.Trigger>
-
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[100] bg-black/65" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-[101] w-[min(92vw,40rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-800 bg-black p-5 shadow-2xl shadow-black/70">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <Dialog.Title className="text-base font-semibold text-white">
-                FleetGraph
-              </Dialog.Title>
-              <Dialog.Description className="mt-1 text-sm text-slate-400">
-                Quick PM review and report actions for this document.
-              </Dialog.Description>
-            </div>
-            <Dialog.Close className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white hover:bg-slate-900">
-              Close
-            </Dialog.Close>
+    <aside className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-800 bg-black shadow-lg shadow-black/30">
+      <div className="border-b border-slate-800 px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-950 text-white">
+            <LightbulbIcon className="h-4 w-4" />
           </div>
-
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0 flex-1 space-y-2">
-                {displayStatus && typeof displayScore === 'number' ? (
-                  <div
-                    className={cn(
-                      'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide',
-                      STATUS_BADGE_STYLES[displayStatus]
-                    )}
-                  >
-                    {statusLabel} {Math.round(displayScore * 100)}%
-                  </div>
-                ) : (
-                  <div className="inline-flex rounded-full border border-slate-700 bg-black px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
-                    FleetGraph not run yet
-                  </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <div className="text-base font-semibold text-white">FleetGraph</div>
+              <span
+                className={cn(
+                  'h-2.5 w-2.5 rounded-full',
+                  displayStatus ? STATUS_DOT_STYLES[displayStatus] : 'bg-slate-500'
                 )}
-                <p className="max-w-2xl text-sm text-white">
-                  {displaySummary ?? 'Run live analysis or create a report to see FleetGraph feedback for this document.'}
-                </p>
-                {displayTags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {displayTags.slice(0, 4).map((tag) => (
-                      <span
-                        key={`${tag.key}-${tag.label}`}
-                        className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-xs text-slate-300"
-                      >
-                        {tag.label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                {(persisted?.lastScoredAt || data?.analysis.generatedAt) && (
-                  <div className="text-xs text-slate-500">
-                    Updated {formatShortTimestamp(persisted?.lastScoredAt || data?.analysis.generatedAt)}
-                  </div>
-                )}
-              </div>
-
-              <div className="flex flex-col items-stretch gap-2">
-                {actionLabel && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onCreateReportDraft?.();
-                    }}
-                    disabled={Boolean(isCreatingReportDraft)}
-                    className="rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {actionLabel}
-                  </button>
-                )}
-                {qualityReportId && onOpenReport && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenReport(qualityReportId);
-                      setOpen(false);
-                    }}
-                    className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
-                  >
-                    {linkedReport?.state === 'published' ? 'Open Report' : 'Open Draft'}
-                  </button>
-                )}
-                {onRequestLiveAnalysis && (
-                  <button
-                    type="button"
-                    onClick={onRequestLiveAnalysis}
-                    disabled={Boolean(liveAnalysisRequested || isLoading)}
-                    className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isLoading || liveAnalysisRequested ? 'Running Review...' : 'Run Fresh Review'}
-                  </button>
-                )}
-              </div>
+              />
             </div>
+            <p className="mt-1 text-xs text-slate-500">PM review for this document</p>
           </div>
+        </div>
+      </div>
 
-          {conciseSuggestions.length > 0 && (
-            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
-              <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
-                Recommended Next Steps
-              </div>
-              <div className="mt-3 space-y-3">
-                {conciseSuggestions.map((suggestion, index) => (
-                  <div key={`${suggestion.title}-${index}`} className="rounded-lg border border-slate-800 bg-black p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="text-sm font-medium text-white">{suggestion.title}</div>
-                      <span className="text-[11px] uppercase tracking-wide text-slate-500">
-                        {suggestion.priority}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-400">
-                      {suggestion.rationale}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950 p-4">
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
-              Ask FleetGraph
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {suggestedPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => submitChatQuestion(prompt)}
-                  disabled={chatMutation.isPending}
-                  className="rounded-full border border-slate-700 bg-black px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+      <div className="flex flex-col gap-2 px-3 py-3">
+        <div className="rounded-xl border border-slate-800 bg-gradient-to-b from-slate-950 to-black p-3">
+          <div className="min-w-0 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              {displayStatus && typeof displayScore === 'number' ? (
+                <div
+                  className={cn(
+                    'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium uppercase tracking-wide',
+                    STATUS_BADGE_STYLES[displayStatus]
+                  )}
                 >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 space-y-3">
-              {messages.length === 0 ? (
-                <div className="rounded-lg border border-slate-800 bg-black p-3 text-xs leading-5 text-slate-500">
-                  Ask what is blocking execution, what to fix first, or whether this document is ready to move.
+                  {statusLabel} {Math.round(displayScore * 100)}%
                 </div>
               ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={cn(
-                      'rounded-lg border p-3 text-sm leading-6',
-                      message.role === 'user'
-                        ? 'border-slate-700 bg-black text-slate-100'
-                        : 'border-slate-800 bg-slate-900 text-slate-200'
-                    )}
-                  >
-                    <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">
-                      {message.role === 'user' ? 'You' : 'FleetGraph'}
-                    </div>
-                    <div>{message.content}</div>
-                  </div>
-                ))
+                <div className="inline-flex rounded-full border border-slate-700 bg-black px-2.5 py-1 text-xs font-medium uppercase tracking-wide text-slate-300">
+                  FleetGraph not run yet
+                </div>
               )}
-              {chatMutation.isPending && (
-                <div className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-slate-400">
-                  FleetGraph is reviewing the current context...
+              {updatedAt && (
+                <div className="pt-0.5 text-xs text-slate-500">
+                  {formatShortTimestamp(updatedAt)}
                 </div>
               )}
             </div>
+            <div className="space-y-3">
+              {scopeSummary && (
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    Review Scope
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-500">
+                    <span>{scopeSummary.documentCount} docs</span>
+                    <span>{scopeSummary.edgeCount} edges</span>
+                    <span>depth {scopeSummary.maxDepthReached}</span>
+                    <span>{scopeSummary.truncated ? 'bounded traversal' : 'full local scope'}</span>
+                  </div>
+                </div>
+              )}
+              {uncertaintySummary && (
+                <div>
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    Confidence And Limits
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                    {uncertaintySummary.summary}
+                  </p>
+                </div>
+              )}
+              <div>
+                <p className="mt-1 text-sm leading-6 text-slate-100">
+                  {reviewBrief.assessment}
+                </p>
+              </div>
+              {evidencePoints[0] ? (
+                <div className="rounded-lg border border-slate-800 bg-black/50 px-3 py-2 text-sm text-slate-200">
+                  {evidencePoints[0]}
+                </div>
+              ) : null}
+              {evidencePoints.length > 1 ? (
+                <div className="flex flex-wrap gap-2">
+                  {evidencePoints.slice(1, 3).map((point) => (
+                    <span
+                      key={point}
+                      className="rounded-full border border-slate-700 bg-black px-2 py-0.5 text-[11px] text-slate-300"
+                    >
+                      {point}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {onRunReview && (
+              <button
+                type="button"
+                onClick={onRunReview}
+                disabled={Boolean(isRunningReview || liveAnalysisRequested || isLoading)}
+                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isRunningReview || isLoading || liveAnalysisRequested ? 'Running Review...' : 'Run Review'}
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
+
+      <div className="min-h-0 flex-1 px-3 pb-3">
+        <div className="flex h-full min-h-0 flex-col rounded-xl border border-slate-800 bg-slate-950 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-medium text-white">Ask FleetGraph</div>
+              <div className="text-xs text-slate-500">Ask about readiness, risk, or what to fix next.</div>
+            </div>
+            <div className="text-xs text-slate-500">
+              {error
+                ? 'Live analysis unavailable.'
+                : data
+                  ? `${data.scoringPayload.documentCount} docs reviewed`
+                  : 'Context scoped to this document.'}
+            </div>
+          </div>
+
+          <div
+            ref={chatScrollRef}
+            className="mt-3 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1"
+          >
+            {messages.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-800 bg-black/60 p-3 text-xs leading-5 text-slate-500">
+                Start with what is blocked, what to fix first, or whether this work is ready to move.
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <div
+                  key={`${message.role}-${index}`}
+                  className={cn(
+                    'rounded-lg border p-3 text-sm leading-6',
+                    message.role === 'user'
+                      ? 'border-slate-700 bg-black text-slate-100'
+                      : 'border-slate-800 bg-slate-900/80 text-slate-200'
+                  )}
+                >
+                  <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">
+                    {message.role === 'user' ? 'You' : 'FleetGraph'}
+                  </div>
+                  <div>{message.content}</div>
+                </div>
+              ))
+            )}
+            {chatMutation.isPending && (
+              <div className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-slate-400">
+                FleetGraph is reviewing the current context...
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="mt-3 border-t border-slate-800 pt-3">
             <form
-              className="mt-3 flex gap-2"
+              className="flex gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 submitChatQuestion(chatInput);
@@ -353,7 +374,7 @@ export function FleetGraphInsightsPanel({
                 type="text"
                 value={chatInput}
                 onChange={(event) => setChatInput(event.target.value)}
-                placeholder="Ask about risks, readiness, or next steps"
+                placeholder="Ask a PM-style question"
                 className="h-10 flex-1 rounded-md border border-slate-800 bg-black px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-slate-600"
               />
               <button
@@ -364,30 +385,28 @@ export function FleetGraphInsightsPanel({
                 Send
               </button>
             </form>
-          </div>
-
-          <div className="mt-4 flex items-center justify-between gap-3 text-xs text-slate-500">
-            <div>
-              {error
-                ? 'Live analysis unavailable.'
-                : data
-                  ? `${data.scoringPayload.documentCount} docs reviewed`
-                  : 'Use live analysis only when you want a fresh check.'}
+            <div className="mt-3">
+              <div className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                Suggested Questions
+              </div>
+              <div className="flex flex-wrap gap-2">
+              {suggestedPrompts.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => submitChatQuestion(prompt)}
+                  disabled={chatMutation.isPending}
+                  className="rounded-full border border-slate-800 bg-black px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {prompt}
+                </button>
+              ))}
             </div>
-            {onPersist && data && (
-              <button
-                type="button"
-                onClick={onPersist}
-                disabled={Boolean(isPersisting)}
-                className="rounded-md border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isPersisting ? 'Persisting...' : 'Persist Snapshot'}
-              </button>
-            )}
+            </div>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -397,34 +416,69 @@ function getSeedPrompts(data: FleetGraphInsightsResponse): string[] {
 
   return [
     `What is the biggest risk in this ${typeLabel}?`,
-    'What should I fix first?',
-    'Is this ready to execute?',
+    'What should happen next?',
+    'What would a PM want to know?',
   ];
 }
 
-function buildConciseSuggestions(
-  suggestions: FleetGraphInsightsResponse['analysis']['remediationSuggestions'],
-  tags: PersistedFleetGraphView['qualityTags']
-) {
-  const normalizedTags = new Set(tags.map((tag) => normalizeFleetGraphText(tag.label)));
-  const seen = new Set<string>();
+function getChatToolActions({
+  canRunReview,
+  onRunReview,
+  runReviewPending,
+}: {
+  canRunReview: boolean;
+  onRunReview?: () => void;
+  runReviewPending?: boolean;
+}) {
+  const actions: ChatToolAction[] = [];
 
-  return suggestions
-    .flatMap((suggestion) => {
-      const titleKey = normalizeFleetGraphText(suggestion.title);
-      if (!titleKey || seen.has(titleKey)) {
-        return [];
-      }
+  actions.push({
+    label: 'Run Review',
+    command: '/run-review',
+    aliases: ['/review', '/rerun-review'],
+    feedback: 'Running a fresh FleetGraph review, saving the snapshot, and updating the linked report for this document now.',
+    onClick: onRunReview,
+    pending: Boolean(runReviewPending),
+    unavailableReason:
+      canRunReview
+        ? undefined
+        : 'FleetGraph cannot run a review from this view right now.',
+  });
 
-      const titleWithoutPrefix = titleKey.replace(/^improve [a-z_]+:\s*/, '');
-      if (normalizedTags.has(titleWithoutPrefix)) {
-        return [];
-      }
+  return actions.slice(0, 1);
+}
 
-      seen.add(titleKey);
-      return [suggestion];
-    })
-    .slice(0, 3);
+interface ChatToolAction {
+  label: string;
+  command: string;
+  aliases?: string[];
+  feedback: string;
+  onClick?: () => void;
+  pending?: boolean;
+  unavailableReason?: string;
+}
+
+function findChatToolAction(
+  actions: ChatToolAction[],
+  input: string
+): ChatToolAction | null {
+  const normalized = input.trim().toLowerCase();
+
+  if (normalized === '/help') {
+    return {
+      label: 'Help',
+      command: '/help',
+      feedback: `Available commands: ${actions.map((action) => action.command).join(', ')}.`,
+    };
+  }
+
+  return (
+    actions.find((action) =>
+      [action.command, ...(action.aliases ?? [])].some(
+        (candidate) => candidate.toLowerCase() === normalized
+      )
+    ) ?? null
+  );
 }
 
 function normalizeFleetGraphText(value: unknown): string {
@@ -462,6 +516,14 @@ function sanitizeFleetGraphSummary(
     next = `${next}.`;
   }
 
+  next = next
+    .replace(/^the document is incomplete due to the absence of an owner.*$/i, 'Needs an owner.')
+    .replace(/^key issues:\s*/i, '')
+    .replace(/^missing content,\s*missing owner\.?$/i, 'Needs scope and an owner.')
+    .replace(/^missing content,\s*missing acceptance criteria\.?$/i, 'Needs scope and acceptance criteria.')
+    .replace(/^missing owner\.?$/i, 'Needs an owner.')
+    .replace(/^missing content\.?$/i, 'Needs more detail before work can start.');
+
   if (status === 'red' && /^missing content\.?$/i.test(next)) {
     return 'This reads like a placeholder and is not ready to execute.';
   }
@@ -469,25 +531,37 @@ function sanitizeFleetGraphSummary(
   return next.charAt(0).toUpperCase() + next.slice(1);
 }
 
-function filterRedundantTags(
-  tags: PersistedFleetGraphView['qualityTags'],
-  summary: string | null
-) {
-  const normalizedSummary = normalizeFleetGraphText(summary).replace(/[.?!]+$/g, '');
+function buildReviewBrief({
+  summary,
+  status,
+}: {
+  summary: string | null;
+  status: 'green' | 'yellow' | 'red' | null;
+}) {
+  const assessment =
+    summary ?? 'This document needs a quick PM review before the next action is clear.';
 
-  return tags.filter((tag) => {
-    const normalizedLabel = normalizeFleetGraphText(tag.label);
+  if (status === 'green') {
+    return {
+      assessment,
+    };
+  }
 
-    if (!normalizedLabel) {
-      return false;
-    }
+  if (status === 'yellow') {
+    return {
+      assessment,
+    };
+  }
 
-    if (normalizedSummary && normalizedSummary.includes(normalizedLabel)) {
-      return false;
-    }
+  if (status === 'red') {
+    return {
+      assessment,
+    };
+  }
 
-    return true;
-  });
+  return {
+    assessment,
+  };
 }
 
 function formatShortTimestamp(value: string | null | undefined): string {
@@ -506,6 +580,70 @@ function formatShortTimestamp(value: string | null | undefined): string {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+
+function buildScopeSummary(data: FleetGraphInsightsResponse): {
+  summary: string;
+  documentCount: number;
+  edgeCount: number;
+  maxDepthReached: number;
+  truncated: boolean;
+} {
+  const { scoringPayload, graph } = data;
+  const types = new Set(
+    scoringPayload.documents
+      .map((document) => document.documentType)
+      .filter((value): value is string => Boolean(value))
+  );
+
+  return {
+    summary: `Reviewed ${scoringPayload.documentCount} connected documents across ${types.size} document types around this root document.`,
+    documentCount: scoringPayload.documentCount,
+    edgeCount: scoringPayload.edgeCount,
+    maxDepthReached: graph.metadata.maxDepthReached,
+    truncated: graph.metadata.truncated,
+  };
+}
+
+function buildEvidencePoints({
+  tags,
+  suggestions,
+  summary,
+}: {
+  tags: Array<{ label: string }>;
+  suggestions: Array<{ title: string }>;
+  summary: string | null;
+}): string[] {
+  const points: string[] = [];
+
+  for (const tag of tags.slice(0, 2)) {
+    points.push(`Flagged: ${tag.label.replace(/_/g, ' ')}.`);
+  }
+
+  for (const suggestion of suggestions.slice(0, Math.max(0, 3 - points.length))) {
+    points.push(`Suggested next step: ${suggestion.title}.`);
+  }
+
+  if (points.length === 0 && summary) {
+    points.push(`Primary assessment: ${summary}`);
+  }
+
+  return points;
+}
+
+function buildUncertaintySummary(data: FleetGraphInsightsResponse): { summary: string } {
+  if (data.graph.metadata.truncated) {
+    return {
+      summary:
+        'FleetGraph hit the current traversal limit, so this review is helpful but may not include every connected document.',
+    };
+  }
+
+  return {
+    summary:
+      'FleetGraph reviewed the full local scope it loaded for this document. Findings are heuristic, but they are grounded in the connected documents fetched here.',
+  };
 }
 
 function LightbulbIcon({ className }: { className?: string }) {

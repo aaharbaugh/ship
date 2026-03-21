@@ -97,19 +97,31 @@ export interface FleetGraphQueueStatus {
   batchIntervalMs: number;
   maxDocumentsPerFlush: number;
   isFlushing: boolean;
+  leaseTimeoutMs: number;
   pendingCount: number;
+  runningCount: number;
+  failedCount: number;
+  completedCount: number;
   lastFlushStartedAt: string | null;
   lastFlushCompletedAt: string | null;
   workspaceGroups: Array<{
     workspaceId: string;
     pendingCount: number;
+    runningCount: number;
   }>;
   pendingDocuments: Array<{
+    id: string;
     workspaceId: string;
     documentId: string;
     source: string;
     documentType?: string | null;
     userId?: string | null;
+    contentHash?: string | null;
+    status: 'pending' | 'running';
+    attemptCount: number;
+    leasedBy: string | null;
+    createdAt: string;
+    updatedAt: string;
   }>;
 }
 
@@ -126,7 +138,10 @@ export interface FleetGraphReadinessStatus {
     openAiConfigured: boolean;
     langSmithEnabled: boolean;
     langSmithProject: string | null;
+    workerEnabled: boolean;
+    durableQueueEnabled: boolean;
     queueIntervalMs: number;
+    leaseTimeoutMs: number;
     maxDocumentsPerFlush: number;
     collaborationIdleMs: number;
     maxGraphDepth: number;

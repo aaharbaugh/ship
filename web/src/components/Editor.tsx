@@ -37,6 +37,7 @@ import { PlanReferenceBlockExtension } from './editor/PlanReferenceBlock';
 import { useCommentsQuery, useCreateComment, useUpdateComment } from '@/hooks/useCommentsQuery';
 import { BubbleMenu } from '@tiptap/react';
 import { useToast } from '@/components/ui/Toast';
+import { FleetGraphInlineAssistant } from '@/components/FleetGraphInlineAssistant';
 import 'tippy.js/dist/tippy.css';
 
 interface EditorProps {
@@ -82,6 +83,8 @@ interface EditorProps {
   aiScoringAnalysis?: { planAnalysis?: unknown; retroAnalysis?: unknown } | null;
   /** Suffix displayed after the title in the header (e.g., author name) */
   titleSuffix?: string;
+  /** Enables the inline FleetGraph assistant anchored to the current caret */
+  enableFleetGraphInlineAssistant?: boolean;
 }
 
 type SyncStatus = 'connecting' | 'cached' | 'synced' | 'disconnected';
@@ -179,6 +182,7 @@ export function Editor({
   onContentChange,
   aiScoringAnalysis,
   titleSuffix,
+  enableFleetGraphInlineAssistant = false,
 }: EditorProps) {
   const [title, setTitle] = useState(initialTitle === 'Untitled' ? '' : initialTitle);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -965,7 +969,7 @@ export function Editor({
             />
             {contentBanner}
             <div
-              className="tiptap-wrapper"
+              className="tiptap-wrapper relative"
               data-testid="tiptap-editor"
               onContextMenu={(e) => {
                 if (!editor || editor.state.selection.empty) return;
@@ -996,6 +1000,9 @@ export function Editor({
               <ErrorBoundary>
                 <EditorContent editor={editor} />
               </ErrorBoundary>
+              {editor && !editor.isDestroyed && enableFleetGraphInlineAssistant ? (
+                <FleetGraphInlineAssistant editor={editor} documentId={documentId} />
+              ) : null}
             </div>
             {editor && !editor.isDestroyed && (
               <BubbleMenu

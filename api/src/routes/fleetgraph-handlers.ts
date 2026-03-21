@@ -96,6 +96,10 @@ function getInternalBaseUrl(context: FleetGraphRouteContext): string {
   return `${context.protocol ?? 'http'}://${context.host ?? 'localhost'}`;
 }
 
+function isMissingDocumentError(caught: unknown): boolean {
+  return caught instanceof Error && /\bfailed \(404\)\b/.test(caught.message);
+}
+
 export function createRouteClient(context: FleetGraphRouteContext): FleetGraphShipApiClient {
   const baseUrl = getInternalBaseUrl(context);
   const authHeader = getHeader(context.headers, 'authorization');
@@ -144,9 +148,17 @@ export async function getReportsHandler(context: FleetGraphRouteContext) {
 
 export async function getReportDetailHandler(context: FleetGraphRouteContext) {
   const client = createRouteClient(context);
-  return ok({
-    report: await getFleetGraphReportDetail(client, String(context.params.id)),
-  });
+  try {
+    return ok({
+      report: await getFleetGraphReportDetail(client, String(context.params.id)),
+    });
+  } catch (caught) {
+    if (isMissingDocumentError(caught)) {
+      return error(404, 'FleetGraph report not found');
+    }
+
+    throw caught;
+  }
 }
 
 export async function getReviewSessionHandler(context: FleetGraphRouteContext) {
@@ -157,7 +169,7 @@ export async function getReviewSessionHandler(context: FleetGraphRouteContext) {
 }
 
 export async function getQueueStatusHandler() {
-  return ok(getFleetGraphQueueStatus());
+  return ok(await getFleetGraphQueueStatus());
 }
 
 export async function getReadinessHandler(context: FleetGraphRouteContext) {
@@ -186,22 +198,40 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
       : null;
 
   if (existingReportId) {
-    const report = await updateFleetGraphQualityReportDraft(
-      client,
-      existingReportId,
-      prepared,
-      analysis
-    );
-    await client.updateDocumentMetadata(prepared.rootDocumentId, {
-      ...(prepared.context.rootDocument.properties ?? {}),
-      quality_report_id: report.reportId,
-    });
+    try {
+      const report = await updateFleetGraphQualityReportDraft(
+        client,
+        existingReportId,
+        prepared,
+        analysis
+      );
+      await client.updateDocumentMetadata(prepared.rootDocumentId, {
+        ...(prepared.context.rootDocument.properties ?? {}),
+        quality_report_id: report.reportId,
+      });
 
-    return ok({
-      created: false,
-      updated: true,
-      reportId: existingReportId,
-    });
+      return ok({
+        created: false,
+        updated: true,
+        reportId: existingReportId,
+      });
+    } catch (caught) {
+      if (!isMissingDocumentError(caught)) {
+        throw caught;
+      }
+
+      const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);
+      await client.updateDocumentMetadata(prepared.rootDocumentId, {
+        ...(prepared.context.rootDocument.properties ?? {}),
+        quality_report_id: report.reportId,
+      });
+
+      return ok({
+        created: true,
+        updated: false,
+        reportId: report.reportId,
+      });
+    }
   }
 
   const report = await createFleetGraphQualityReportDraft(client, prepared, analysis);

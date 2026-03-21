@@ -169,6 +169,10 @@ interface UnifiedEditorProps {
   onTypeChange?: (newType: DocumentType) => Promise<void>;
   /** Suffix displayed after the title in the header (e.g., author name) */
   titleSuffix?: string;
+  /** Additional system-owned banner content shown above the editor body */
+  contentBanner?: React.ReactNode;
+  /** Enables the inline FleetGraph assistant inside the editor */
+  enableFleetGraphInlineAssistant?: boolean;
 }
 
 /**
@@ -204,6 +208,8 @@ export function UnifiedEditor({
   showTypeSelector = false,
   onTypeChange,
   titleSuffix,
+  contentBanner,
+  enableFleetGraphInlineAssistant = false,
 }: UnifiedEditorProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -445,6 +451,13 @@ export function UnifiedEditor({
     return <WeeklyReviewSubNav reviewState={weeklyReviewState} />;
   }, [weeklyReviewState]);
 
+  const combinedContentBanner = useMemo(() => {
+    if (contentBanner && qualityBanner) {
+      return <div className="space-y-4">{contentBanner}{qualityBanner}</div>;
+    }
+    return contentBanner ?? qualityBanner;
+  }, [contentBanner, qualityBanner]);
+
   return (
     <Suspense
       fallback={
@@ -472,10 +485,11 @@ export function UnifiedEditor({
         sidebar={sidebar}
         documentType={document.document_type}
         onPlanChange={document.document_type === 'sprint' || document.document_type === 'project' ? handlePlanChange : undefined}
-        contentBanner={qualityBanner}
+        contentBanner={combinedContentBanner}
         onContentChange={isWeeklyDoc ? setEditorContent : undefined}
         aiScoringAnalysis={isWeeklyDoc ? aiScoringAnalysis : undefined}
         titleSuffix={titleSuffix}
+        enableFleetGraphInlineAssistant={enableFleetGraphInlineAssistant}
       />
     </Suspense>
   );

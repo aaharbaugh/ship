@@ -38,6 +38,7 @@
     "db:init:deploy": "./scripts/init-database.sh",
     "db:seed:deploy": "./scripts/seed-deployment.sh",
     "fleetgraph:nightly-scan": "node scripts/fleetgraph-nightly-scan.mjs",
+    "fleetgraph:worker": "pnpm --filter @ship/api fleetgraph:worker",
     "fleetgraph:evals": "pnpm --filter @ship/api exec vitest run src/services/fleetgraph/eval.test.ts src/services/fleetgraph/triggers.test.ts src/services/fleetgraph/readiness.test.ts",
     "db:orphan-check": "pnpm --filter @ship/api db:orphan-check",
     "prepare": "husky",

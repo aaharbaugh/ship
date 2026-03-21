@@ -127,6 +127,11 @@ async function expandFleetGraphTraversal(
   ];
   const queued = new Set<string>([rootDocumentId]);
   const rootDocument = await client.getDocument(rootDocumentId);
+
+  if (isFleetGraphReportDocument(rootDocument)) {
+    throw new Error('FleetGraph report documents are output artifacts and cannot be reviewed');
+  }
+
   documentMap.set(rootDocument.id, rootDocument);
   let maxDepthReached = 0;
   let truncated = false;
@@ -183,6 +188,9 @@ async function expandFleetGraphTraversal(
     }
 
     for (const document of nextDocuments) {
+      if (isFleetGraphReportDocument(document)) {
+        continue;
+      }
       documentMap.set(document.id, document);
       queue.push({ documentId: document.id, depth: current.depth + 1 });
       queued.add(document.id);
@@ -200,6 +208,10 @@ async function expandFleetGraphTraversal(
     maxDepthReached,
     truncated,
   };
+}
+
+function isFleetGraphReportDocument(document: FleetGraphDocumentRecord): boolean {
+  return document.properties.fleetgraph_report_type === 'quality_report';
 }
 
 function collectRelatedDocumentIds(

@@ -5,6 +5,7 @@ const DEFAULT_COLLAB_IDLE_MS = 90_000;
 const DEFAULT_MAX_DOCUMENTS_PER_FLUSH = 24;
 const DEFAULT_MAX_GRAPH_DEPTH = 2;
 const DEFAULT_MAX_GRAPH_DOCUMENTS = 40;
+const DEFAULT_LEASE_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface FleetGraphReadinessStatus {
   ready: boolean;
@@ -19,7 +20,10 @@ export interface FleetGraphReadinessStatus {
     openAiConfigured: boolean;
     langSmithEnabled: boolean;
     langSmithProject: string | null;
+    workerEnabled: boolean;
+    durableQueueEnabled: boolean;
     queueIntervalMs: number;
+    leaseTimeoutMs: number;
     maxDocumentsPerFlush: number;
     collaborationIdleMs: number;
     maxGraphDepth: number;
@@ -76,9 +80,15 @@ export function getFleetGraphReadinessStatus(): FleetGraphReadinessStatus {
       openAiConfigured: Boolean(process.env.OPENAI_API_KEY),
       langSmithEnabled: isFleetGraphLangSmithEnabled(),
       langSmithProject: process.env.LANGSMITH_PROJECT ?? null,
+      workerEnabled: process.env.FLEETGRAPH_WORKER_ENABLED !== 'false',
+      durableQueueEnabled: true,
       queueIntervalMs: numberFromEnv(
         process.env.FLEETGRAPH_BATCH_INTERVAL_MS,
         DEFAULT_BATCH_INTERVAL_MS
+      ),
+      leaseTimeoutMs: numberFromEnv(
+        process.env.FLEETGRAPH_LEASE_TIMEOUT_MS,
+        DEFAULT_LEASE_TIMEOUT_MS
       ),
       maxDocumentsPerFlush: numberFromEnv(
         process.env.FLEETGRAPH_MAX_DOCUMENTS_PER_FLUSH,

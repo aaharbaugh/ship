@@ -104,6 +104,7 @@ const latestFleetGraphIdleEvents = new Map<string, {
   documentId: string;
   userId: string | null;
   documentType: string | null;
+  properties: Record<string, unknown>;
   contentHash: string;
 }>();
 const FLEETGRAPH_COLLAB_IDLE_MS = Number(
@@ -194,6 +195,7 @@ async function persistDocument(docName: string, doc: Y.Doc) {
         documentId: docId,
         userId: typeof createdBy === 'string' ? createdBy : null,
         documentType: typeof documentType === 'string' ? documentType : null,
+        properties: updatedProps as Record<string, unknown>,
         contentHash: computeFleetGraphContentHash({
           content,
           properties: updatedProps as Record<string, unknown>,
@@ -236,14 +238,21 @@ function scheduleFleetGraphIdleCheckpoint(
       return;
     }
 
-    enqueueFleetGraphRun({
-      workspaceId: event.workspaceId,
-      documentId: event.documentId,
-      source: 'collaboration_persist',
-      userId: event.userId,
-      documentType: event.documentType,
-      contentHash: event.contentHash,
-    });
+    if (!isFleetGraphReportProperties(event.properties)) {
+      void enqueueFleetGraphRun({
+        workspaceId: event.workspaceId,
+        documentId: event.documentId,
+        source: 'collaboration_persist',
+        userId: event.userId,
+        documentType: event.documentType,
+        contentHash: event.contentHash,
+      }).catch((error) => {
+        console.error('[FleetGraph] Failed to enqueue collaboration idle run', {
+          documentId: event.documentId,
+          error,
+        });
+      });
+    }
     pendingFleetGraphIdleRuns.delete(docName);
     latestFleetGraphIdleEvents.delete(docName);
   }, delayMs));
@@ -922,4 +931,8 @@ export function setupCollaboration(server: Server) {
 
   console.log('Yjs collaboration server attached');
   console.log('Events WebSocket server attached');
+}
+
+function isFleetGraphReportProperties(properties: Record<string, unknown> | null | undefined): boolean {
+  return properties?.fleetgraph_report_type === 'quality_report';
 }
