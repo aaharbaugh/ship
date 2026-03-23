@@ -47,6 +47,14 @@ export function FleetGraphReportsPage() {
   >(null);
 
   const reports = reportsQuery.data ?? [];
+  const readinessRuntime = readinessQuery.data?.runtime as
+    | {
+        openAiConfigured: boolean;
+        langSmithEnabled: boolean;
+        interactiveGraphDepth?: number;
+        interactiveAnalysisMode?: string;
+      }
+    | undefined;
   const filteredReports = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -158,17 +166,21 @@ export function FleetGraphReportsPage() {
               </button>
               {readinessQuery.data && (
                 <>
-                  <span>{readinessQuery.data.runtime.openAiConfigured ? 'OpenAI ready' : 'OpenAI missing'}</span>
+                  <span>{readinessRuntime?.openAiConfigured ? 'OpenAI ready' : 'OpenAI missing'}</span>
                   <span>·</span>
-                  <span>{readinessQuery.data.runtime.langSmithEnabled ? 'LangSmith on' : 'LangSmith missing'}</span>
-                  <span>·</span>
-                  <span>
-                    interactive depth {readinessQuery.data.runtime.interactiveGraphDepth}
-                  </span>
-                  <span>·</span>
-                  <span>
-                    interactive mode {readinessQuery.data.runtime.interactiveAnalysisMode}
-                  </span>
+                  <span>{readinessRuntime?.langSmithEnabled ? 'LangSmith on' : 'LangSmith missing'}</span>
+                  {typeof readinessRuntime?.interactiveGraphDepth === 'number' && (
+                    <>
+                      <span>·</span>
+                      <span>interactive depth {readinessRuntime.interactiveGraphDepth}</span>
+                    </>
+                  )}
+                  {readinessRuntime?.interactiveAnalysisMode && (
+                    <>
+                      <span>·</span>
+                      <span>interactive mode {readinessRuntime.interactiveAnalysisMode}</span>
+                    </>
+                  )}
                 </>
               )}
               {queueStatusQuery.data && (
