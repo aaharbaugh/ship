@@ -147,7 +147,7 @@
     <text x="700" y="950" class="nodeTitle">scoreGraph</text>
     <text x="700" y="968" class="nodeFile">analyze.ts + reasoning.ts</text>
     <text x="700" y="992" class="nodeBody">analyzeFleetGraphPayload()</text>
-    <text x="700" y="1008" class="nodeBody">analyzeFleetGraphWithReasoning()</text>
+    <text x="700" y="1008" class="nodeBody">analyzeFleetGraphForPurpose()</text>
     <text x="700" y="1024" class="nodeBody">mergeReasoningIntoAnalysis()</text>
   </g>
 

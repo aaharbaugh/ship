@@ -37,19 +37,50 @@ export function analyzeFleetGraphPayload(
 
 const tracedAnalyzeFleetGraphPayload = traceable(
   function analyzePayload(payload: FleetGraphScoringPayload): FleetGraphAnalysis {
-  const documents = payload.documents.map(analyzeDocument);
+    const documents = payload.documents.map(analyzeDocument);
 
-  return {
-    generatedAt: new Date().toISOString(),
-    rootDocumentId: payload.rootDocumentId,
-    mode: 'deterministic',
-    model: null,
-    executiveSummary: buildExecutiveSummary(payload, documents),
-    remediationSuggestions: buildRemediationSuggestions(documents),
-    documents,
-  };
+    return {
+      generatedAt: new Date().toISOString(),
+      rootDocumentId: payload.rootDocumentId,
+      mode: 'deterministic',
+      model: null,
+      executiveSummary: buildExecutiveSummary(payload, documents),
+      remediationSuggestions: buildRemediationSuggestions(documents),
+      documents,
+    };
   },
-  fleetGraphTraceConfig('fleetgraph.analyze_deterministic')
+  fleetGraphTraceConfig('fleetgraph.subprocess.score_graph.deterministic', {
+    processInputs: (inputs) => {
+      const [payload] = 'args' in inputs ? (inputs.args as [FleetGraphScoringPayload]) : [];
+      if (!payload) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: payload.rootDocumentId,
+        documentCount: payload.documentCount,
+        edgeCount: payload.edgeCount,
+        maxDepthReached: payload.maxDepthReached,
+        truncated: payload.truncated,
+      };
+    },
+    processOutputs: (outputs) => {
+      const analysis = 'rootDocumentId' in outputs ? (outputs as FleetGraphAnalysis) : null;
+      if (!analysis) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: analysis.rootDocumentId,
+        mode: analysis.mode,
+        model: analysis.model,
+        documentCount: analysis.documents.length,
+        suggestionCount: analysis.remediationSuggestions.length,
+        redDocuments: analysis.documents.filter((document) => document.qualityStatus === 'red').length,
+        yellowDocuments: analysis.documents.filter((document) => document.qualityStatus === 'yellow').length,
+      };
+    },
+  })
 );
 
 function analyzeDocument(document: FleetGraphScoringDocument): FleetGraphDocumentAnalysis {

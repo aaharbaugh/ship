@@ -19,6 +19,55 @@ export interface FleetGraphInsightsResponse {
   rootDocumentId: string;
   triggerSource: string;
   nodeIds: string[];
+  trace: {
+    triggerSource: string;
+    rootDocumentId: string;
+    stepCount: number;
+    path: string[];
+    plannedPath: string[];
+    nextPath: string[];
+    scope: {
+      documentCount: number;
+      edgeCount: number;
+      maxDepthReached: number;
+      truncated: boolean;
+      depthLimit: number;
+      documentLimit: number;
+    };
+    steps: Array<{
+      id: string;
+      description: string;
+      dependsOn: string[];
+      status: 'completed';
+    }>;
+    decision?: {
+      outcome:
+        | 'healthy'
+        | 'persist_metadata'
+        | 'human_review_required'
+        | 'draft_report_recommended';
+      proposedAction:
+        | 'none'
+        | 'persist_metadata'
+        | 'review_findings'
+        | 'draft_quality_report';
+      humanDecisionRequired: boolean;
+      rootStatus: 'green' | 'yellow' | 'red' | null;
+      reason: string;
+    };
+    analysis?: {
+      generatedAt: string;
+      mode: 'deterministic' | 'gpt-4o';
+      model: string | null;
+      documentCount: number;
+      suggestionCount: number;
+      statuses: {
+        green: number;
+        yellow: number;
+        red: number;
+      };
+    };
+  };
   graph: {
     rootDocumentId: string;
     metadata: {
@@ -91,9 +140,32 @@ export interface FleetGraphChatResponse {
   suggestedPrompts: string[];
 }
 
+export interface FleetGraphLiveReviewRun {
+  runId: string;
+  documentId: string;
+  workspaceId: string;
+  triggerSource: 'manual';
+  status: 'running' | 'completed' | 'failed';
+  startedAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+  error: string | null;
+  path: string[];
+  nextPath: string[];
+  currentStepId: string | null;
+  trace?: FleetGraphInsightsResponse['trace'];
+  steps: Array<{
+    id: string;
+    description: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'failed';
+    completedAt?: string;
+  }>;
+}
+
 export const fleetGraphInsightsKeys = {
   all: ['fleetgraph-insights'] as const,
   detail: (id: string) => [...fleetGraphInsightsKeys.all, id] as const,
+  liveRun: (runId: string) => ['fleetgraph-live-run', runId] as const,
 };
 
 async function fetchFleetGraphInsights(documentId: string): Promise<FleetGraphInsightsResponse> {
@@ -177,5 +249,36 @@ export function useFleetGraphChatMutation(documentId: string | undefined) {
       }
       return res.json() as Promise<FleetGraphChatResponse>;
     },
+  });
+}
+
+export function useFleetGraphStartLiveReviewMutation(documentId: string | undefined) {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await apiPost(`/api/fleetgraph/documents/${documentId}/live-review`, {});
+      if (!res.ok) {
+        throw new Error('Failed to start FleetGraph live review');
+      }
+      return res.json() as Promise<{ run: FleetGraphLiveReviewRun }>;
+    },
+  });
+}
+
+export function useFleetGraphLiveReviewQuery(runId: string | undefined) {
+  return useQuery({
+    queryKey: fleetGraphInsightsKeys.liveRun(runId || ''),
+    queryFn: async () => {
+      const res = await apiGet(`/api/fleetgraph/live-review/${runId}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch FleetGraph live review');
+      }
+      return res.json() as Promise<{ run: FleetGraphLiveReviewRun }>;
+    },
+    enabled: !!runId,
+    refetchInterval: (query) => {
+      const run = (query.state.data as { run: FleetGraphLiveReviewRun } | undefined)?.run;
+      return run?.status === 'running' || !run ? 1000 : false;
+    },
+    staleTime: 0,
   });
 }

@@ -5,7 +5,10 @@ import {
   type FleetGraphShipApiClient,
 } from '../services/fleetgraph/client.js';
 import { persistFleetGraphAnalysis } from '../services/fleetgraph/persist.js';
-import { analyzeFleetGraphWithReasoning } from '../services/fleetgraph/reasoning.js';
+import {
+  analyzeFleetGraphForPurpose,
+  type FleetGraphAnalysisPurpose,
+} from '../services/fleetgraph/reasoning.js';
 import {
   createFleetGraphQualityReportDraft,
   deleteFleetGraphQualityReport,
@@ -22,7 +25,15 @@ import { runFleetGraphWorkspaceScan } from '../services/fleetgraph/scan.js';
 import { getFleetGraphQueueStatus } from '../services/fleetgraph/triggers.js';
 import { sendFleetGraphDirectorFeedback } from '../services/fleetgraph/feedback.js';
 import { getFleetGraphReadinessStatus } from '../services/fleetgraph/readiness.js';
-import { answerFleetGraphQuestion, type FleetGraphChatMessage } from '../services/fleetgraph/chat.js';
+import {
+  answerFleetGraphQuestion,
+  type FleetGraphChatMessage,
+} from '../services/fleetgraph/chat.js';
+import { withFleetGraphTraceAnalysis } from '../services/fleetgraph/tracing.js';
+import {
+  getFleetGraphLiveReviewRun,
+  startFleetGraphLiveReviewRun,
+} from '../services/fleetgraph/live-run.js';
 
 const nightlyScanSchema = z.object({
   createDraftReports: z.boolean().optional(),
@@ -118,23 +129,30 @@ export function createRouteClient(context: FleetGraphRouteContext): FleetGraphSh
   return createFleetGraphSessionClient(baseUrl, cookieHeader, csrfToken);
 }
 
-export async function buildInsightsContext(context: FleetGraphRouteContext) {
+export async function buildInsightsContext(
+  context: FleetGraphRouteContext,
+  purpose: FleetGraphAnalysisPurpose = 'insights'
+) {
   const client = createRouteClient(context);
   const prepared = await prepareFleetGraphRun(client, {
     workspaceId: String(context.workspaceId),
     documentId: String(context.params.id),
     source: 'manual',
   });
-  const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
+  const analysis = await analyzeFleetGraphForPurpose(prepared.scoringPayload, {
+    triggerSource: 'manual',
+    purpose,
+  });
 
   return { client, prepared, analysis };
 }
 
 export async function buildInsightsResponse(context: FleetGraphRouteContext) {
-  const { prepared, analysis } = await buildInsightsContext(context);
+  const { prepared, analysis } = await buildInsightsContext(context, 'insights');
 
   return {
     ...prepared,
+    trace: prepared.trace ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'insights') : undefined,
     analysis,
   };
 }
@@ -181,17 +199,18 @@ export async function getReadinessHandler(context: FleetGraphRouteContext) {
 }
 
 export async function persistInsightsHandler(context: FleetGraphRouteContext) {
-  const { client, analysis } = await buildInsightsContext(context);
+  const { client, prepared, analysis } = await buildInsightsContext(context, 'persist');
   await persistFleetGraphAnalysis(client, analysis);
 
   return ok({
     persisted: analysis.documents.length,
+    trace: prepared.trace ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'persist') : undefined,
     analysis,
   });
 }
 
 export async function createReportDraftHandler(context: FleetGraphRouteContext) {
-  const { client, prepared, analysis } = await buildInsightsContext(context);
+  const { client, prepared, analysis } = await buildInsightsContext(context, 'draft_report');
   const existingReportId =
     typeof prepared.context.rootDocument.properties.quality_report_id === 'string'
       ? prepared.context.rootDocument.properties.quality_report_id
@@ -214,6 +233,7 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
         created: false,
         updated: true,
         reportId: existingReportId,
+        trace: prepared.trace ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'draft_report') : undefined,
       });
     } catch (caught) {
       if (!isMissingDocumentError(caught)) {
@@ -230,6 +250,7 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
         created: true,
         updated: false,
         reportId: report.reportId,
+        trace: prepared.trace ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'draft_report') : undefined,
       });
     }
   }
@@ -244,6 +265,7 @@ export async function createReportDraftHandler(context: FleetGraphRouteContext) 
     created: true,
     updated: false,
     reportId: report.reportId,
+    trace: prepared.trace ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'draft_report') : undefined,
   });
 }
 
@@ -253,7 +275,7 @@ export async function chatHandler(context: FleetGraphRouteContext) {
     return error(400, 'Invalid FleetGraph chat payload', parsed.error.flatten());
   }
 
-  const { prepared, analysis } = await buildInsightsContext(context);
+  const { prepared, analysis } = await buildInsightsContext(context, 'chat');
   return ok(
     await answerFleetGraphQuestion(
       prepared,
@@ -262,6 +284,27 @@ export async function chatHandler(context: FleetGraphRouteContext) {
       (parsed.data.history ?? []) as FleetGraphChatMessage[]
     )
   );
+}
+
+export async function startLiveReviewHandler(context: FleetGraphRouteContext) {
+  const client = createRouteClient(context);
+  return ok({
+    run: startFleetGraphLiveReviewRun({
+      client,
+      workspaceId: String(context.workspaceId),
+      documentId: String(context.params.id),
+    }),
+  });
+}
+
+export async function getLiveReviewHandler(context: FleetGraphRouteContext) {
+  const runId = String(context.params.runId);
+  const run = getFleetGraphLiveReviewRun(runId);
+  if (!run) {
+    return error(404, 'FleetGraph live review run not found');
+  }
+
+  return ok({ run });
 }
 
 export async function publishReportHandler(context: FleetGraphRouteContext) {

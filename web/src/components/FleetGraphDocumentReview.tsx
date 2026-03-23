@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/cn';
-import type { FleetGraphInsightsResponse } from '@/hooks/useFleetGraphInsightsQuery';
+import type {
+  FleetGraphInsightsResponse,
+  FleetGraphLiveReviewRun,
+} from '@/hooks/useFleetGraphInsightsQuery';
 import type {
   FleetGraphReportDetail,
   FleetGraphReportListItem,
@@ -33,6 +36,7 @@ export function FleetGraphDocumentReview({
   isLoadingReportDetail,
   onPublishReport,
   isPublishingReport,
+  liveRun,
   expanded: expandedProp,
   onExpandedChange,
 }: {
@@ -48,6 +52,7 @@ export function FleetGraphDocumentReview({
   isLoadingReportDetail?: boolean;
   onPublishReport?: (reportId: string) => void;
   isPublishingReport?: boolean;
+  liveRun?: FleetGraphLiveReviewRun | null;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
 }) {
@@ -96,6 +101,10 @@ export function FleetGraphDocumentReview({
   );
   const report = reportDetail?.report ?? linkedReport ?? null;
   const linkedTargets = reportDetail?.targetDocuments ?? [];
+  const displayedTrace = useMemo(
+    () => deriveDisplayedTrace(data?.trace, report, liveRun ?? null),
+    [data?.trace, report, liveRun]
+  );
   const hasVisibleContent =
     Boolean(displayStatus) ||
     Boolean(displaySummary) ||
@@ -142,6 +151,9 @@ export function FleetGraphDocumentReview({
                 )}
                 <span className="text-xs text-slate-500">
                   {updatedAt ? `Updated ${formatShortTimestamp(updatedAt)}` : 'Run review to generate a gameplan'}
+                </span>
+                <span className="rounded-full border border-sky-900/60 bg-sky-950/40 px-2 py-0.5 text-[11px] font-medium text-sky-200">
+                  Interactive run: quick deterministic check
                 </span>
               </div>
             </div>
@@ -203,6 +215,14 @@ export function FleetGraphDocumentReview({
                 <MetricPill>depth {scopeSummary.maxDepthReached}</MetricPill>
               </>
             ) : null}
+            {data?.trace ? (
+              <>
+                <MetricPill>{data.trace.stepCount} graph steps</MetricPill>
+                <MetricPill>{data.trace.path.length} executed</MetricPill>
+                <MetricPill>trigger {data.trace.triggerSource}</MetricPill>
+                {data.trace.analysis?.model ? <MetricPill>model {data.trace.analysis.model}</MetricPill> : null}
+              </>
+            ) : null}
             {uncertaintySummary ? (
               <span
                 className={cn(
@@ -237,6 +257,45 @@ export function FleetGraphDocumentReview({
                   {humanizeEvidenceLabel(tag.label)}
                 </span>
               ))}
+            </div>
+          ) : null}
+
+          {displayedTrace ? (
+            <div className="rounded-xl border border-slate-800 bg-black/40 px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                Trace Path
+              </div>
+              <div className="mt-2 text-xs leading-5 text-slate-300">
+                executed: {displayedTrace.path.join(' -> ')}
+              </div>
+              {displayedTrace.nextPath.length > 0 ? (
+                <div className="mt-1 text-xs leading-5 text-amber-300">
+                  next: {displayedTrace.nextPath.join(' -> ')}
+                </div>
+              ) : null}
+              {displayedTrace.reason ? (
+                <div className="mt-2 text-xs leading-5 text-slate-400">
+                  {displayedTrace.reason}
+                </div>
+              ) : null}
+              {liveRun?.status === 'running' ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {liveRun.steps.map((step) => (
+                    <span
+                      key={step.id}
+                      className={cn(
+                        'rounded-full border px-2 py-1 text-[11px]',
+                        step.status === 'completed' && 'border-emerald-900/60 bg-emerald-950/30 text-emerald-200',
+                        step.status === 'in_progress' && 'border-sky-900/60 bg-sky-950/30 text-sky-200',
+                        step.status === 'pending' && 'border-slate-800 bg-black/40 text-slate-400',
+                        step.status === 'failed' && 'border-red-900/60 bg-red-950/30 text-red-200'
+                      )}
+                    >
+                      {step.id}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -449,6 +508,59 @@ function buildScopeSummary(data: FleetGraphInsightsResponse): {
     documentCount: scoringPayload.documentCount,
     edgeCount: scoringPayload.edgeCount,
     maxDepthReached: graph.metadata.maxDepthReached,
+  };
+}
+
+function deriveDisplayedTrace(
+  trace: FleetGraphInsightsResponse['trace'] | undefined,
+  report: FleetGraphReportDetail['report'] | FleetGraphReportListItem | null,
+  liveRun: FleetGraphLiveReviewRun | null
+): {
+  path: string[];
+  nextPath: string[];
+  reason: string | null;
+} | null {
+  if (liveRun) {
+    return {
+      path: liveRun.path,
+      nextPath: liveRun.nextPath,
+      reason:
+        liveRun.status === 'failed'
+          ? liveRun.error ?? 'FleetGraph review failed before completing the graph.'
+          : liveRun.status === 'running'
+            ? `FleetGraph is currently running ${liveRun.currentStepId ?? 'the next graph step'} and updating the trace as each node completes.`
+            : liveRun.trace?.decision?.reason ?? 'FleetGraph completed the live review run.',
+    };
+  }
+
+  if (!trace) {
+    return null;
+  }
+
+  const base = {
+    path: trace.path,
+    nextPath: trace.nextPath,
+    reason: trace.decision?.reason ?? null,
+  };
+
+  if (!report) {
+    return base;
+  }
+
+  if (report.state === 'published') {
+    return {
+      path: [...trace.path, 'human-review', 'draft-report', 'publish-report'],
+      nextPath: [],
+      reason:
+        'A FleetGraph report has already been reviewed and published for these findings, so the graph has advanced past report creation and is now in the published artifact state.',
+    };
+  }
+
+  return {
+    path: [...trace.path, 'human-review', 'draft-report'],
+    nextPath: [],
+    reason:
+      'A FleetGraph draft report already exists for these findings, so the graph has advanced past report recommendation and is waiting on human review or publication.',
   };
 }
 

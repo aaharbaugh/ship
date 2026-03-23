@@ -33,7 +33,19 @@ Current gaps for external MVP completion:
 
 - public deployment
 - trace-link submission
+- final proof capture tying use cases to concrete trace evidence
 - final polish of the PM-facing workflow and documentation
+
+Proof matrix:
+
+- see `fleetgraph/PROOF_MATRIX.md`
+
+Final-submission proof expectation:
+
+- every use case should map to a concrete test case
+- every test case should have an expected path and expected result
+- every trace should show how FleetGraph chose its branch
+- at least one scenario should be shown end to end as a flagship proof story
 
 ## Agent Responsibility
 
@@ -46,6 +58,26 @@ For the current on-demand UX, FleetGraph is primarily positioned as a contextual
 - it produces one executive summary plus supporting findings
 - it can refresh or draft a report for that root context
 - it includes an embedded chat surface for document-scoped follow-up questions like risk, readiness, and next steps
+- it now shows live step progression for on-demand review runs instead of only a final trace snapshot
+
+## Final Proof Package
+
+The final submission should be reviewed as one proof package rather than separate product features.
+
+The intended package is:
+
+- deterministic eval corpus in `api/src/services/fleetgraph/eval.ts`
+- route/runtime tests in `api/src/routes/fleetgraph.test.ts`
+- proof matrix in `fleetgraph/PROOF_MATRIX.md`
+- observability diagrams in `fleetgraph/FLEETGRAPH_OBSERVABILITY_FLOW.svg`
+- one flagship scenario: `blocked-project-graph`
+
+What the reviewer should be able to verify quickly:
+
+- FleetGraph takes different graph branches for different findings
+- a human decision point exists where it matters
+- the trace exposes why the branch was chosen
+- the resulting artifact or metadata state matches the chosen branch
 
 For MVP, FleetGraph is allowed to:
 
@@ -204,6 +236,7 @@ The important shape is:
 
 - many entry points
 - one shared core prepare/score/persist path
+- an early context-resolution branch before scoring
 - multiple consumers of the same outputs
 
 ### Entry Nodes
@@ -221,7 +254,7 @@ The important shape is:
 - `prepareFleetGraphRun()` in `runner.ts`
 - `buildFleetGraphSnapshot()` in `graph.ts`
 - `buildFleetGraphScoringPayload()` in `payload.ts`
-- `analyzeFleetGraphWithReasoning()` in `reasoning.ts`
+- `analyzeFleetGraphForPurpose()` in `reasoning.ts`
 - `persistFleetGraphAnalysis()` in `persist.ts`
 
 ### Shared Traversal Subnodes
@@ -231,11 +264,28 @@ These are documented in `api/src/services/fleetgraph/nodes.ts`:
 - `load-trigger-context`
 - `load-document`
 - `load-associations`
+- `resolve-anchor-context`
+- `resolve-execution-context`
 - `load-related-documents`
 - `build-graph`
 - `score-graph`
+- `decide-action`
+- `human-review`
 - `persist-metadata`
 - `draft-report`
+
+### Early Structural Branch
+
+FleetGraph now branches before scoring based on the type of root document:
+
+- leaf-ish documents such as `issue`, `standup`, `weekly_plan`, `weekly_retro`, and `wiki`
+  - use `resolve-anchor-context`
+  - FleetGraph climbs upward first to anchor the run in a containing project or program context
+- parent/execution documents such as `project`, `program`, and `sprint`
+  - use `resolve-execution-context`
+  - FleetGraph fans outward or downward first into child execution documents before broader graph expansion
+
+This means the runtime no longer only branches at the final decision stage. It also branches earlier in the context-assembly stage, which changes how nearby documents are fetched and ordered before scoring.
 
 ### Branch Nodes
 

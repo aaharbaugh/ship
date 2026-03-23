@@ -6,6 +6,7 @@ import type {
   FleetGraphAlertTag,
   FleetGraphDocumentMetadata,
   FleetGraphRemediationSuggestion,
+  FleetGraphTriggerSource,
 } from '@ship/shared';
 import {
   analyzeFleetGraphPayload,
@@ -89,10 +90,35 @@ const reasoningResponseSchema = z.object({
 
 const DEFAULT_MODEL = process.env.FLEETGRAPH_OPENAI_MODEL || 'gpt-4o';
 
+export type FleetGraphAnalysisPurpose =
+  | 'insights'
+  | 'chat'
+  | 'persist'
+  | 'draft_report'
+  | 'execute_trigger'
+  | 'nightly_scan';
+
 export async function analyzeFleetGraphWithReasoning(
   payload: FleetGraphScoringPayload
 ): Promise<FleetGraphAnalysis> {
   const deterministic = analyzeFleetGraphPayload(payload);
+  return tracedAnalyzeFleetGraphWithReasoning(payload, deterministic);
+}
+
+export async function analyzeFleetGraphForPurpose(
+  payload: FleetGraphScoringPayload,
+  options: {
+    triggerSource: FleetGraphTriggerSource;
+    purpose: FleetGraphAnalysisPurpose;
+  }
+): Promise<FleetGraphAnalysis> {
+  const deterministic = analyzeFleetGraphPayload(payload);
+  const strategy = resolveFleetGraphAnalysisStrategy(options);
+
+  if (strategy === 'deterministic') {
+    return deterministic;
+  }
+
   return tracedAnalyzeFleetGraphWithReasoning(payload, deterministic);
 }
 
@@ -111,7 +137,7 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
       const client = wrapOpenAI(
         new OpenAI({ apiKey }),
         {
-          name: 'fleetgraph.openai',
+          name: 'fleetgraph.subprocess.score_graph.openai',
           tags: ['fleetgraph', 'openai'],
           metadata: fleetGraphTraceMetadata({
             rootDocumentId: payload.rootDocumentId,
@@ -138,7 +164,7 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
         ],
       }, {
         langsmithExtra: {
-          name: 'fleetgraph.reasoning_completion',
+          name: 'fleetgraph.subprocess.score_graph.llm_completion',
           tags: ['fleetgraph', 'reasoning'],
           metadata: buildReasoningTraceMetadata(payload, deterministic),
         },
@@ -159,7 +185,7 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
       return deterministic;
     }
   },
-  fleetGraphTraceConfig('fleetgraph.analyze_reasoning', {
+  fleetGraphTraceConfig('fleetgraph.node.score_graph', {
     getInvocationParams: (payload) => ({
       ls_provider: 'openai',
       ls_model_name: DEFAULT_MODEL,
@@ -203,6 +229,21 @@ const tracedAnalyzeFleetGraphWithReasoning = traceable(
     },
   })
 );
+
+function resolveFleetGraphAnalysisStrategy(options: {
+  triggerSource: FleetGraphTriggerSource;
+  purpose: FleetGraphAnalysisPurpose;
+}): 'deterministic' | 'reasoning' {
+  if (options.purpose === 'draft_report' || options.purpose === 'nightly_scan') {
+    return 'reasoning';
+  }
+
+  if (options.purpose === 'execute_trigger') {
+    return options.triggerSource === 'nightly_scan' ? 'reasoning' : 'deterministic';
+  }
+
+  return 'deterministic';
+}
 
 function buildReasoningTraceMetadata(
   payload: FleetGraphScoringPayload,
@@ -338,8 +379,7 @@ function normalizeReasoningResponse(value: unknown): unknown {
 
   return {
     ...response,
-    executiveSummary:
-      typeof response.executiveSummary === 'string' ? response.executiveSummary.trim() : response.executiveSummary,
+    executiveSummary: normalizeExecutiveSummary(response.executiveSummary),
     documents: Array.isArray(response.documents)
       ? response.documents.map((document) => normalizeReasoningDocument(document))
       : response.documents,
@@ -397,6 +437,29 @@ function normalizeQualityScore(value: unknown): unknown {
 function normalizeConfidence(value: unknown): unknown {
   if (value === 'low' || value === 'medium' || value === 'high') {
     return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized) {
+      return value;
+    }
+
+    if (normalized === 'very low' || normalized === 'lowest' || normalized === 'minimal') {
+      return 'low';
+    }
+
+    if (
+      normalized === 'moderate' ||
+      normalized === 'moderately confident' ||
+      normalized === 'average'
+    ) {
+      return 'medium';
+    }
+
+    if (normalized === 'very high' || normalized === 'strong' || normalized === 'highest') {
+      return 'high';
+    }
   }
 
   if (typeof value !== 'number' || !Number.isFinite(value)) {
@@ -641,4 +704,52 @@ function buildMergedSummary(
   }
 
   return deterministicSummary;
+}
+
+function normalizeExecutiveSummary(value: unknown): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : value;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const summaryObject = value as Record<string, unknown>;
+  const candidateKeys = [
+    'summary',
+    'text',
+    'message',
+    'analysis',
+    'executive_summary',
+    'executiveSummary',
+  ];
+
+  for (const key of candidateKeys) {
+    const candidate = summaryObject[key];
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+
+  const joinedValues = Object.values(summaryObject)
+    .flatMap((entry) => {
+      if (typeof entry === 'string' && entry.trim().length > 0) {
+        return [entry.trim()];
+      }
+
+      if (Array.isArray(entry)) {
+        return entry.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+      }
+
+      return [];
+    })
+    .slice(0, 3);
+
+  if (joinedValues.length > 0) {
+    return joinedValues.join(' ');
+  }
+
+  return value;
 }

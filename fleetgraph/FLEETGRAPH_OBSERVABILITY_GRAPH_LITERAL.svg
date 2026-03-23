@@ -1,0 +1,151 @@
+<svg width="2000" height="1240" viewBox="0 0 2000 1240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="literalGrid" width="36" height="36" patternUnits="userSpaceOnUse">
+      <path d="M36 0H0V36" stroke="#E7E0D2" stroke-width="1"/>
+    </pattern>
+    <filter id="literalShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#312E2A" flood-opacity="0.10"/>
+    </filter>
+    <marker id="literalArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1 1L8 5L1 9" stroke="#264653" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="literalHotArrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M1 1L8 5L1 9" stroke="#B85C38" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 46px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #1F2933; }
+      .subtitle { font: 500 19px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #5B6470; }
+      .section { font: 700 18px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #284B63; letter-spacing: 0.08em; text-transform: uppercase; }
+      .group { font: 700 15px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #5F6B5B; letter-spacing: 0.08em; text-transform: uppercase; }
+      .nodeId { font: 700 18px "IBM Plex Mono", "SFMono-Regular", Consolas, monospace; fill: #24303A; }
+      .nodeText { font: 500 15px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #53606C; }
+      .pill { font: 700 12px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #284B63; letter-spacing: 0.06em; text-transform: uppercase; }
+      .tiny { font: 500 14px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #7A6F63; }
+      .noteTitle { font: 700 18px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #24303A; }
+      .noteText { font: 500 15px "IBM Plex Sans", "Segoe UI", Arial, sans-serif; fill: #5B6470; }
+    </style>
+  </defs>
+
+  <rect width="2000" height="1240" fill="#F6F1E8"/>
+  <rect width="2000" height="1240" fill="url(#literalGrid)" opacity="0.5"/>
+  <rect x="60" y="60" width="1880" height="1120" rx="28" fill="#FBF8F2" stroke="#DCCFBD"/>
+
+  <text x="96" y="110" class="title">FleetGraph Graph Literal</text>
+  <text x="96" y="146" class="subtitle">Implementation-facing view using the exact node ids currently represented in the FleetGraph run plan and trace model, including the early context branch.</text>
+
+  <text x="96" y="212" class="section">Run Plan</text>
+  <rect x="96" y="238" width="1808" height="700" rx="24" fill="#FFFDF9" stroke="#D8CCBA"/>
+
+  <text x="126" y="278" class="group">Pre-Decision Runtime</text>
+
+  <rect x="126" y="312" width="208" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="144" y="328" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="163" y="344" class="pill">Node 1</text>
+  <text x="144" y="378" class="nodeId">load-trigger-context</text>
+  <text x="144" y="402" class="nodeText">Normalize trigger payload.</text>
+
+  <rect x="390" y="312" width="208" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="408" y="328" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="427" y="344" class="pill">Node 2</text>
+  <text x="408" y="378" class="nodeId">load-document</text>
+  <text x="408" y="402" class="nodeText">Fetch root document.</text>
+
+  <rect x="654" y="312" width="208" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="672" y="328" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="691" y="344" class="pill">Node 3</text>
+  <text x="672" y="378" class="nodeId">load-associations</text>
+  <text x="672" y="402" class="nodeText">Fetch direct and reverse edges.</text>
+
+  <rect x="918" y="264" width="256" height="116" rx="18" fill="#FFFDF9" stroke="#D5A98D" filter="url(#literalShadow)"/>
+  <rect x="936" y="280" width="94" height="22" rx="11" fill="#F1D6C7"/>
+  <text x="956" y="296" class="pill">Node 4A</text>
+  <text x="936" y="332" class="nodeId">resolve-anchor-context</text>
+  <text x="936" y="356" class="nodeText">Leaf-ish docs climb upward first.</text>
+
+  <rect x="918" y="414" width="272" height="116" rx="18" fill="#FFFDF9" stroke="#D5A98D" filter="url(#literalShadow)"/>
+  <rect x="936" y="430" width="94" height="22" rx="11" fill="#F1D6C7"/>
+  <text x="956" y="446" class="pill">Node 4B</text>
+  <text x="936" y="482" class="nodeId">resolve-execution-context</text>
+  <text x="936" y="506" class="nodeText">Parent docs fan outward first.</text>
+
+  <rect x="1268" y="340" width="236" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="1286" y="356" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="1305" y="372" class="pill">Node 5</text>
+  <text x="1286" y="406" class="nodeId">load-related-documents</text>
+  <text x="1286" y="430" class="nodeText">Expand bounded neighbor set.</text>
+
+  <rect x="1580" y="340" width="180" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="1598" y="356" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="1617" y="372" class="pill">Node 6</text>
+  <text x="1598" y="406" class="nodeId">build-graph</text>
+  <text x="1598" y="430" class="nodeText">Build graph snapshot.</text>
+
+  <rect x="520" y="606" width="180" height="100" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="538" y="622" width="82" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="557" y="638" class="pill">Node 7</text>
+  <text x="538" y="672" class="nodeId">score-graph</text>
+  <text x="538" y="696" class="nodeText">Run analysis and reasoning.</text>
+
+  <rect x="820" y="606" width="204" height="104" rx="18" fill="#F5E8DF" stroke="#D5A98D" filter="url(#literalShadow)"/>
+  <rect x="838" y="622" width="88" height="22" rx="11" fill="#F1D6C7"/>
+  <text x="860" y="638" class="pill">Node 8</text>
+  <text x="838" y="672" class="nodeId">decide-action</text>
+  <text x="838" y="696" class="nodeText">Choose branch and nextPath.</text>
+
+  <rect x="1142" y="606" width="192" height="104" rx="18" fill="#F5E8DF" stroke="#D5A98D" filter="url(#literalShadow)"/>
+  <rect x="1160" y="622" width="88" height="22" rx="11" fill="#F1D6C7"/>
+  <text x="1182" y="638" class="pill">Node 9</text>
+  <text x="1160" y="672" class="nodeId">human-review</text>
+  <text x="1160" y="696" class="nodeText">Human gate before action.</text>
+
+  <rect x="612" y="822" width="212" height="104" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="630" y="838" width="94" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="650" y="854" class="pill">Branch A</text>
+  <text x="630" y="888" class="nodeId">persist-metadata</text>
+  <text x="630" y="912" class="nodeText">Write findings to Ship.</text>
+
+  <rect x="1128" y="822" width="192" height="104" rx="18" fill="#FFFDF9" stroke="#B8CAD3" filter="url(#literalShadow)"/>
+  <rect x="1146" y="838" width="94" height="22" rx="11" fill="#E3EEF2"/>
+  <text x="1166" y="854" class="pill">Branch B</text>
+  <text x="1146" y="888" class="nodeId">draft-report</text>
+  <text x="1146" y="912" class="nodeText">Create review artifact.</text>
+
+  <path d="M334 362H390" stroke="#264653" stroke-width="3" stroke-linecap="round" marker-end="url(#literalArrow)"/>
+  <path d="M598 362H654" stroke="#264653" stroke-width="3" stroke-linecap="round" marker-end="url(#literalArrow)"/>
+  <path d="M862 362H918" stroke="#264653" stroke-width="3" stroke-linecap="round" marker-end="url(#literalArrow)"/>
+  <path d="M862 362V472H918" stroke="#264653" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#literalArrow)"/>
+  <path d="M1174 322V390H1268" stroke="#B85C38" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#literalHotArrow)"/>
+  <path d="M1190 472V438H1268" stroke="#B85C38" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#literalHotArrow)"/>
+  <path d="M1504 390H1580" stroke="#264653" stroke-width="3" stroke-linecap="round" marker-end="url(#literalArrow)"/>
+  <path d="M1670 440V540H610V606" stroke="#264653" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#literalArrow)"/>
+  <path d="M700 656H820" stroke="#264653" stroke-width="3" stroke-linecap="round" marker-end="url(#literalArrow)"/>
+  <path d="M1024 658H1142" stroke="#B85C38" stroke-width="3.4" stroke-linecap="round" marker-end="url(#literalHotArrow)"/>
+  <path d="M922 710V772H718V822" stroke="#264653" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#literalArrow)"/>
+  <path d="M1238 710V822" stroke="#B85C38" stroke-width="3.4" stroke-linecap="round" marker-end="url(#literalHotArrow)"/>
+
+  <text x="96" y="990" class="section">Trace Model</text>
+  <rect x="96" y="1016" width="1808" height="170" rx="24" fill="#FFFDF9" stroke="#D8CCBA"/>
+
+  <rect x="122" y="1044" width="394" height="114" rx="18" fill="#FBF8F2" stroke="#D8CCBA"/>
+  <text x="146" y="1078" class="noteTitle">plannedPath</text>
+  <text x="146" y="1106" class="noteText">The full graph plan from the node list.</text>
+  <text x="146" y="1132" class="noteText">Now includes both early branch nodes.</text>
+
+  <rect x="548" y="1044" width="394" height="114" rx="18" fill="#FBF8F2" stroke="#D8CCBA"/>
+  <text x="572" y="1078" class="noteTitle">path</text>
+  <text x="572" y="1106" class="noteText">The executed path for this run.</text>
+  <text x="572" y="1132" class="noteText">Shows which early branch actually ran.</text>
+
+  <rect x="974" y="1044" width="394" height="114" rx="18" fill="#FBF8F2" stroke="#D8CCBA"/>
+  <text x="998" y="1078" class="noteTitle">nextPath</text>
+  <text x="998" y="1106" class="noteText">The recommended branch after the decision node.</text>
+  <text x="998" y="1132" class="noteText">Used to show conditional behavior.</text>
+
+  <rect x="1400" y="1044" width="478" height="114" rx="18" fill="#FBF8F2" stroke="#D8CCBA"/>
+  <text x="1424" y="1078" class="noteTitle">decision</text>
+  <text x="1424" y="1106" class="noteText">`outcome`, `proposedAction`, `humanDecisionRequired`,</text>
+  <text x="1424" y="1132" class="noteText">`rootStatus`, and the branch reason.</text>
+
+  <text x="820" y="748" class="tiny">Hot line = branch selection visible in the trace.</text>
+  <text x="1128" y="958" class="tiny">Literal node ids match the codebase and LangSmith naming model.</text>
+</svg>

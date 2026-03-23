@@ -182,7 +182,7 @@ function createMockClient(): FleetGraphShipApiClient {
 }
 
 describe('FleetGraph runner', () => {
-  it('prepares a bounded recursive graph through the Ship API client', async () => {
+  it('keeps manual runs focused on nearby documents', async () => {
     const client = createMockClient();
 
     const result = await prepareFleetGraphRun(client, {
@@ -199,11 +199,60 @@ describe('FleetGraph runner', () => {
     expect(result.context.reverseAssociations).toHaveLength(1);
     expect(result.context.relatedDocuments.map((doc) => doc.id).sort()).toEqual([
       'issue-1',
-      'issue-2',
       'program-1',
       'sprint-1',
       'standup-1',
     ]);
+    expect(result.context.expandedDocuments.map((doc) => doc.id).sort()).toEqual([
+      'doc-1',
+      'issue-1',
+      'program-1',
+      'sprint-1',
+      'standup-1',
+    ]);
+    expect(result.context.expandedAssociations).toHaveLength(3);
+    expect(result.context.maxDepthReached).toBe(1);
+    expect(result.context.truncated).toBe(false);
+    expect(result.graph.rootDocumentId).toBe('doc-1');
+    expect(result.graph.metadata.maxDepthReached).toBe(1);
+    expect(result.graph.metadata.truncated).toBe(false);
+    expect(result.graph.nodes.map((node) => node.id).sort()).toEqual([
+      'doc-1',
+      'issue-1',
+      'program-1',
+      'sprint-1',
+      'standup-1',
+    ]);
+    expect(result.graph.edges.some((edge) => edge.relationshipType === 'parent')).toBe(true);
+    expect(result.graph.edges.some((edge) => edge.relationshipType === 'blocked_by')).toBe(true);
+    expect(result.scoringPayload.rootDocumentId).toBe('doc-1');
+    expect(result.scoringPayload.documentCount).toBe(5);
+    expect(result.scoringPayload.maxDepthReached).toBe(1);
+    expect(result.scoringPayload.truncated).toBe(false);
+    expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.ownerId).toBe('owner-1');
+    expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.summaryText)
+      .toContain('Project alpha needs acceptance criteria.');
+    expect(result.scoringPayload.documents.find((doc) => doc.id === 'issue-1')?.summaryText)
+      .toContain('Issue one summary');
+    expect(client.getDocumentAssociations).toHaveBeenCalledWith('issue-1');
+    expect(result.nodeIds).toContain('load-document');
+    expect(result.nodeIds).toContain('load-associations');
+    expect(result.trace?.triggerSource).toBe('manual');
+    expect(result.trace?.path).toContain('build-graph');
+    expect(result.trace?.scope.documentCount).toBe(5);
+    expect(result.trace?.scope.edgeCount).toBe(result.graph.edges.length);
+    expect(result.trace?.steps.find((step) => step.id === 'score-graph')?.status).toBe('completed');
+  });
+
+  it('allows nightly scans to traverse one level deeper', async () => {
+    const client = createMockClient();
+
+    const result = await prepareFleetGraphRun(client, {
+      workspaceId: 'ws-1',
+      documentId: 'doc-1',
+      source: 'nightly_scan',
+    });
+
     expect(result.context.expandedDocuments.map((doc) => doc.id).sort()).toEqual([
       'doc-1',
       'issue-1',
@@ -212,36 +261,9 @@ describe('FleetGraph runner', () => {
       'sprint-1',
       'standup-1',
     ]);
-    expect(result.context.expandedAssociations).toHaveLength(3);
     expect(result.context.maxDepthReached).toBe(2);
-    expect(result.context.truncated).toBe(false);
-    expect(result.graph.rootDocumentId).toBe('doc-1');
     expect(result.graph.metadata.maxDepthReached).toBe(2);
-    expect(result.graph.metadata.truncated).toBe(false);
-    expect(result.graph.nodes.map((node) => node.id).sort()).toEqual([
-      'doc-1',
-      'issue-1',
-      'issue-2',
-      'program-1',
-      'sprint-1',
-      'standup-1',
-    ]);
-    expect(result.graph.edges.some((edge) => edge.relationshipType === 'parent')).toBe(true);
-    expect(result.graph.edges.some((edge) => edge.relationshipType === 'sprint')).toBe(true);
-    expect(result.graph.edges.some((edge) => edge.relationshipType === 'blocked_by')).toBe(true);
-    expect(result.scoringPayload.rootDocumentId).toBe('doc-1');
     expect(result.scoringPayload.documentCount).toBe(6);
-    expect(result.scoringPayload.maxDepthReached).toBe(2);
-    expect(result.scoringPayload.truncated).toBe(false);
-    expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.ownerId).toBe('owner-1');
-    expect(result.scoringPayload.documents.find((doc) => doc.id === 'doc-1')?.summaryText)
-      .toContain('Project alpha needs acceptance criteria.');
-    expect(result.scoringPayload.documents.find((doc) => doc.id === 'issue-1')?.summaryText)
-      .toContain('Issue one summary');
-    expect(client.getDocument).toHaveBeenCalledWith('issue-2');
-    expect(client.getDocumentAssociations).toHaveBeenCalledWith('issue-1');
-    expect(result.nodeIds).toContain('load-document');
-    expect(result.nodeIds).toContain('load-associations');
   });
 
   it('can return a lightweight preview from the prepared run', async () => {

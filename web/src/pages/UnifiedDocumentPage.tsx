@@ -10,9 +10,10 @@ import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { useProjectsQuery } from '@/hooks/useProjectsQuery';
 import {
+  fleetGraphInsightsKeys,
   useFleetGraphInsightsQuery,
-  useFleetGraphPersistMutation,
-  useFleetGraphReportDraftMutation,
+  useFleetGraphLiveReviewQuery,
+  useFleetGraphStartLiveReviewMutation,
 } from '@/hooks/useFleetGraphInsightsQuery';
 import {
   useFleetGraphReportsQuery,
@@ -45,6 +46,7 @@ export function UnifiedDocumentPage() {
   const { id, '*': wildcardPath } = useParams<{ id: string; '*'?: string }>();
   const navigate = useNavigate();
   const [fleetGraphLiveRequested, setFleetGraphLiveRequested] = useState(false);
+  const [fleetGraphLiveRunId, setFleetGraphLiveRunId] = useState<string | null>(null);
 
   // Parse wildcard path into tab and nested path
   // Example: /documents/abc/sprints/xyz -> wildcardPath = "sprints/xyz" -> tab = "sprints", nestedPath = "xyz"
@@ -73,14 +75,13 @@ export function UnifiedDocumentPage() {
     retry: false,
   });
   const fleetGraphInsightsQuery = useFleetGraphInsightsQuery(id, fleetGraphLiveRequested);
-  const fleetGraphPersistMutation = useFleetGraphPersistMutation(id);
-  const fleetGraphReportDraftMutation = useFleetGraphReportDraftMutation(id);
+  const fleetGraphStartLiveReviewMutation = useFleetGraphStartLiveReviewMutation(id);
+  const fleetGraphLiveRunQuery = useFleetGraphLiveReviewQuery(fleetGraphLiveRunId ?? undefined);
   const fleetGraphReportsQuery = useFleetGraphReportsQuery();
   const fleetGraphPublishMutation = useFleetGraphPublishReportMutation();
   const fleetGraphRunningReview =
-    fleetGraphLiveRequested ||
-    fleetGraphPersistMutation.isPending ||
-    fleetGraphReportDraftMutation.isPending;
+    fleetGraphStartLiveReviewMutation.isPending ||
+    fleetGraphLiveRunQuery.data?.run.status === 'running';
   const [fleetGraphCardExpanded, setFleetGraphCardExpanded] = useState(false);
   const fleetGraphCardRef = useRef<HTMLDivElement | null>(null);
 
@@ -505,7 +506,24 @@ export function UnifiedDocumentPage() {
 
   useEffect(() => {
     setFleetGraphLiveRequested(false);
+    setFleetGraphLiveRunId(null);
   }, [id]);
+
+  useEffect(() => {
+    const run = fleetGraphLiveRunQuery.data?.run;
+    if (!run || run.status === 'running') {
+      return;
+    }
+
+    setFleetGraphLiveRequested(false);
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['document', id] }),
+      queryClient.invalidateQueries({ queryKey: fleetGraphInsightsKeys.detail(id || '') }),
+      queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+      queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+    ]);
+  }, [fleetGraphLiveRunQuery.data?.run, id, queryClient]);
 
   const isFleetGraphReportDocument =
     Boolean(document?.properties) &&
@@ -528,18 +546,16 @@ export function UnifiedDocumentPage() {
   }, []);
 
   const runFleetGraphReview = useCallback(async () => {
-    setFleetGraphLiveRequested(true);
     revealFleetGraphReview();
+    setFleetGraphLiveRequested(true);
 
     try {
-      await Promise.allSettled([
-        fleetGraphPersistMutation.mutateAsync(),
-        fleetGraphReportDraftMutation.mutateAsync(),
-      ]);
-    } finally {
+      const result = await fleetGraphStartLiveReviewMutation.mutateAsync();
+      setFleetGraphLiveRunId(result.run.runId);
+    } catch {
       setFleetGraphLiveRequested(false);
     }
-  }, [fleetGraphPersistMutation, fleetGraphReportDraftMutation, revealFleetGraphReview]);
+  }, [fleetGraphStartLiveReviewMutation, revealFleetGraphReview]);
 
   const embeddedFleetGraphReview = useMemo(
     () => (
@@ -559,6 +575,7 @@ export function UnifiedDocumentPage() {
           isPublishingReport={fleetGraphPublishMutation.isPending}
           expanded={fleetGraphCardExpanded}
           onExpandedChange={setFleetGraphCardExpanded}
+          liveRun={fleetGraphLiveRunQuery.data?.run}
         />
       </div>
     ),
@@ -571,6 +588,7 @@ export function UnifiedDocumentPage() {
       fleetGraphRunningReview,
       persistedFleetGraph,
       fleetGraphLiveRequested,
+      fleetGraphLiveRunQuery.data?.run,
       fleetGraphReportDetailQuery.data,
       fleetGraphReportDetailQuery.isLoading,
       fleetGraphReportsQuery.data,

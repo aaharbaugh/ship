@@ -2,9 +2,9 @@ import { traceable } from 'langsmith/traceable';
 import type { FleetGraphAnalysis } from './analyze.js';
 import { createFleetGraphBearerClient } from './client.js';
 import { persistFleetGraphAnalysis } from './persist.js';
-import { analyzeFleetGraphWithReasoning } from './reasoning.js';
+import { analyzeFleetGraphForPurpose } from './reasoning.js';
 import { prepareFleetGraphRun, type FleetGraphPreparedRun } from './runner.js';
-import { fleetGraphTraceConfig } from './tracing.js';
+import { fleetGraphTraceConfig, withFleetGraphTraceAnalysis } from './tracing.js';
 import type { FleetGraphTriggerEvent } from './triggers.js';
 
 export interface FleetGraphExecutionResult {
@@ -44,7 +44,10 @@ const tracedExecuteFleetGraphTrigger = traceable(
       documentId: event.documentId,
       source: event.source,
     });
-    const analysis = await analyzeFleetGraphWithReasoning(prepared.scoringPayload);
+    const analysis = await analyzeFleetGraphForPurpose(prepared.scoringPayload, {
+      triggerSource: event.source,
+      purpose: 'execute_trigger',
+    });
     await persistFleetGraphAnalysis(client, analysis);
 
     console.info('[FleetGraph] Execution complete', {
@@ -55,6 +58,12 @@ const tracedExecuteFleetGraphTrigger = traceable(
       model: analysis.model,
       documents: analysis.documents.length,
       suggestions: analysis.remediationSuggestions.length,
+      actualPath: prepared.trace
+        ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'execute_trigger').path
+        : null,
+      nextPath: prepared.trace
+        ? withFleetGraphTraceAnalysis(prepared.trace, analysis, 'execute_trigger').nextPath
+        : null,
     });
 
     return {
@@ -63,5 +72,32 @@ const tracedExecuteFleetGraphTrigger = traceable(
       analysis,
     };
   },
-  fleetGraphTraceConfig('fleetgraph.execute_trigger')
+  fleetGraphTraceConfig('fleetgraph.run.execute_trigger', {
+    processInputs: (inputs) => {
+      const [event] = 'args' in inputs ? (inputs.args as [FleetGraphTriggerEvent]) : [];
+      if (!event) {
+        return {};
+      }
+
+      return {
+        workspaceId: event.workspaceId,
+        documentId: event.documentId,
+        triggerSource: event.source,
+      };
+    },
+    processOutputs: (outputs) => {
+      const result = 'executed' in outputs ? (outputs as FleetGraphExecutionResult) : null;
+      if (!result) {
+        return {};
+      }
+
+      return {
+        executed: result.executed,
+        reason: result.reason ?? null,
+        rootDocumentId: result.prepared?.rootDocumentId ?? null,
+        mode: result.analysis?.mode ?? null,
+        model: result.analysis?.model ?? null,
+      };
+    },
+  })
 );

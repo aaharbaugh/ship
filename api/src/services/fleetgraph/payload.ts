@@ -56,7 +56,36 @@ const tracedBuildFleetGraphScoringPayload = traceable(
     })),
   };
   },
-  fleetGraphTraceConfig('fleetgraph.build_scoring_payload')
+  fleetGraphTraceConfig('fleetgraph.subprocess.build_scoring_payload', {
+    processInputs: (inputs) => {
+      const [graph] = 'args' in inputs ? (inputs.args as [FleetGraphGraphSnapshot]) : [];
+      if (!graph) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: graph.rootDocumentId,
+        nodeCount: graph.nodes.length,
+        edgeCount: graph.edges.length,
+        maxDepthReached: graph.metadata.maxDepthReached,
+        truncated: graph.metadata.truncated,
+      };
+    },
+    processOutputs: (outputs) => {
+      const payload = 'rootDocumentId' in outputs ? (outputs as FleetGraphScoringPayload) : null;
+      if (!payload) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: payload.rootDocumentId,
+        documentCount: payload.documentCount,
+        edgeCount: payload.edgeCount,
+        maxDepthReached: payload.maxDepthReached,
+        truncated: payload.truncated,
+      };
+    },
+  })
 );
 
 function toScoringDocument(node: FleetGraphNodeSnapshot): FleetGraphScoringDocument {

@@ -39,6 +39,8 @@ const mocks = vi.hoisted(() => {
     sendFleetGraphDirectorFeedback: vi.fn(),
     getFleetGraphReadinessStatus: vi.fn(),
     answerFleetGraphQuestion: vi.fn(),
+    startFleetGraphLiveReviewRun: vi.fn(),
+    getFleetGraphLiveReviewRun: vi.fn(),
   };
 });
 
@@ -52,7 +54,7 @@ vi.mock('../services/fleetgraph/runner.js', () => ({
 }));
 
 vi.mock('../services/fleetgraph/reasoning.js', () => ({
-  analyzeFleetGraphWithReasoning: mocks.analyzeFleetGraphWithReasoning,
+  analyzeFleetGraphForPurpose: mocks.analyzeFleetGraphWithReasoning,
 }));
 
 vi.mock('../services/fleetgraph/persist.js', () => ({
@@ -92,14 +94,22 @@ vi.mock('../services/fleetgraph/chat.js', () => ({
   answerFleetGraphQuestion: mocks.answerFleetGraphQuestion,
 }));
 
+vi.mock('../services/fleetgraph/live-run.js', () => ({
+  startFleetGraphLiveReviewRun: mocks.startFleetGraphLiveReviewRun,
+  getFleetGraphLiveReviewRun: mocks.getFleetGraphLiveReviewRun,
+}));
+
 import {
+  buildInsightsResponse,
   chatHandler,
   createReportDraftHandler,
   deleteReportHandler,
   directorFeedbackHandler,
+  getLiveReviewHandler,
   getReadinessHandler,
   getReportsHandler,
   nightlyScanHandler,
+  startLiveReviewHandler,
 } from './fleetgraph-handlers.js';
 
 function createContext(overrides: Partial<Parameters<typeof getReadinessHandler>[0]> = {}) {
@@ -238,6 +248,36 @@ describe('FleetGraph route handlers', () => {
       answer: 'Start by tightening the acceptance criteria.',
       suggestedPrompts: ['What should I fix first?'],
     });
+    mocks.startFleetGraphLiveReviewRun.mockReturnValue({
+      runId: 'run-1',
+      documentId: 'project-1',
+      workspaceId: 'workspace-1',
+      triggerSource: 'manual',
+      status: 'running',
+      startedAt: '2026-03-18T02:00:00.000Z',
+      updatedAt: '2026-03-18T02:00:00.000Z',
+      completedAt: null,
+      error: null,
+      path: ['load-trigger-context'],
+      nextPath: [],
+      currentStepId: 'load-document',
+      steps: [],
+    });
+    mocks.getFleetGraphLiveReviewRun.mockReturnValue({
+      runId: 'run-1',
+      documentId: 'project-1',
+      workspaceId: 'workspace-1',
+      triggerSource: 'manual',
+      status: 'completed',
+      startedAt: '2026-03-18T02:00:00.000Z',
+      updatedAt: '2026-03-18T02:00:03.000Z',
+      completedAt: '2026-03-18T02:00:03.000Z',
+      error: null,
+      path: ['load-trigger-context', 'load-document', 'load-associations'],
+      nextPath: [],
+      currentStepId: null,
+      steps: [],
+    });
 
     const response = await createReportDraftHandler(
       createContext({
@@ -246,13 +286,131 @@ describe('FleetGraph route handlers', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({
-      created: false,
-      updated: true,
-      reportId: 'report-existing',
-    });
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        created: false,
+        updated: true,
+        reportId: 'report-existing',
+      })
+    );
     expect(mocks.createFleetGraphQualityReportDraft).not.toHaveBeenCalled();
     expect(mocks.updateFleetGraphQualityReportDraft).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns a trace with executed path, next path, and decision details', async () => {
+    mocks.prepareFleetGraphRun.mockResolvedValue({
+      rootDocumentId: 'project-1',
+      triggerSource: 'manual',
+      nodeIds: [
+        'load-trigger-context',
+        'load-document',
+        'load-associations',
+        'load-related-documents',
+        'build-graph',
+        'score-graph',
+        'decide-action',
+        'human-review',
+        'persist-metadata',
+        'draft-report',
+      ],
+      trace: {
+        triggerSource: 'manual',
+        rootDocumentId: 'project-1',
+        stepCount: 10,
+        path: [
+          'load-trigger-context',
+          'load-document',
+          'load-associations',
+          'load-related-documents',
+          'build-graph',
+        ],
+        plannedPath: [
+          'load-trigger-context',
+          'load-document',
+          'load-associations',
+          'load-related-documents',
+          'build-graph',
+          'score-graph',
+          'decide-action',
+          'human-review',
+          'persist-metadata',
+          'draft-report',
+        ],
+        nextPath: [],
+        scope: {
+          documentCount: 2,
+          edgeCount: 1,
+          maxDepthReached: 1,
+          truncated: false,
+          depthLimit: 3,
+          documentLimit: 25,
+        },
+        steps: [],
+      },
+      graph: {
+        nodes: [],
+        edges: [],
+        metadata: {
+          maxDepthReached: 1,
+          truncated: false,
+          depthLimit: 3,
+          documentLimit: 25,
+        },
+      },
+      scoringPayload: { documents: [] },
+      context: {
+        rootDocument: {
+          id: 'project-1',
+          title: 'Project Alpha',
+          properties: {},
+        },
+      },
+    });
+    mocks.analyzeFleetGraphWithReasoning.mockResolvedValue({
+      generatedAt: '2026-03-18T02:00:00.000Z',
+      rootDocumentId: 'project-1',
+      mode: 'deterministic',
+      model: null,
+      executiveSummary: 'Project Alpha is not ready to execute yet.',
+      remediationSuggestions: [],
+      documents: [
+        {
+          documentId: 'project-1',
+          documentType: 'project',
+          qualityScore: 0.4,
+          qualityStatus: 'red',
+          summary: 'Project Alpha is blocked by unresolved readiness gaps.',
+          tags: [],
+          metadata: {},
+        },
+      ],
+    });
+
+    const response = await buildInsightsResponse(
+      createContext({
+        params: { id: 'project-1' },
+      })
+    );
+
+    expect(response.trace).toEqual(
+      expect.objectContaining({
+        path: [
+          'load-trigger-context',
+          'load-document',
+          'load-associations',
+          'load-related-documents',
+          'build-graph',
+          'score-graph',
+          'decide-action',
+        ],
+        nextPath: ['human-review', 'draft-report'],
+        decision: expect.objectContaining({
+          outcome: 'draft_report_recommended',
+          proposedAction: 'draft_quality_report',
+          humanDecisionRequired: true,
+        }),
+      })
+    );
   });
 
   it('validates director feedback payloads before invoking the service', async () => {
@@ -336,10 +494,48 @@ describe('FleetGraph route handlers', () => {
 
     expect(response.status).toBe(200);
     expect(mocks.answerFleetGraphQuestion).toHaveBeenCalledTimes(1);
-    expect(response.body).toEqual({
-      answer: 'Start by tightening the acceptance criteria.',
-      suggestedPrompts: ['What should I fix first?'],
-    });
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        answer: 'Start by tightening the acceptance criteria.',
+        suggestedPrompts: ['What should I fix first?'],
+      })
+    );
+  });
+
+  it('starts and retrieves a live FleetGraph review run', async () => {
+    const startResponse = await startLiveReviewHandler(
+      createContext({
+        params: { id: 'project-1' },
+      })
+    );
+
+    expect(startResponse.status).toBe(200);
+    expect(mocks.startFleetGraphLiveReviewRun).toHaveBeenCalledTimes(1);
+    expect(startResponse.body).toEqual(
+      expect.objectContaining({
+        run: expect.objectContaining({
+          runId: 'run-1',
+          status: 'running',
+        }),
+      })
+    );
+
+    const getResponse = await getLiveReviewHandler(
+      createContext({
+        params: { runId: 'run-1' },
+      })
+    );
+
+    expect(getResponse.status).toBe(200);
+    expect(mocks.getFleetGraphLiveReviewRun).toHaveBeenCalledWith('run-1');
+    expect(getResponse.body).toEqual(
+      expect.objectContaining({
+        run: expect.objectContaining({
+          runId: 'run-1',
+          status: 'completed',
+        }),
+      })
+    );
   });
 
   it('uses the scan service for nightly scans', async () => {

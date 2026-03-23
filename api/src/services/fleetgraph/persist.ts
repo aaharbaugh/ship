@@ -15,9 +15,27 @@ const tracedPersistFleetGraphAnalysis = traceable(
     client: FleetGraphShipApiClient,
     analysis: FleetGraphAnalysis
   ): Promise<void> {
-  for (const document of analysis.documents) {
-    await client.updateDocumentMetadata(document.documentId, document.metadata);
-  }
+    for (const document of analysis.documents) {
+      await client.updateDocumentMetadata(document.documentId, document.metadata);
+    }
   },
-  fleetGraphTraceConfig('fleetgraph.persist_analysis')
+  fleetGraphTraceConfig('fleetgraph.node.persist_metadata', {
+    processInputs: (inputs) => {
+      const [, analysis] =
+        'args' in inputs ? (inputs.args as [FleetGraphShipApiClient, FleetGraphAnalysis]) : [];
+      if (!analysis) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: analysis.rootDocumentId,
+        mode: analysis.mode,
+        documentCount: analysis.documents.length,
+        suggestionCount: analysis.remediationSuggestions.length,
+      };
+    },
+    processOutputs: () => ({
+      persisted: true,
+    }),
+  })
 );

@@ -161,15 +161,90 @@ export function FleetGraphReportsPage() {
                   <span>{readinessQuery.data.runtime.openAiConfigured ? 'OpenAI ready' : 'OpenAI missing'}</span>
                   <span>·</span>
                   <span>{readinessQuery.data.runtime.langSmithEnabled ? 'LangSmith on' : 'LangSmith missing'}</span>
+                  <span>·</span>
+                  <span>
+                    interactive depth {readinessQuery.data.runtime.interactiveGraphDepth}
+                  </span>
+                  <span>·</span>
+                  <span>
+                    interactive mode {readinessQuery.data.runtime.interactiveAnalysisMode}
+                  </span>
                 </>
               )}
               {queueStatusQuery.data && (
                 <>
                   <span>·</span>
                   <span>{queueStatusQuery.data.pendingCount} queued</span>
+                  <span>·</span>
+                  <span>{queueStatusQuery.data.runningCount} running</span>
                 </>
               )}
             </div>
+            {queueStatusQuery.data ? (
+              <div className="rounded-xl border border-slate-800 bg-black/40 p-3">
+                <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                  Worker Activity
+                </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                  <span>
+                    Last flush started{' '}
+                    {queueStatusQuery.data.lastFlushStartedAt
+                      ? formatFleetGraphTimestamp(queueStatusQuery.data.lastFlushStartedAt)
+                      : 'never'}
+                  </span>
+                  <span>
+                    Last flush completed{' '}
+                    {queueStatusQuery.data.lastFlushCompletedAt
+                      ? formatFleetGraphTimestamp(queueStatusQuery.data.lastFlushCompletedAt)
+                      : 'never'}
+                  </span>
+                  <span>
+                    Interval {Math.round(queueStatusQuery.data.batchIntervalMs / 1000)}s
+                  </span>
+                  <span>
+                    Lease {Math.round(queueStatusQuery.data.leaseTimeoutMs / 1000)}s
+                  </span>
+                </div>
+                {queueStatusQuery.data.pendingDocuments.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {queueStatusQuery.data.pendingDocuments.map((job) => (
+                      <div
+                        key={job.id}
+                        className="rounded-lg border border-slate-800 bg-black/60 px-3 py-2"
+                      >
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-300">
+                          <span
+                            className={cn(
+                              'rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wide',
+                              job.status === 'running'
+                                ? 'border-amber-800 bg-amber-950/40 text-amber-200'
+                                : 'border-slate-700 bg-slate-950 text-slate-300'
+                            )}
+                          >
+                            {job.status}
+                          </span>
+                          <span>{job.documentType ?? 'document'}</span>
+                          <span>{job.documentId}</span>
+                          <span>source {job.source}</span>
+                          <span>attempt {job.attemptCount}</span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          Updated {formatFleetGraphTimestamp(job.updatedAt)}
+                          {job.leasedBy ? ` · leased by ${job.leasedBy}` : ''}
+                        </div>
+                      </div>
+                    ))}
+                    <div className="text-[11px] text-slate-500">
+                      If a LangSmith run is active, it likely corresponds to a running or recently updated job shown here.
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 text-xs text-slate-500">
+                    No queued or running FleetGraph jobs right now.
+                  </div>
+                )}
+              </div>
+            ) : null}
             {readinessQuery.data?.missing.length ? (
               <div className="flex flex-wrap gap-2">
                 {readinessQuery.data.missing.map((item) => (

@@ -47,7 +47,7 @@ const tracedAnswerFleetGraphQuestion = traceable(
     const client = wrapOpenAI(
       new OpenAI({ apiKey }),
       {
-        name: 'fleetgraph.chat.openai',
+        name: 'fleetgraph.subprocess.chat.openai',
         tags: ['fleetgraph', 'chat', 'openai'],
         metadata: fleetGraphTraceMetadata({
           rootDocumentId: prepared.rootDocumentId,
@@ -76,7 +76,7 @@ const tracedAnswerFleetGraphQuestion = traceable(
         ],
       }, {
         langsmithExtra: {
-          name: 'fleetgraph.chat_completion',
+          name: 'fleetgraph.subprocess.chat.llm_completion',
           tags: ['fleetgraph', 'chat'],
           metadata: {
             rootDocumentId: prepared.rootDocumentId,
@@ -99,7 +99,45 @@ const tracedAnswerFleetGraphQuestion = traceable(
       return buildFallbackAnswer(prepared, analysis, question);
     }
   },
-  fleetGraphTraceConfig('fleetgraph.answer_question')
+  fleetGraphTraceConfig('fleetgraph.chat.answer_question', {
+    processInputs: (inputs) => {
+      const [prepared, analysis, question, history] =
+        'args' in inputs
+          ? (inputs.args as [
+              FleetGraphPreparedRun,
+              FleetGraphAnalysis,
+              string,
+              FleetGraphChatMessage[],
+            ])
+          : [];
+
+      if (!prepared || !analysis || typeof question !== 'string' || !Array.isArray(history)) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: prepared.rootDocumentId,
+        triggerSource: prepared.triggerSource,
+        question,
+        historyLength: history.length,
+        documentCount: prepared.graph.nodes.length,
+        edgeCount: prepared.graph.edges.length,
+        mode: analysis.mode,
+        model: analysis.model,
+      };
+    },
+    processOutputs: (outputs) => {
+      const response = 'answer' in outputs ? (outputs as FleetGraphChatResponse) : null;
+      if (!response) {
+        return {};
+      }
+
+      return {
+        answerLength: response.answer.length,
+        suggestedPromptCount: response.suggestedPrompts.length,
+      };
+    },
+  })
 );
 
 function buildChatContext(prepared: FleetGraphPreparedRun, analysis: FleetGraphAnalysis) {
@@ -168,6 +206,7 @@ function buildFallbackAnswer(
   };
 }
 
+
 function getSuggestedPrompts(prepared: FleetGraphPreparedRun): string[] {
   const label = prepared.context.rootDocument.document_type;
   return [
@@ -176,6 +215,7 @@ function getSuggestedPrompts(prepared: FleetGraphPreparedRun): string[] {
     'Should this be ready to execute?',
   ];
 }
+
 
 function findTitle(prepared: FleetGraphPreparedRun, documentId: string): string {
   const document = prepared.context.expandedDocuments.find((entry) => entry.id === documentId);

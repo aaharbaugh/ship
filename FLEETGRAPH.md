@@ -80,24 +80,27 @@ flowchart TD
     B[Load Trigger Context]
     C[Load Root Document]
     D[Load Direct and Reverse Associations]
-    E[Load Related Documents]
-    F[Build Graph Snapshot]
-    G[Build Scoring Payload]
-    H[Reasoning Node]
-    H1[Deterministic Analysis]
-    H2[LLM Analysis]
-    I{Healthy Graph?}
-    J[Persist Metadata]
-    K{Needs Draft Report?}
-    L[Create or Update Draft Report]
-    M[Contextual Output]
-    M1[Review Panel]
-    M2[Chat Answer]
-    M3[Reports Queue and Review Session]
-    N{Human Approval?}
-    O[Publish Report]
-    P[Send Director Feedback]
-    Q[Fallback and Error Handling]
+    E{Root Is Leaf-Like?}
+    E1[Resolve Anchor Context]
+    E2[Resolve Execution Context]
+    F[Load Related Documents]
+    G[Build Graph Snapshot]
+    H[Build Scoring Payload]
+    I[Reasoning Node]
+    I1[Deterministic Analysis]
+    I2[LLM Analysis]
+    J{Healthy Graph?}
+    K[Persist Metadata]
+    L{Needs Draft Report?}
+    M[Create or Update Draft Report]
+    N[Contextual Output]
+    N1[Review Panel]
+    N2[Chat Answer]
+    N3[Reports Queue and Review Session]
+    O{Human Approval?}
+    P[Publish Report]
+    Q[Send Director Feedback]
+    R[Fallback and Error Handling]
 
     A --> A1 --> B
     A --> A2 --> B
@@ -105,27 +108,31 @@ flowchart TD
     B --> C
     C --> D
     D --> E
-    E --> F
+    E -- Yes --> E1
+    E -- No --> E2
+    E1 --> F
+    E2 --> F
     F --> G
     G --> H
-    H --> H1
-    H1 --> H2
-    H2 --> I
-    I --> J
+    H --> I
+    I --> I1
+    I1 --> I2
+    I2 --> J
     J --> K
-    K -- Yes --> L
-    K -- No --> M
-    L --> M
-    M --> M1
-    M --> M2
-    M --> M3
+    K --> L
+    L -- Yes --> M
+    L -- No --> N
     M --> N
-    N -- Publish confirmed --> O
-    N -- Feedback confirmed --> P
-    C --> Q
-    D --> Q
-    E --> Q
-    H --> Q
+    N --> N1
+    N --> N2
+    N --> N3
+    N --> O
+    O -- Publish confirmed --> P
+    O -- Feedback confirmed --> Q
+    C --> R
+    D --> R
+    F --> R
+    I --> R
 ```
 
 ## Use Cases
@@ -202,6 +209,8 @@ FleetGraph is split into:
 - fetch nodes:
   - fetch the root document
   - fetch direct and reverse associations in parallel
+  - resolve anchor context for leaf-ish documents
+  - resolve execution context for parent documents
   - fetch nearby related documents
 - reasoning nodes:
   - deterministic scoring first

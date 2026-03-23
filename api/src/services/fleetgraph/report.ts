@@ -70,7 +70,7 @@ const tracedCreateFleetGraphQualityReportDraft = traceable(
 
     return { reportId: report.id };
   },
-  fleetGraphTraceConfig('fleetgraph.create_quality_report_draft')
+  fleetGraphTraceConfig('fleetgraph.node.draft_report.create')
 );
 
 const tracedUpdateFleetGraphQualityReportDraft = traceable(
@@ -108,7 +108,7 @@ const tracedUpdateFleetGraphQualityReportDraft = traceable(
 
     return { reportId };
   },
-  fleetGraphTraceConfig('fleetgraph.update_quality_report_draft')
+  fleetGraphTraceConfig('fleetgraph.node.draft_report.update')
 );
 
 export async function publishFleetGraphQualityReport(
@@ -195,7 +195,7 @@ const tracedPublishFleetGraphQualityReport = traceable(
       publishedAt,
     };
   },
-  fleetGraphTraceConfig('fleetgraph.publish_quality_report')
+  fleetGraphTraceConfig('fleetgraph.report.publish')
 );
 
 const tracedDeleteFleetGraphQualityReport = traceable(
@@ -228,7 +228,7 @@ const tracedDeleteFleetGraphQualityReport = traceable(
       clearedDocumentIds: linkedDocuments.map((document) => document.id),
     };
   },
-  fleetGraphTraceConfig('fleetgraph.delete_quality_report')
+  fleetGraphTraceConfig('fleetgraph.report.delete')
 );
 
 function buildQualityReportContent(

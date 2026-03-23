@@ -75,7 +75,36 @@ const tracedBuildFleetGraphSnapshot = traceable(
       },
     };
   },
-  fleetGraphTraceConfig('fleetgraph.build_graph')
+  fleetGraphTraceConfig('fleetgraph.node.build_graph', {
+    processInputs: (inputs) => {
+      const [context] = 'args' in inputs ? (inputs.args as [FleetGraphFetchContext]) : [];
+      if (!context) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: context.rootDocument.id,
+        expandedDocumentCount: context.expandedDocuments.length,
+        expandedAssociationCount: context.expandedAssociations.length,
+        maxDepthReached: context.maxDepthReached,
+        truncated: context.truncated,
+      };
+    },
+    processOutputs: (outputs) => {
+      const graph = 'rootDocumentId' in outputs ? (outputs as FleetGraphGraphSnapshot) : null;
+      if (!graph) {
+        return {};
+      }
+
+      return {
+        rootDocumentId: graph.rootDocumentId,
+        nodeCount: graph.nodes.length,
+        edgeCount: graph.edges.length,
+        maxDepthReached: graph.metadata.maxDepthReached,
+        truncated: graph.metadata.truncated,
+      };
+    },
+  })
 );
 
 function buildParentEdge(document: FleetGraphDocumentRecord): FleetGraphEdgeSnapshot[] {

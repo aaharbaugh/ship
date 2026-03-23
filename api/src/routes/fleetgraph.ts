@@ -8,12 +8,14 @@ import {
   directorFeedbackHandler,
   getQueueStatusHandler,
   getReadinessHandler,
+  getLiveReviewHandler,
   getReportDetailHandler,
   getReportsHandler,
   getReviewSessionHandler,
   nightlyScanHandler,
   persistInsightsHandler,
   publishReportHandler,
+  startLiveReviewHandler,
   type FleetGraphRouteContext,
 } from './fleetgraph-handlers.js';
 
@@ -141,6 +143,26 @@ router.post('/documents/:id/chat', authMiddleware, async (req: Request, res: Res
   } catch (error) {
     console.error('FleetGraph chat error:', error);
     return res.status(500).json({ error: 'Failed to answer FleetGraph question' });
+  }
+});
+
+router.post('/documents/:id/live-review', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await startLiveReviewHandler(toContext(req));
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('FleetGraph live review error:', error);
+    return res.status(500).json({ error: 'Failed to start FleetGraph live review' });
+  }
+});
+
+router.get('/live-review/:runId', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const result = await getLiveReviewHandler(toContext(req));
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error('FleetGraph live review lookup error:', error);
+    return res.status(500).json({ error: 'Failed to load FleetGraph live review' });
   }
 });
 

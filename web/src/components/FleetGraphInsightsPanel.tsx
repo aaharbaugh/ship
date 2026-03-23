@@ -56,6 +56,7 @@ export function FleetGraphInsightsPanel({
   const [suggestedPrompts, setSuggestedPrompts] = useState<string[]>([]);
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
   const chatMutation = useFleetGraphChatMutation(documentId);
   const primaryDocument =
     data?.analysis.documents.find((document) => document.documentId === data.rootDocumentId) ??
@@ -176,6 +177,14 @@ export function FleetGraphInsightsPanel({
     );
   };
 
+  const populateChatInput = (prompt: string) => {
+    setChatInput(prompt);
+    window.requestAnimationFrame(() => {
+      chatInputRef.current?.focus();
+      chatInputRef.current?.setSelectionRange(prompt.length, prompt.length);
+    });
+  };
+
   const runToolAction = (action: ChatToolAction, commandOverride?: string) => {
     if (chatMutation.isPending || action.pending) {
       return;
@@ -219,6 +228,9 @@ export function FleetGraphInsightsPanel({
               />
             </div>
             <p className="mt-1 text-xs text-slate-500">PM review for this document</p>
+            <div className="mt-2 inline-flex rounded-full border border-sky-900/60 bg-sky-950/40 px-2 py-1 text-[11px] font-medium text-sky-200">
+              Interactive run: quick deterministic check
+            </div>
           </div>
         </div>
       </div>
@@ -276,6 +288,34 @@ export function FleetGraphInsightsPanel({
                   {reviewBrief.assessment}
                 </p>
               </div>
+              {data?.trace ? (
+                <div className="rounded-lg border border-slate-800 bg-black/50 px-3 py-2">
+                  <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    Trace
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                    <span>trigger {data.trace.triggerSource}</span>
+                    <span>{data.trace.stepCount} steps</span>
+                    <span>{data.trace.path.length} executed</span>
+                    <span>{data.trace.scope.documentCount} docs</span>
+                    <span>{data.trace.scope.edgeCount} edges</span>
+                    {data.trace.analysis?.model ? <span>model {data.trace.analysis.model}</span> : null}
+                  </div>
+                  <div className="mt-2 text-xs leading-5 text-slate-300">
+                    path: {data.trace.path.join(' -> ')}
+                  </div>
+                  {data.trace.nextPath.length > 0 ? (
+                    <div className="mt-1 text-xs leading-5 text-amber-300">
+                      next: {data.trace.nextPath.join(' -> ')}
+                    </div>
+                  ) : null}
+                  {data.trace.decision ? (
+                    <div className="mt-2 text-xs leading-5 text-slate-400">
+                      decision: {data.trace.decision.outcome} | action {data.trace.decision.proposedAction}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {evidencePoints[0] ? (
                 <div className="rounded-lg border border-slate-800 bg-black/50 px-3 py-2 text-sm text-slate-200">
                   {evidencePoints[0]}
@@ -371,6 +411,7 @@ export function FleetGraphInsightsPanel({
               }}
             >
               <input
+                ref={chatInputRef}
                 type="text"
                 value={chatInput}
                 onChange={(event) => setChatInput(event.target.value)}
@@ -394,7 +435,7 @@ export function FleetGraphInsightsPanel({
                 <button
                   key={prompt}
                   type="button"
-                  onClick={() => submitChatQuestion(prompt)}
+                  onClick={() => populateChatInput(prompt)}
                   disabled={chatMutation.isPending}
                   className="rounded-full border border-slate-800 bg-black px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60"
                 >

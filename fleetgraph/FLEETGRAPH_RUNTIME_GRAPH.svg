@@ -33,7 +33,7 @@
   <rect width="1400" height="2200" fill="url(#bg)"/>
 
   <text x="70" y="70" class="title">FleetGraph Runtime Graph</text>
-  <text x="70" y="102" class="subtitle">Detailed function/node view, top-to-bottom. Main path in the center; report/review branches to the right.</text>
+  <text x="70" y="102" class="subtitle">Detailed function/node view, top-to-bottom. Main path in the center; early context branch and report/review branches to the right.</text>
 
   <text x="120" y="150" class="section">Trigger Sources</text>
   <text x="520" y="150" class="section">Main Runtime Path</text>
@@ -105,8 +105,8 @@
     <text x="455" y="775" class="node-body">1. load-trigger-context</text>
     <text x="455" y="794" class="node-body">2. load-document</text>
     <text x="455" y="813" class="node-body">3. load-associations</text>
-    <text x="455" y="832" class="node-body">4. load-related-documents</text>
-    <text x="455" y="851" class="node-body">bounded recursive REST crawl</text>
+    <text x="455" y="832" class="node-body">4. resolve-anchor-context OR</text>
+    <text x="455" y="851" class="node-body">   resolve-execution-context, then load-related-documents</text>
   </g>
 
   <g filter="url(#shadow)">
@@ -127,7 +127,7 @@
 
   <g filter="url(#shadow)">
     <rect x="430" y="1240" rx="22" width="360" height="150" fill="url(#card)" stroke="#38bdf8" stroke-width="2"/>
-    <text x="455" y="1272" class="node-title">analyzeFleetGraphWithReasoning()</text>
+    <text x="455" y="1272" class="node-title">analyzeFleetGraphForPurpose()</text>
     <text x="455" y="1294" class="node-file">api/src/services/fleetgraph/reasoning.ts</text>
     <text x="455" y="1315" class="node-body">analyzeFleetGraphPayload() first</text>
     <text x="455" y="1334" class="node-body">wrapOpenAI(new OpenAI(...)) second</text>
@@ -232,6 +232,7 @@
   <!-- labels -->
   <text x="645" y="345" class="edge-label">run</text>
   <text x="645" y="515" class="edge-label">prepare</text>
+  <text x="645" y="845" class="edge-label">early branch</text>
   <text x="646" y="885" class="edge-label">snapshot</text>
   <text x="646" y="1215" class="edge-label">reason</text>
   <text x="850" y="615" class="edge-label">report</text>

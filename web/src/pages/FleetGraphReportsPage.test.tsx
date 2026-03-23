@@ -69,12 +69,29 @@ const mockQueueStatus = {
   batchIntervalMs: 300000,
   maxDocumentsPerFlush: 10,
   isFlushing: false,
+  leaseTimeoutMs: 600000,
   pendingCount: 2,
+  runningCount: 1,
+  failedCount: 0,
+  completedCount: 12,
   lastFlushStartedAt: '2026-03-18T04:00:00.000Z',
   lastFlushCompletedAt: '2026-03-18T04:05:00.000Z',
-  workspaceGroups: [{ workspaceId: 'workspace-1', pendingCount: 2 }],
+  workspaceGroups: [{ workspaceId: 'workspace-1', pendingCount: 2, runningCount: 1 }],
   pendingDocuments: [
-    { workspaceId: 'workspace-1', documentId: 'project-1', source: 'save', documentType: 'project' },
+    {
+      id: 'job-1',
+      workspaceId: 'workspace-1',
+      documentId: 'project-1',
+      source: 'save',
+      documentType: 'project',
+      userId: 'user-1',
+      contentHash: 'hash-1',
+      status: 'running',
+      attemptCount: 1,
+      leasedBy: 'worker-1',
+      createdAt: '2026-03-18T03:58:00.000Z',
+      updatedAt: '2026-03-18T04:01:00.000Z',
+    },
   ],
 };
 
@@ -96,6 +113,10 @@ const mockReadiness = {
     collaborationIdleMs: 30000,
     maxGraphDepth: 3,
     maxGraphDocuments: 25,
+    interactiveGraphDepth: 1,
+    interactiveGraphDocuments: 20,
+    interactiveAnalysisMode: 'deterministic' as const,
+    proactiveAnalysisMode: 'reasoning' as const,
   },
   routes: {
     insights: '/api/fleetgraph/documents/:id',
@@ -166,6 +187,9 @@ describe('FleetGraphReportsPage', () => {
 
     expect(screen.getByText('FleetGraph Reports')).toBeInTheDocument();
     expect(screen.getByText('FleetGraph Diagnostics')).toBeInTheDocument();
+    expect(screen.getByText('Worker Activity')).toBeInTheDocument();
+    expect(screen.getByText('1 running')).toBeInTheDocument();
+    expect(screen.getByText(/source save/i)).toBeInTheDocument();
     expect(screen.getByText('Draft Reports')).toBeInTheDocument();
     expect(screen.getByText('Published Reports')).toBeInTheDocument();
   });
