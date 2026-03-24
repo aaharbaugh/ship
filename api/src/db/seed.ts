@@ -35,6 +35,70 @@ async function createAssociation(
   );
 }
 
+function asRichTextDocument(paragraphs: readonly string[]): Record<string, unknown> {
+  return {
+    type: 'doc',
+    content: paragraphs.map((paragraph) => ({
+      type: 'paragraph',
+      content: [{ type: 'text', text: paragraph }],
+    })),
+  };
+}
+
+async function resetFleetGraphDemoSeed(pool: pg.Pool, workspaceId: string): Promise<void> {
+  const demoTitles = [
+    'FleetGraph Demo Program',
+    'FleetGraph Healthy Demo Workspace',
+    'FleetGraph Review Demo Workspace',
+    'FleetGraph Risky Demo Workspace',
+    'FleetGraph Healthy Demo Week',
+    'FleetGraph Review Demo Week',
+    'FleetGraph Risky Demo Week',
+    'FleetGraph Healthy Demo Spec',
+    'FleetGraph Healthy Demo QA Checklist',
+    'FleetGraph Review Demo Notes',
+    'FleetGraph Review Demo Sync',
+    'FleetGraph Risky Demo Rollout',
+    'FleetGraph Risky Demo Dependency Cleanup',
+    'FleetGraph Healthy Demo Brief',
+    'FleetGraph Risky Demo Notes',
+    'FleetGraph Healthy Demo Standup',
+    'FleetGraph Review Demo Standup',
+    'FleetGraph Risky Demo Standup',
+    'FleetGraph Healthy Demo Project',
+    'FleetGraph Healthy Demo Issue',
+  ];
+
+  const existingDemoDocs = await pool.query(
+    `SELECT id FROM documents
+     WHERE workspace_id = $1
+       AND (
+         title = ANY($2::text[])
+         OR title LIKE 'FleetGraph Quality Report: FleetGraph % Demo %'
+       )`,
+    [workspaceId, demoTitles]
+  );
+
+  if (existingDemoDocs.rows.length === 0) {
+    return;
+  }
+
+  const demoDocIds = existingDemoDocs.rows.map((row) => row.id as string);
+  await pool.query(
+    `DELETE FROM document_associations
+     WHERE document_id = ANY($1::uuid[])
+        OR related_id = ANY($1::uuid[])`,
+    [demoDocIds]
+  );
+  await pool.query(
+    `DELETE FROM documents
+     WHERE id = ANY($1::uuid[])`,
+    [demoDocIds]
+  );
+
+  console.log(`🧹 Reset ${demoDocIds.length} FleetGraph demo documents before reseeding`);
+}
+
 async function seed() {
   // Load secrets from SSM in production (must happen before Pool creation)
   await loadProductionSecrets();
@@ -84,6 +148,8 @@ async function seed() {
       workspaceId = workspaceResult.rows[0].id;
       console.log('✅ Workspace created');
     }
+
+    await resetFleetGraphDemoSeed(pool, workspaceId);
 
     // Team members to seed (dev user + 10 fake users)
     const teamMembers = [
@@ -278,6 +344,36 @@ async function seed() {
       console.log('ℹ️  All programs already exist');
     }
 
+    const demoProgramTitle = 'FleetGraph Demo Program';
+    const existingDemoProgram = await pool.query(
+      `SELECT id FROM documents WHERE workspace_id = $1 AND document_type = 'program' AND title = $2`,
+      [workspaceId, demoProgramTitle]
+    );
+
+    let fleetGraphDemoProgramId: string;
+    if (existingDemoProgram.rows[0]) {
+      fleetGraphDemoProgramId = existingDemoProgram.rows[0].id;
+    } else {
+      const demoProgramResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, properties)
+         VALUES ($1, 'program', $2, $3)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoProgramTitle,
+          JSON.stringify({ prefix: 'FGD', color: '#0f766e' }),
+        ]
+      );
+      fleetGraphDemoProgramId = demoProgramResult.rows[0].id;
+      console.log('✅ Created FleetGraph demo program');
+    }
+
+    const shipCoreProgram = programs.find((program) => program.prefix === 'SHIP');
+    if (!shipCoreProgram) {
+      throw new Error('Ship Core program is required for FleetGraph demo seed data');
+    }
+    const devUser = allUsers.find((user: { name: string }) => user.name === 'Dev User') ?? allUsers[0];
+
     // Define stable teams per program so sprint ownership, issue assignment,
     // and weekly plans/retros all align consistently.
     // Uses names (not indices) because allUsers query order is non-deterministic.
@@ -413,6 +509,213 @@ async function seed() {
       console.log(`✅ Created ${projectsCreated} projects`);
     } else {
       console.log('ℹ️  All projects already exist');
+    }
+
+    const demoProjectDefinitions = [
+      {
+        title: 'FleetGraph Healthy Demo Workspace',
+        color: '#14b8a6',
+        emoji: '🟢',
+        plan:
+          'Healthy demo workspace has clear ownership, linked execution documents, and stable next steps for the current milestone.',
+        targetDateOffsetDays: 14,
+        content: [
+          'This workspace is ready for execution. The owner, sprint scope, and linked implementation work are all aligned for the current milestone.',
+          'Acceptance criteria are documented in the linked issues, QA coverage is planned, and no open blockers are present in the local graph.',
+        ],
+      },
+      {
+        title: 'FleetGraph Review Demo Workspace',
+        color: '#f59e0b',
+        emoji: '🟡',
+        plan:
+          'Review demo workspace is mostly clear, but one supporting document is under-specified and should trigger a human-review branch.',
+        targetDateOffsetDays: 12,
+        content: [
+          'This workspace is broadly ready to execute and has a clear owner, sprint plan, and linked issue with acceptance criteria.',
+          'FleetGraph should still recommend a human review because one supporting project note is thin and needs clarification before the team proceeds.',
+        ],
+      },
+      {
+        title: 'FleetGraph Risky Demo Workspace',
+        color: '#dc2626',
+        emoji: '🔴',
+        plan:
+          'Risky demo workspace has unresolved execution gaps and is intended to trigger a non-healthy FleetGraph branch.',
+        targetDateOffsetDays: 10,
+        content: [
+          'This workspace is not ready to execute. The linked rollout work is blocked, completion conditions are missing, and the surrounding notes do not provide a reliable plan.',
+          'FleetGraph should identify blocker-level risk in the local graph and recommend the human-reviewed draft report path.',
+        ],
+      },
+    ] as const;
+
+    const demoProjectIds = new Map<string, string>();
+    for (const demoProject of demoProjectDefinitions) {
+      const existingDemoProject = await pool.query(
+        `SELECT d.id FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $3 AND da.relationship_type = 'program'
+         WHERE d.workspace_id = $1 AND d.document_type = 'project' AND d.title = $2`,
+        [workspaceId, demoProject.title, fleetGraphDemoProgramId]
+      );
+
+      if (existingDemoProject.rows[0]) {
+        demoProjectIds.set(demoProject.title, existingDemoProject.rows[0].id);
+        continue;
+      }
+
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + demoProject.targetDateOffsetDays);
+      const demoProjectResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, properties)
+         VALUES ($1, 'project', $2, $3, $4)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoProject.title,
+          JSON.stringify(asRichTextDocument(demoProject.content)),
+          JSON.stringify({
+            color: demoProject.color,
+            emoji: demoProject.emoji,
+            owner_id: devUser?.id ?? null,
+            impact: 4,
+            confidence:
+              demoProject.title.includes('Healthy') ? 5 : demoProject.title.includes('Review') ? 4 : 2,
+            ease:
+              demoProject.title.includes('Healthy') ? 4 : demoProject.title.includes('Review') ? 3 : 2,
+            plan: demoProject.plan,
+            monetary_impact_expected:
+              demoProject.title.includes('Healthy') ? 18000 : demoProject.title.includes('Review') ? 15000 : 12000,
+            target_date: targetDate.toISOString().split('T')[0],
+          }),
+        ]
+      );
+      const demoProjectId = demoProjectResult.rows[0].id;
+      await createAssociation(pool, demoProjectId, fleetGraphDemoProgramId, 'program');
+      demoProjectIds.set(demoProject.title, demoProjectId);
+      console.log(`✅ Created ${demoProject.title}`);
+    }
+
+    const demoHealthyProjectId = demoProjectIds.get('FleetGraph Healthy Demo Workspace');
+    const demoReviewProjectId = demoProjectIds.get('FleetGraph Review Demo Workspace');
+    const demoRiskyProjectId = demoProjectIds.get('FleetGraph Risky Demo Workspace');
+    if (!demoHealthyProjectId || !demoReviewProjectId || !demoRiskyProjectId) {
+      throw new Error('FleetGraph demo projects are required for seeded proof scenarios');
+    }
+
+    const healthyProjectTitle = 'FleetGraph Healthy Demo Project';
+    const healthyIssueTitle = 'FleetGraph Healthy Demo Issue';
+
+    const existingHealthyProject = await pool.query(
+      `SELECT d.id FROM documents d
+       JOIN document_associations da ON da.document_id = d.id
+         AND da.related_id = $3 AND da.relationship_type = 'program'
+       WHERE d.workspace_id = $1 AND d.document_type = 'project' AND d.title = $2`,
+      [workspaceId, healthyProjectTitle, shipCoreProgram.id]
+    );
+
+    let healthyProjectId: string;
+    if (existingHealthyProject.rows[0]) {
+      healthyProjectId = existingHealthyProject.rows[0].id;
+    } else {
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + 21);
+
+      const healthyProjectResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, properties)
+         VALUES ($1, 'project', $2, $3, $4)
+         RETURNING id`,
+        [
+          workspaceId,
+          healthyProjectTitle,
+          JSON.stringify(
+            asRichTextDocument([
+              'This project is ready to execute with a clear owner, scoped deliverable, and linked implementation issue for the current milestone.',
+              'Acceptance criteria, QA expectations, and rollout expectations are defined in the connected work so FleetGraph should keep this local graph healthy.',
+            ])
+          ),
+          JSON.stringify({
+            color: '#14b8a6',
+            emoji: '✅',
+            owner_id: devUser?.id ?? null,
+            impact: 4,
+            confidence: 5,
+            ease: 4,
+            plan:
+              'FleetGraph healthy demo project has a clear owner, linked implementation issue, and concrete execution context for the upcoming milestone.',
+            monetary_impact_expected: 20000,
+            target_date: targetDate.toISOString().split('T')[0],
+            has_design_review: true,
+            design_review_notes:
+              'Design and scope were reviewed together and approved for the current milestone.',
+          }),
+        ]
+      );
+      healthyProjectId = healthyProjectResult.rows[0].id;
+      await createAssociation(pool, healthyProjectId, shipCoreProgram.id, 'program');
+      projects.push({
+        id: healthyProjectId,
+        programId: shipCoreProgram.id,
+        title: healthyProjectTitle,
+      });
+      console.log('✅ Created FleetGraph healthy demo project');
+    }
+
+    const existingHealthyIssue = await pool.query(
+      `SELECT d.id FROM documents d
+       JOIN document_associations da ON da.document_id = d.id
+         AND da.related_id = $3 AND da.relationship_type = 'project'
+       WHERE d.workspace_id = $1 AND d.document_type = 'issue' AND d.title = $2`,
+      [workspaceId, healthyIssueTitle, healthyProjectId]
+    );
+
+    if (!existingHealthyIssue.rows[0]) {
+      const maxHealthyTicketResult = await pool.query(
+        `SELECT COALESCE(MAX(d.ticket_number), 0) as max_ticket
+         FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'program'
+         WHERE d.workspace_id = $1 AND d.document_type = 'issue'`,
+        [workspaceId, shipCoreProgram.id]
+      );
+      const nextHealthyTicketNumber = Number(maxHealthyTicketResult.rows[0]?.max_ticket ?? 0) + 1;
+      const healthyIssueResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, properties, ticket_number)
+         VALUES ($1, 'issue', $2, $3, $4, $5)
+         RETURNING id`,
+        [
+          workspaceId,
+          healthyIssueTitle,
+          JSON.stringify({
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  {
+                    type: 'text',
+                    text:
+                      'Implement the final status summary card for FleetGraph review. Owner is assigned, scope is clear, and acceptance criteria are a shipped card with deterministic status labels, passing UI checks, and a verified review state.',
+                  },
+                ],
+              },
+            ],
+          }),
+          JSON.stringify({
+            state: 'todo',
+            priority: 'medium',
+            source: 'internal',
+            assignee_id: devUser?.id ?? null,
+            estimate: 3,
+          }),
+          nextHealthyTicketNumber,
+        ]
+      );
+      const healthyIssueId = healthyIssueResult.rows[0].id;
+      await createAssociation(pool, healthyIssueId, shipCoreProgram.id, 'program');
+      await createAssociation(pool, healthyIssueId, healthyProjectId, 'project');
+      console.log('✅ Created FleetGraph healthy demo issue');
     }
 
     // Get workspace sprint start date and calculate current sprint (1-week sprints)
@@ -562,8 +865,90 @@ async function seed() {
       console.log('ℹ️  All weeks already exist');
     }
 
-    // Get Ship Core program for comprehensive sprint testing
-    const shipCoreProgram = programs.find(p => p.prefix === 'SHIP')!;
+    const demoSprintDefinitions = [
+      {
+        title: 'FleetGraph Healthy Demo Week',
+        projectId: demoHealthyProjectId,
+        confidence: 88,
+        plan:
+          'Healthy demo week is fully scoped, with owners assigned to every linked item and clear acceptance criteria for the release.',
+        successCriteria:
+          'Complete the linked work, verify the QA checklist, and finish the week with no open blockers.',
+      },
+      {
+        title: 'FleetGraph Review Demo Week',
+        projectId: demoReviewProjectId,
+        confidence: 71,
+        plan:
+          'Review demo week has an executable issue plan, but one supporting note needs human review to tighten scope before the team runs with it.',
+        successCriteria:
+          'Clarify the thin support note and confirm the execution plan without escalating to a blocker workflow.',
+      },
+      {
+        title: 'FleetGraph Risky Demo Week',
+        projectId: demoRiskyProjectId,
+        confidence: 42,
+        plan:
+          'Risky demo week has unresolved dependencies, blocked rollout work, and missing completion conditions.',
+        successCriteria:
+          'Restore an executable plan by resolving blocker uncertainty and defining what done looks like.',
+      },
+    ] as const;
+
+    const demoSprintIds = new Map<string, string>();
+    for (const demoSprint of demoSprintDefinitions) {
+      const existingDemoSprint = await pool.query(
+        `SELECT d.id
+         FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'project'
+         WHERE d.workspace_id = $1 AND d.document_type = 'sprint' AND d.title = $3`,
+        [workspaceId, demoSprint.projectId, demoSprint.title]
+      );
+
+      if (existingDemoSprint.rows[0]) {
+        demoSprintIds.set(demoSprint.title, existingDemoSprint.rows[0].id);
+        continue;
+      }
+
+      const demoSprintResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, properties)
+         VALUES ($1, 'sprint', $2, $3, $4)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoSprint.title,
+          JSON.stringify(
+            asRichTextDocument([
+              demoSprint.plan,
+              demoSprint.successCriteria,
+            ])
+          ),
+          JSON.stringify({
+            sprint_number: currentSprintNumber,
+            owner_id: devUser?.id ?? null,
+            project_id: demoSprint.projectId,
+            assignee_ids: [devUser?.person_doc_id].filter(Boolean),
+            plan: demoSprint.plan,
+            success_criteria: demoSprint.successCriteria,
+            confidence: demoSprint.confidence,
+            status: 'active',
+          }),
+        ]
+      );
+      const demoSprintId = demoSprintResult.rows[0].id;
+      await createAssociation(pool, demoSprintId, demoSprint.projectId, 'project');
+      await createAssociation(pool, demoSprintId, fleetGraphDemoProgramId, 'program');
+      demoSprintIds.set(demoSprint.title, demoSprintId);
+      console.log(`✅ Created ${demoSprint.title}`);
+    }
+
+    const demoHealthySprintId = demoSprintIds.get('FleetGraph Healthy Demo Week');
+    const demoReviewSprintId = demoSprintIds.get('FleetGraph Review Demo Week');
+    const demoRiskySprintId = demoSprintIds.get('FleetGraph Risky Demo Week');
+    if (!demoHealthySprintId || !demoReviewSprintId || !demoRiskySprintId) {
+      throw new Error('FleetGraph demo sprints are required for seeded proof scenarios');
+    }
 
     // Comprehensive issue templates for Ship Core covering all sprint/state combinations
     // This gives us realistic data to test all views
@@ -809,6 +1194,166 @@ async function seed() {
       console.log('ℹ️  All issues already exist');
     }
 
+    const demoIssueDefinitions = [
+      {
+        title: 'FleetGraph Healthy Demo Spec',
+        projectId: demoHealthyProjectId,
+        sprintId: demoHealthySprintId,
+        summary:
+          'Document the release summary card with clear owner, acceptance criteria, rollout note, and validation steps for the current milestone.',
+        priority: 'medium',
+        estimate: 3,
+      },
+      {
+        title: 'FleetGraph Healthy Demo QA Checklist',
+        projectId: demoHealthyProjectId,
+        sprintId: demoHealthySprintId,
+        summary:
+          'Verify status labels, live trace updates, and report states against the release acceptance criteria checklist before release.',
+        priority: 'low',
+        estimate: 2,
+      },
+      {
+        title: 'FleetGraph Review Demo Sync',
+        projectId: demoReviewProjectId,
+        sprintId: demoReviewSprintId,
+        summary:
+          'Prepare the review summary update with acceptance criteria for owner handoff, timeline confirmation, and decision logging before the sprint review.',
+        priority: 'medium',
+        estimate: 3,
+      },
+      {
+        title: 'FleetGraph Risky Demo Rollout',
+        projectId: demoRiskyProjectId,
+        sprintId: demoRiskySprintId,
+        summary:
+          'Rollout is blocked by unresolved dependency work and still lacks concrete completion conditions for handoff.',
+        priority: 'high',
+        estimate: 5,
+      },
+      {
+        title: 'FleetGraph Risky Demo Dependency Cleanup',
+        projectId: demoRiskyProjectId,
+        sprintId: demoRiskySprintId,
+        summary:
+          'Cleanup remains blocked, has thin content, and does not define what done looks like for the team.',
+        priority: 'high',
+        estimate: 4,
+      },
+    ] as const;
+
+    for (const demoIssue of demoIssueDefinitions) {
+      const existingDemoIssue = await pool.query(
+        `SELECT d.id FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'project'
+         WHERE d.workspace_id = $1 AND d.title = $3 AND d.document_type = 'issue'`,
+        [workspaceId, demoIssue.projectId, demoIssue.title]
+      );
+
+      if (existingDemoIssue.rows[0]) {
+        continue;
+      }
+
+      const maxDemoTicketResult = await pool.query(
+        `SELECT COALESCE(MAX(d.ticket_number), 0) as max_ticket
+         FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'program'
+         WHERE d.workspace_id = $1 AND d.document_type = 'issue'`,
+        [workspaceId, fleetGraphDemoProgramId]
+      );
+      const nextDemoTicketNumber = Number(maxDemoTicketResult.rows[0]?.max_ticket ?? 0) + 1;
+
+      const demoIssueResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, properties, ticket_number)
+         VALUES ($1, 'issue', $2, $3, $4, $5)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoIssue.title,
+          JSON.stringify({
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [{ type: 'text', text: demoIssue.summary }],
+              },
+            ],
+          }),
+          JSON.stringify({
+            state: 'todo',
+            priority: demoIssue.priority,
+            source: 'internal',
+            assignee_id: devUser?.id ?? null,
+            estimate: demoIssue.estimate,
+          }),
+          nextDemoTicketNumber,
+        ]
+      );
+      const demoIssueId = demoIssueResult.rows[0].id;
+      await createAssociation(pool, demoIssueId, fleetGraphDemoProgramId, 'program');
+      await createAssociation(pool, demoIssueId, demoIssue.projectId, 'project');
+      await createAssociation(pool, demoIssueId, demoIssue.sprintId, 'sprint');
+      console.log(`✅ Created ${demoIssue.title}`);
+    }
+
+    const demoWikiDefinitions = [
+      {
+        title: 'FleetGraph Healthy Demo Brief',
+        projectId: demoHealthyProjectId,
+        content:
+          'Owner: Dev User. Goal: ship the review summary card this week. Success: status, trace, and report state all match the proof matrix. Dependencies are closed and the team can execute immediately.',
+        ownerId: devUser?.id ?? null,
+      },
+      {
+        title: 'FleetGraph Review Demo Notes',
+        projectId: demoReviewProjectId,
+        content:
+          'Need a quick pass on owner handoff timing.',
+        ownerId: null,
+      },
+      {
+        title: 'FleetGraph Risky Demo Notes',
+        projectId: demoRiskyProjectId,
+        content: 'todo',
+        ownerId: null,
+      },
+    ] as const;
+
+    for (const demoWiki of demoWikiDefinitions) {
+      const existingDemoWiki = await pool.query(
+        `SELECT d.id FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'project'
+         WHERE d.workspace_id = $1 AND d.title = $3 AND d.document_type = 'wiki'`,
+        [workspaceId, demoWiki.projectId, demoWiki.title]
+      );
+
+      if (existingDemoWiki.rows[0]) {
+        continue;
+      }
+
+      const demoWikiResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, created_by, properties)
+         VALUES ($1, 'wiki', $2, $3, $4, $5)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoWiki.title,
+          JSON.stringify(asRichTextDocument([demoWiki.content])),
+          devUser?.id ?? null,
+          JSON.stringify(
+            demoWiki.ownerId
+              ? { owner_id: demoWiki.ownerId }
+              : {}
+          ),
+        ]
+      );
+      await createAssociation(pool, demoWikiResult.rows[0].id, demoWiki.projectId, 'project');
+      console.log(`✅ Created ${demoWiki.title}`);
+    }
+
     // Create welcome/tutorial wiki document
     const existingTutorial = await pool.query(
       'SELECT id FROM documents WHERE workspace_id = $1 AND document_type = $2 AND title = $3',
@@ -973,6 +1518,67 @@ async function seed() {
       console.log(`✅ Created ${standupsCreated} standups`);
     } else {
       console.log('ℹ️  All standups already exist');
+    }
+
+    const demoStandupDefinitions = [
+      {
+        title: 'FleetGraph Healthy Demo Standup',
+        sprintId: demoHealthySprintId,
+        body: [
+          'Yesterday: finished the review summary card and verified the acceptance checklist.',
+          'Today: closing out QA and updating the proof matrix screenshots.',
+          'Blockers: None.',
+        ],
+      },
+      {
+        title: 'FleetGraph Review Demo Standup',
+        sprintId: demoReviewSprintId,
+        body: [
+          'Yesterday: finalized the review summary update and aligned on acceptance criteria.',
+          'Today: confirm owner handoff timing and tighten the supporting note before the sprint review.',
+          'Blockers: None, but one note still needs clarification.',
+        ],
+      },
+      {
+        title: 'FleetGraph Risky Demo Standup',
+        sprintId: demoRiskySprintId,
+        body: ['done'],
+      },
+    ] as const;
+
+    for (const demoStandup of demoStandupDefinitions) {
+      const existingDemoStandup = await pool.query(
+        `SELECT d.id FROM documents d
+         JOIN document_associations da ON da.document_id = d.id
+           AND da.related_id = $2 AND da.relationship_type = 'sprint'
+         WHERE d.workspace_id = $1 AND d.title = $3 AND d.document_type = 'standup'`,
+        [workspaceId, demoStandup.sprintId, demoStandup.title]
+      );
+
+      if (existingDemoStandup.rows[0]) {
+        continue;
+      }
+
+      const standupResult = await pool.query(
+        `INSERT INTO documents (workspace_id, document_type, title, content, created_by, properties)
+         VALUES ($1, 'standup', $2, $3, $4, $5)
+         RETURNING id`,
+        [
+          workspaceId,
+          demoStandup.title,
+          JSON.stringify({
+            type: 'doc',
+            content: demoStandup.body.map((line) => ({
+              type: 'paragraph',
+              content: [{ type: 'text', text: line }],
+            })),
+          }),
+          devUser?.id ?? null,
+          JSON.stringify({ author_id: devUser?.id ?? null }),
+        ]
+      );
+      await createAssociation(pool, standupResult.rows[0].id, demoStandup.sprintId, 'sprint');
+      console.log(`✅ Created ${demoStandup.title}`);
     }
 
     // Create sprint reviews for ALL completed sprints (not just recent ones)

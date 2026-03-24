@@ -1,0 +1,299 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1400" viewBox="0 0 1800 1400" role="img" aria-labelledby="title desc">
+  <title id="title">FleetGraph Circular Node Graph</title>
+  <desc id="desc">Detailed circular-node view of FleetGraph runtime functions and review branches.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#08111f"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7dd3fc"/>
+    </marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#020617" flood-opacity="0.4"/>
+    </filter>
+    <style>
+      .title { font: 700 36px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; }
+      .subtitle { font: 500 17px ui-sans-serif, system-ui, sans-serif; fill: #94a3b8; }
+      .cluster { font: 700 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; letter-spacing: 0.16em; text-transform: uppercase; }
+      .nodeTitle { font: 700 15px ui-sans-serif, system-ui, sans-serif; fill: #f8fafc; text-anchor: middle; }
+      .nodeFile { font: 700 10px ui-sans-serif, system-ui, sans-serif; fill: #bfdbfe; text-anchor: middle; }
+      .nodeBody { font: 500 10px ui-sans-serif, system-ui, sans-serif; fill: #dbeafe; text-anchor: middle; }
+      .edge { stroke: #7dd3fc; stroke-width: 3; fill: none; marker-end: url(#arrow); opacity: 0.92; }
+      .edgeSoft { stroke: #64748b; stroke-width: 2.5; fill: none; marker-end: url(#arrow); opacity: 0.72; }
+      .edgeLabel { font: 600 11px ui-sans-serif, system-ui, sans-serif; fill: #bae6fd; text-anchor: middle; }
+    </style>
+  </defs>
+
+  <rect width="1800" height="1400" fill="url(#bg)"/>
+
+  <text x="70" y="70" class="title">FleetGraph Circular Node Graph</text>
+  <text x="70" y="102" class="subtitle">Detailed function-node map. Center spine is the runtime; side orbits are trigger sources and review/report branches.</text>
+
+  <text x="185" y="160" class="cluster">Trigger Orbit</text>
+  <text x="900" y="160" class="cluster">Runtime Spine</text>
+  <text x="1480" y="160" class="cluster">Report + Review Orbit</text>
+
+  <!-- edges first -->
+  <path class="edge" d="M 300 300 C 430 300, 510 260, 640 260"/>
+  <path class="edge" d="M 300 500 C 430 500, 510 380, 640 380"/>
+  <path class="edge" d="M 300 700 C 430 700, 510 500, 640 500"/>
+  <path class="edge" d="M 300 900 C 430 900, 510 620, 640 620"/>
+
+  <path class="edge" d="M 760 260 C 900 260, 900 260, 1040 260"/>
+  <path class="edge" d="M 1160 260 C 1300 260, 1300 300, 1440 300"/>
+  <path class="edge" d="M 760 380 C 900 380, 900 380, 1040 380"/>
+  <path class="edge" d="M 1160 380 C 1240 380, 1310 380, 1440 430"/>
+  <path class="edge" d="M 760 500 C 900 500, 900 500, 1040 500"/>
+  <path class="edge" d="M 1160 500 C 1260 500, 1320 520, 1440 560"/>
+  <path class="edge" d="M 760 620 C 900 620, 900 620, 1040 620"/>
+  <path class="edge" d="M 1160 620 C 1280 620, 1340 650, 1440 690"/>
+  <path class="edge" d="M 760 740 C 900 740, 900 740, 1040 740"/>
+  <path class="edge" d="M 760 860 C 900 860, 900 860, 1040 860"/>
+  <path class="edge" d="M 760 980 C 900 980, 900 980, 1040 980"/>
+  <path class="edge" d="M 760 1100 C 900 1100, 900 1100, 1040 1100"/>
+
+  <path class="edgeSoft" d="M 1160 740 C 1290 740, 1335 780, 1440 820"/>
+  <path class="edgeSoft" d="M 1160 860 C 1280 860, 1335 890, 1440 950"/>
+  <path class="edgeSoft" d="M 1160 980 C 1280 980, 1335 1010, 1440 1080"/>
+  <path class="edgeSoft" d="M 1160 1100 C 1280 1100, 1335 1130, 1440 1210"/>
+
+  <!-- left orbit nodes -->
+  <g filter="url(#shadow)">
+    <circle cx="185" cy="300" r="115" fill="#10231a" stroke="#22c55e" stroke-width="3"/>
+    <text x="185" y="272" class="nodeTitle">Document Routes</text>
+    <text x="185" y="290" class="nodeFile">routes/documents.ts</text>
+    <text x="185" y="314" class="nodeBody">create / update / content</text>
+    <text x="185" y="330" class="nodeBody">computeFleetGraphContentHash()</text>
+    <text x="185" y="346" class="nodeBody">enqueueFleetGraphRun()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="185" cy="500" r="120" fill="#1f1728" stroke="#a855f7" stroke-width="3"/>
+    <text x="185" y="464" class="nodeTitle">Collaboration</text>
+    <text x="185" y="482" class="nodeFile">collaboration/index.ts</text>
+    <text x="185" y="506" class="nodeBody">schedulePersist()</text>
+    <text x="185" y="522" class="nodeBody">latest idle candidate capture</text>
+    <text x="185" y="538" class="nodeBody">scheduleFleetGraphIdleCheckpoint()</text>
+    <text x="185" y="554" class="nodeBody">Y.js no longer directly spams runs</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="185" cy="700" r="110" fill="#2a1b10" stroke="#f59e0b" stroke-width="3"/>
+    <text x="185" y="672" class="nodeTitle">Nightly Scan API</text>
+    <text x="185" y="690" class="nodeFile">routes/fleetgraph.ts</text>
+    <text x="185" y="714" class="nodeBody">POST /nightly-scan</text>
+    <text x="185" y="730" class="nodeBody">workspace-level sweep trigger</text>
+    <text x="185" y="746" class="nodeBody">optional draft reports</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="185" cy="900" r="120" fill="#1e293b" stroke="#38bdf8" stroke-width="3"/>
+    <text x="185" y="864" class="nodeTitle">Trigger Queue</text>
+    <text x="185" y="882" class="nodeFile">services/fleetgraph/triggers.ts</text>
+    <text x="185" y="906" class="nodeBody">hash dedupe</text>
+    <text x="185" y="922" class="nodeBody">workspace-balanced selection</text>
+    <text x="185" y="938" class="nodeBody">4-minute flush</text>
+    <text x="185" y="954" class="nodeBody">queue status feed</text>
+  </g>
+
+  <!-- center left runtime nodes -->
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="260" r="70" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="247" class="nodeTitle">flushFleetGraph</text>
+    <text x="700" y="264" class="nodeFile">triggers.ts</text>
+    <text x="700" y="286" class="nodeBody">flushFleetGraphQueue()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="380" r="78" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="363" class="nodeTitle">executeTrigger</text>
+    <text x="700" y="380" class="nodeFile">execute.ts</text>
+    <text x="700" y="402" class="nodeBody">executeFleetGraphTrigger()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="500" r="78" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="483" class="nodeTitle">prepareRun</text>
+    <text x="700" y="500" class="nodeFile">runner.ts</text>
+    <text x="700" y="522" class="nodeBody">prepareFleetGraphRun()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="620" r="92" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="592" class="nodeTitle">Traversal Nodes</text>
+    <text x="700" y="610" class="nodeFile">nodes.ts + runner.ts</text>
+    <text x="700" y="634" class="nodeBody">load-trigger-context</text>
+    <text x="700" y="650" class="nodeBody">load-document</text>
+    <text x="700" y="666" class="nodeBody">load-associations / related docs</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="740" r="70" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="727" class="nodeTitle">buildGraph</text>
+    <text x="700" y="744" class="nodeFile">graph.ts</text>
+    <text x="700" y="766" class="nodeBody">buildFleetGraphSnapshot()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="860" r="74" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="847" class="nodeTitle">buildPayload</text>
+    <text x="700" y="864" class="nodeFile">payload.ts</text>
+    <text x="700" y="886" class="nodeBody">buildFleetGraphScoringPayload()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="980" r="98" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="950" class="nodeTitle">scoreGraph</text>
+    <text x="700" y="968" class="nodeFile">analyze.ts + reasoning.ts</text>
+    <text x="700" y="992" class="nodeBody">analyzeFleetGraphPayload()</text>
+    <text x="700" y="1008" class="nodeBody">analyzeFleetGraphForPurpose()</text>
+    <text x="700" y="1024" class="nodeBody">mergeReasoningIntoAnalysis()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="700" cy="1100" r="74" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="700" y="1087" class="nodeTitle">persistAnalysis</text>
+    <text x="700" y="1104" class="nodeFile">persist.ts</text>
+    <text x="700" y="1126" class="nodeBody">persistFleetGraphAnalysis()</text>
+  </g>
+
+  <!-- center right runtime nodes -->
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="260" r="74" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="247" class="nodeTitle">REST Client</text>
+    <text x="1100" y="264" class="nodeFile">client.ts</text>
+    <text x="1100" y="286" class="nodeBody">Bearer + session clients</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="380" r="78" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="363" class="nodeTitle">Tracing</text>
+    <text x="1100" y="380" class="nodeFile">tracing.ts</text>
+    <text x="1100" y="402" class="nodeBody">traceable config + metadata</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="500" r="82" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="483" class="nodeTitle">Hash Guard</text>
+    <text x="1100" y="500" class="nodeFile">hash.ts</text>
+    <text x="1100" y="522" class="nodeBody">computeFleetGraphContentHash()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="620" r="82" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="603" class="nodeTitle">Recursive Crawl</text>
+    <text x="1100" y="620" class="nodeFile">runner.ts</text>
+    <text x="1100" y="642" class="nodeBody">expandFleetGraphTraversal()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="740" r="74" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="727" class="nodeTitle">Snapshot Meta</text>
+    <text x="1100" y="744" class="nodeFile">graph.ts</text>
+    <text x="1100" y="766" class="nodeBody">depth / truncation / limits</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="860" r="78" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="847" class="nodeTitle">Payload Meta</text>
+    <text x="1100" y="864" class="nodeFile">payload.ts</text>
+    <text x="1100" y="886" class="nodeBody">doc/edge counts + summaries</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="980" r="92" fill="#10231a" stroke="#22c55e" stroke-width="3"/>
+    <text x="1100" y="952" class="nodeTitle">LangSmith + GPT</text>
+    <text x="1100" y="970" class="nodeFile">reasoning.ts + index.ts</text>
+    <text x="1100" y="994" class="nodeBody">wrapOpenAI()</text>
+    <text x="1100" y="1010" class="nodeBody">LangSmith startup status</text>
+    <text x="1100" y="1026" class="nodeBody">Invocation metadata</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1100" cy="1100" r="78" fill="#0f2233" stroke="#38bdf8" stroke-width="3"/>
+    <text x="1100" y="1087" class="nodeTitle">Insights API</text>
+    <text x="1100" y="1104" class="nodeFile">routes/fleetgraph.ts</text>
+    <text x="1100" y="1126" class="nodeBody">GET /documents/:id</text>
+  </g>
+
+  <!-- right orbit -->
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="300" r="95" fill="#11251f" stroke="#14b8a6" stroke-width="3"/>
+    <text x="1560" y="272" class="nodeTitle">Draft Report</text>
+    <text x="1560" y="290" class="nodeFile">report.ts</text>
+    <text x="1560" y="314" class="nodeBody">createFleetGraphQualityReportDraft()</text>
+    <text x="1560" y="330" class="nodeBody">adds response options</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="430" r="85" fill="#11251f" stroke="#14b8a6" stroke-width="3"/>
+    <text x="1560" y="406" class="nodeTitle">Publish Report</text>
+    <text x="1560" y="424" class="nodeFile">report.ts</text>
+    <text x="1560" y="448" class="nodeBody">publishFleetGraphQualityReport()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="560" r="92" fill="#11251f" stroke="#14b8a6" stroke-width="3"/>
+    <text x="1560" y="532" class="nodeTitle">Director Feedback</text>
+    <text x="1560" y="550" class="nodeFile">feedback.ts</text>
+    <text x="1560" y="574" class="nodeBody">sendFleetGraphDirectorFeedback()</text>
+    <text x="1560" y="590" class="nodeBody">writes alert tags + feedback payload</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="690" r="98" fill="#11251f" stroke="#14b8a6" stroke-width="3"/>
+    <text x="1560" y="662" class="nodeTitle">Reports Feed</text>
+    <text x="1560" y="680" class="nodeFile">reports.ts</text>
+    <text x="1560" y="704" class="nodeBody">listFleetGraphReports()</text>
+    <text x="1560" y="720" class="nodeBody">getFleetGraphReportDetail()</text>
+    <text x="1560" y="736" class="nodeBody">getFleetGraphReviewSession()</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="820" r="98" fill="#2a1b10" stroke="#f97316" stroke-width="3"/>
+    <text x="1560" y="792" class="nodeTitle">Reports Page</text>
+    <text x="1560" y="810" class="nodeFile">FleetGraphReportsPage.tsx</text>
+    <text x="1560" y="834" class="nodeBody">queue + filters + publish</text>
+    <text x="1560" y="850" class="nodeBody">scan controls + confirmations</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="950" r="102" fill="#2a1b10" stroke="#f97316" stroke-width="3"/>
+    <text x="1560" y="922" class="nodeTitle">Report Detail</text>
+    <text x="1560" y="940" class="nodeFile">FleetGraphReportDetailPage.tsx</text>
+    <text x="1560" y="964" class="nodeBody">narrative + root health + live graph</text>
+    <text x="1560" y="980" class="nodeBody">director response options</text>
+    <text x="1560" y="996" class="nodeBody">publish / send confirmations</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="1080" r="100" fill="#2a1b10" stroke="#f97316" stroke-width="3"/>
+    <text x="1560" y="1052" class="nodeTitle">Batch Session</text>
+    <text x="1560" y="1070" class="nodeFile">FleetGraphReviewSessionPage.tsx</text>
+    <text x="1560" y="1094" class="nodeBody">flattened red/yellow findings</text>
+    <text x="1560" y="1110" class="nodeBody">bulk publish + chunk review</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <circle cx="1560" cy="1210" r="100" fill="#2a1b10" stroke="#f97316" stroke-width="3"/>
+    <text x="1560" y="1182" class="nodeTitle">Document Insights</text>
+    <text x="1560" y="1200" class="nodeFile">InsightsPanel + Viewer</text>
+    <text x="1560" y="1224" class="nodeBody">compact summary strip</text>
+    <text x="1560" y="1240" class="nodeBody">graph viewer + actions</text>
+    <text x="1560" y="1256" class="nodeBody">repetition minimized</text>
+  </g>
+
+  <!-- edge labels -->
+  <text x="475" y="270" class="edgeLabel">queue flush</text>
+  <text x="900" y="248" class="edgeLabel">client</text>
+  <text x="900" y="370" class="edgeLabel">trace</text>
+  <text x="900" y="492" class="edgeLabel">hash</text>
+  <text x="900" y="610" class="edgeLabel">crawl</text>
+  <text x="900" y="970" class="edgeLabel">model trace</text>
+  <text x="1310" y="690" class="edgeLabel">review feeds</text>
+
+  <!-- footer -->
+  <rect x="70" y="1315" width="1660" height="55" rx="18" fill="#0f172a" stroke="#1e293b" stroke-width="1.5"/>
+  <text x="100" y="1348" class="mini">Main spine: queue → execute → prepare → traverse → graph → payload → score → persist → insights. Right orbit: report drafting, publishing, feedback, review surfaces. Left orbit: entry points and queueing behavior.</text>
+</svg>

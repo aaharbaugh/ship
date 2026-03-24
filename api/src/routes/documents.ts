@@ -6,6 +6,8 @@ import { isWorkspaceAdmin } from '../middleware/visibility.js';
 import { handleVisibilityChange, handleDocumentConversion, invalidateDocumentCache, broadcastToUser } from '../collaboration/index.js';
 import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extractVisionFromContent, extractGoalsFromContent, checkDocumentCompleteness } from '../utils/extractHypothesis.js';
 import { loadContentFromYjsState } from '../utils/yjsConverter.js';
+import { computeFleetGraphContentHash } from '../services/fleetgraph/hash.js';
+import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 type RouterType = ReturnType<typeof Router>;
 const router: RouterType = Router();
@@ -544,6 +546,24 @@ router.patch('/:id/content', authMiddleware, async (req: Request, res: Response)
     // Invalidate collaboration cache so connected clients get fresh content
     invalidateDocumentCache(id);
 
+    if (!isFleetGraphReportProperties(newProps)) {
+      void enqueueFleetGraphRun({
+        workspaceId,
+        documentId: id,
+        source: 'document_content_update',
+        userId,
+        documentType: existing.document_type,
+        contentHash: computeFleetGraphContentHash({
+          title: existing.title,
+          content,
+          properties: newProps,
+          parentId: existing.parent_id,
+        }),
+      }).catch((error) => {
+        console.error('[FleetGraph] Failed to enqueue document content update', { documentId: id, error });
+      });
+    }
+
     res.json({
       id: result.rows[0].id,
       title: result.rows[0].title,
@@ -632,6 +652,26 @@ router.post('/', authMiddleware, async (req: Request, res: Response) => {
     // Documents with outcome property linked to sprints clear the "write retro" action item
     if (document_type === 'weekly_plan' || (properties && 'outcome' in properties)) {
       broadcastToUser(req.userId!, 'accountability:updated', { documentId: newDoc.id, documentType: document_type });
+    }
+
+    const createdProperties = (properties as Record<string, unknown> | undefined) ?? {};
+    if (!isFleetGraphReportProperties(createdProperties)) {
+      void enqueueFleetGraphRun({
+        workspaceId: String(req.workspaceId),
+        documentId: String(newDoc.id),
+        source: 'document_create',
+        userId: String(req.userId),
+        documentType: document_type,
+        contentHash: computeFleetGraphContentHash({
+          title: newDoc.title,
+          content: content ?? null,
+          properties: createdProperties,
+          parentId: newDoc.parent_id,
+          belongsTo: belongs_to ?? null,
+        }),
+      }).catch((error) => {
+        console.error('[FleetGraph] Failed to enqueue document create', { documentId: newDoc.id, error });
+      });
     }
 
     res.status(201).json(newDoc);
@@ -1105,6 +1145,28 @@ router.patch('/:id', authMiddleware, async (req: Request, res: Response) => {
     // Flatten properties for backwards compatibility (match GET endpoint format)
     const updatedDoc = result.rows[0];
     const props = updatedDoc.properties || {};
+    const updatedProperties = (updatedDoc.properties as Record<string, unknown> | null) ?? {};
+
+    if (!isFleetGraphReportProperties(updatedProperties)) {
+      void enqueueFleetGraphRun({
+        workspaceId,
+        documentId: id,
+        source: 'document_update',
+        userId,
+        documentType: existing.document_type,
+        contentHash: computeFleetGraphContentHash({
+          title: updatedDoc.title,
+          content: updatedDoc.content,
+          properties: updatedProperties,
+          parentId: updatedDoc.parent_id,
+          belongsTo: Array.isArray(data.belongs_to)
+            ? data.belongs_to.map((association) => ({ id: association.id, type: association.type }))
+            : null,
+        }),
+      }).catch((error) => {
+        console.error('[FleetGraph] Failed to enqueue document update', { documentId: id, error });
+      });
+    }
 
     // Get owner details for projects (owner_id is a user_id, lookup person document by user_id)
     // Return user_id as id so PersonCombobox can match correctly
@@ -1567,6 +1629,10 @@ router.post('/:id/undo-conversion', authMiddleware, async (req: Request, res: Re
 });
 
 export default router;
+
+function isFleetGraphReportProperties(properties: Record<string, unknown> | null | undefined): boolean {
+  return properties?.fleetgraph_report_type === 'quality_report';
+}
 
 // Type augmentation for Express Request
 declare global {

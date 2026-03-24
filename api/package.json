@@ -17,6 +17,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:orphan-check": "tsx src/db/scripts/orphan-diagnostic.ts",
+    "fleetgraph:worker": "tsx src/scripts/fleetgraph-worker.ts",
     "openapi:generate": "tsx src/scripts/generate-openapi.ts",
     "mcp": "tsx src/mcp/server.ts"
   },
@@ -39,7 +40,9 @@
     "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.2",
     "helmet": "^8.0.0",
+    "langsmith": "^0.5.10",
     "lib0": "^0.2.99",
+    "openai": "^6.31.0",
     "openid-client": "^6.8.1",
     "pg": "^8.13.1",
     "swagger-ui-express": "^5.0.1",

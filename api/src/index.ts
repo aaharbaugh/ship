@@ -29,12 +29,16 @@ async function main() {
   // Now import app after secrets are loaded
   const { createApp } = await import('./app.js');
   const { setupCollaboration } = await import('./collaboration/index.js');
+  const { logFleetGraphTracingStatus } = await import('./services/fleetgraph/tracing.js');
+  const { startFleetGraphWorker } = await import('./services/fleetgraph/triggers.js');
 
   const PORT = process.env.PORT || 3000;
   const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 
   const app = createApp(CORS_ORIGIN);
   const server = createServer(app);
+  logFleetGraphTracingStatus();
+  startFleetGraphWorker();
 
   // DDoS protection: Set server-wide timeouts to prevent slow-read attacks (Slowloris)
   server.timeout = 60000; // 60 seconds max request duration

@@ -1,12 +1,25 @@
-import { useCallback, useMemo, useEffect, Suspense } from 'react';
+import { useCallback, useMemo, useEffect, Suspense, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { UnifiedEditor } from '@/components/UnifiedEditor';
+import { FleetGraphDocumentReview } from '@/components/FleetGraphDocumentReview';
+import type { PersistedFleetGraphView } from '@/components/FleetGraphInsightsPanel';
 import type { UnifiedDocument, SidebarData } from '@/components/UnifiedEditor';
 import { useAuth } from '@/hooks/useAuth';
 import { useAssignableMembersQuery } from '@/hooks/useTeamMembersQuery';
 import { useProgramsQuery } from '@/hooks/useProgramsQuery';
 import { useProjectsQuery } from '@/hooks/useProjectsQuery';
+import {
+  fleetGraphInsightsKeys,
+  useFleetGraphInsightsQuery,
+  useFleetGraphLiveReviewQuery,
+  useFleetGraphStartLiveReviewMutation,
+} from '@/hooks/useFleetGraphInsightsQuery';
+import {
+  useFleetGraphReportsQuery,
+  useFleetGraphPublishReportMutation,
+  useFleetGraphReportDetailQuery,
+} from '@/hooks/useFleetGraphReportsQuery';
 import { useDocumentConversion } from '@/hooks/useDocumentConversion';
 import { apiGet, apiPatch, apiDelete, apiPost } from '@/lib/api';
 import { useToast } from '@/components/ui/Toast';
@@ -32,6 +45,8 @@ import {
 export function UnifiedDocumentPage() {
   const { id, '*': wildcardPath } = useParams<{ id: string; '*'?: string }>();
   const navigate = useNavigate();
+  const [fleetGraphLiveRequested, setFleetGraphLiveRequested] = useState(false);
+  const [fleetGraphLiveRunId, setFleetGraphLiveRunId] = useState<string | null>(null);
 
   // Parse wildcard path into tab and nested path
   // Example: /documents/abc/sprints/xyz -> wildcardPath = "sprints/xyz" -> tab = "sprints", nestedPath = "xyz"
@@ -59,6 +74,16 @@ export function UnifiedDocumentPage() {
     enabled: !!id,
     retry: false,
   });
+  const fleetGraphInsightsQuery = useFleetGraphInsightsQuery(id, fleetGraphLiveRequested);
+  const fleetGraphStartLiveReviewMutation = useFleetGraphStartLiveReviewMutation(id);
+  const fleetGraphLiveRunQuery = useFleetGraphLiveReviewQuery(fleetGraphLiveRunId ?? undefined);
+  const fleetGraphReportsQuery = useFleetGraphReportsQuery();
+  const fleetGraphPublishMutation = useFleetGraphPublishReportMutation();
+  const fleetGraphRunningReview =
+    fleetGraphStartLiveReviewMutation.isPending ||
+    fleetGraphLiveRunQuery.data?.run.status === 'running';
+  const [fleetGraphCardExpanded, setFleetGraphCardExpanded] = useState(false);
+  const fleetGraphCardRef = useRef<HTMLDivElement | null>(null);
 
   // Sync current document context for rail highlighting
   useEffect(() => {
@@ -442,6 +467,163 @@ export function UnifiedDocumentPage() {
     } as UnifiedDocument;
   }, [document]);
 
+  const persistedFleetGraph = useMemo<PersistedFleetGraphView | null>(() => {
+    const properties = document?.properties as Record<string, unknown> | undefined;
+    if (!properties) return null;
+
+    const qualityScore = properties.quality_score;
+    const qualityStatus = properties.quality_status;
+    const qualitySummary = properties.quality_summary;
+    const qualityTags = properties.quality_tags;
+
+    if (
+      typeof qualityScore !== 'number' ||
+      (qualityStatus !== 'green' && qualityStatus !== 'yellow' && qualityStatus !== 'red') ||
+      typeof qualitySummary !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      qualityScore,
+      qualityStatus,
+      qualitySummary,
+      qualityReportId: typeof properties.quality_report_id === 'string' ? properties.quality_report_id : null,
+      qualityTags: Array.isArray(qualityTags)
+        ? qualityTags.filter((tag): tag is PersistedFleetGraphView['qualityTags'][number] => {
+            if (!tag || typeof tag !== 'object') return false;
+            const record = tag as Record<string, unknown>;
+            return (
+              typeof record.key === 'string' &&
+              typeof record.label === 'string' &&
+              (record.severity === 'high' || record.severity === 'medium' || record.severity === 'low')
+            );
+          })
+        : [],
+      lastScoredAt: typeof properties.last_scored_at === 'string' ? properties.last_scored_at : null,
+    };
+  }, [document?.properties]);
+
+  useEffect(() => {
+    setFleetGraphLiveRequested(false);
+    setFleetGraphLiveRunId(null);
+  }, [id]);
+
+  useEffect(() => {
+    const run = fleetGraphLiveRunQuery.data?.run;
+    if (!run || run.status === 'running') {
+      return;
+    }
+
+    setFleetGraphLiveRequested(false);
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['document', id] }),
+      queryClient.invalidateQueries({ queryKey: fleetGraphInsightsKeys.detail(id || '') }),
+      queryClient.invalidateQueries({ queryKey: ['fleetgraph-reports'] }),
+      queryClient.invalidateQueries({ queryKey: ['fleetgraph-report-detail'] }),
+    ]);
+  }, [fleetGraphLiveRunQuery.data?.run, id, queryClient]);
+
+  const isFleetGraphReportDocument =
+    Boolean(document?.properties) &&
+    (document?.properties as Record<string, unknown>).fleetgraph_report_type === 'quality_report';
+
+  const fleetGraphReportId = persistedFleetGraph?.qualityReportId ?? null;
+  const hasLinkedFleetGraphReport = Boolean(
+    fleetGraphReportId &&
+    fleetGraphReportsQuery.data?.some((report) => report.id === fleetGraphReportId)
+  );
+  const fleetGraphReportDetailQuery = useFleetGraphReportDetailQuery(
+    hasLinkedFleetGraphReport ? fleetGraphReportId ?? undefined : undefined
+  );
+
+  const revealFleetGraphReview = useCallback(() => {
+    setFleetGraphCardExpanded(true);
+    requestAnimationFrame(() => {
+      fleetGraphCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
+  const runFleetGraphReview = useCallback(async () => {
+    revealFleetGraphReview();
+    setFleetGraphLiveRequested(true);
+
+    try {
+      const result = await fleetGraphStartLiveReviewMutation.mutateAsync();
+      setFleetGraphLiveRunId(result.run.runId);
+    } catch {
+      setFleetGraphLiveRequested(false);
+    }
+  }, [fleetGraphStartLiveReviewMutation, revealFleetGraphReview]);
+
+  const embeddedFleetGraphReview = useMemo(
+    () => (
+      <div ref={fleetGraphCardRef}>
+        <FleetGraphDocumentReview
+          data={fleetGraphInsightsQuery.data}
+          isLoading={fleetGraphInsightsQuery.isLoading}
+          error={fleetGraphInsightsQuery.error as Error | null}
+          persisted={persistedFleetGraph}
+          liveAnalysisRequested={fleetGraphLiveRequested}
+          onRunReview={runFleetGraphReview}
+          isRunningReview={fleetGraphRunningReview}
+          reports={fleetGraphReportsQuery.data}
+          reportDetail={fleetGraphReportDetailQuery.data}
+          isLoadingReportDetail={fleetGraphReportDetailQuery.isLoading}
+          onPublishReport={(reportId) => fleetGraphPublishMutation.mutate(reportId)}
+          isPublishingReport={fleetGraphPublishMutation.isPending}
+          expanded={fleetGraphCardExpanded}
+          onExpandedChange={setFleetGraphCardExpanded}
+          liveRun={fleetGraphLiveRunQuery.data?.run}
+        />
+      </div>
+    ),
+    [
+      fleetGraphCardExpanded,
+      fleetGraphInsightsQuery.data,
+      fleetGraphInsightsQuery.error,
+      fleetGraphInsightsQuery.isLoading,
+      fleetGraphPublishMutation,
+      fleetGraphRunningReview,
+      persistedFleetGraph,
+      fleetGraphLiveRequested,
+      fleetGraphLiveRunQuery.data?.run,
+      fleetGraphReportDetailQuery.data,
+      fleetGraphReportDetailQuery.isLoading,
+      fleetGraphReportsQuery.data,
+      runFleetGraphReview,
+    ]
+  );
+
+  const fleetGraphArtifactBanner = useMemo(() => {
+    if (!isFleetGraphReportDocument) {
+      return undefined;
+    }
+
+    return (
+      <section className="mb-6 rounded-2xl border border-slate-800 bg-slate-950/95 px-4 py-4 shadow-sm shadow-black/30">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              FleetGraph Artifact
+            </div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+              This document is a FleetGraph review artifact. It records review output for another work document and is not itself a FleetGraph review target.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/team/reviews/fleetgraph')}
+            className="rounded-md border border-slate-700 bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-900"
+          >
+            Open Review Queue
+          </button>
+        </div>
+      </section>
+    );
+  }, [isFleetGraphReportDocument, navigate]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -516,17 +698,30 @@ export function UnifiedDocumentPage() {
 
   // Non-tabbed documents render directly in editor
   return (
-    <UnifiedEditor
-      document={unifiedDocument}
-      sidebarData={sidebarData}
-      onUpdate={handleUpdate}
-      onTypeChange={handleTypeChange}
-      onDocumentConverted={handleDocumentConverted}
-      onBack={hideBackButton ? undefined : handleBack}
-      backLabel={hideBackButton ? undefined : backLabel}
-      onDelete={handleDelete}
-      showTypeSelector={true}
-      titleSuffix={standupAuthorName}
-    />
+    <div className="flex min-h-0 flex-1 gap-4 overflow-hidden p-4 pl-0">
+      <div className="min-w-0 flex-1">
+        <UnifiedEditor
+          document={unifiedDocument}
+          sidebarData={sidebarData}
+          onUpdate={handleUpdate}
+          onTypeChange={handleTypeChange}
+          onDocumentConverted={handleDocumentConverted}
+          onBack={hideBackButton ? undefined : handleBack}
+          backLabel={hideBackButton ? undefined : backLabel}
+          onDelete={handleDelete}
+          showTypeSelector={true}
+          titleSuffix={standupAuthorName}
+          headerBadge={
+            isFleetGraphReportDocument ? (
+              <span className="rounded-full border border-slate-700 bg-slate-950 px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-slate-200">
+                Review Artifact
+              </span>
+            ) : undefined
+          }
+          contentBanner={isFleetGraphReportDocument ? fleetGraphArtifactBanner : embeddedFleetGraphReview}
+          enableFleetGraphInlineAssistant={!isFleetGraphReportDocument}
+        />
+      </div>
+    </div>
   );
 }

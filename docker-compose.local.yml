@@ -36,6 +36,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+    env_file:
+      - .env.local
     ports:
       - "3000:3000"
     environment:
@@ -44,6 +46,10 @@ services:
       DATABASE_URL: postgres://ship:ship_dev_password@postgres:5432/ship_dev
       SESSION_SECRET: local-dev-session-secret-not-for-production
       CORS_ORIGIN: http://localhost:5173
+      FLEETGRAPH_OPENAI_MODEL: gpt-4o-mini
+      APP_BASE_URL: http://localhost:3000
+      LANGSMITH_TRACING: "true"
+      LANGSMITH_PROJECT: fleetgraph-dev
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,10 +58,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.web
+    env_file:
+      - .env.local
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://localhost:3000
+      API_PROXY_TARGET: http://api:3000
     depends_on:
       - api
 

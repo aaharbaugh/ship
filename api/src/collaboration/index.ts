@@ -10,6 +10,8 @@ import { extractHypothesisFromContent, extractSuccessCriteriaFromContent, extrac
 import { yjsToJson, jsonToYjs } from '../utils/yjsConverter.js';
 import { SESSION_TIMEOUT_MS, ABSOLUTE_SESSION_TIMEOUT_MS } from '@ship/shared';
 import cookie from 'cookie';
+import { computeFleetGraphContentHash } from '../services/fleetgraph/hash.js';
+import { enqueueFleetGraphRun } from '../services/fleetgraph/triggers.js';
 
 const messageSync = 0;
 const messageAwareness = 1;
@@ -96,6 +98,18 @@ const eventConns = new Map<WebSocket, { userId: string; workspaceId: string }>()
 
 // Debounce persistence (save every 2 seconds after changes)
 const pendingSaves = new Map<string, NodeJS.Timeout>();
+const pendingFleetGraphIdleRuns = new Map<string, NodeJS.Timeout>();
+const latestFleetGraphIdleEvents = new Map<string, {
+  workspaceId: string;
+  documentId: string;
+  userId: string | null;
+  documentType: string | null;
+  properties: Record<string, unknown>;
+  contentHash: string;
+}>();
+const FLEETGRAPH_COLLAB_IDLE_MS = Number(
+  process.env.FLEETGRAPH_COLLAB_IDLE_MS || 90_000
+);
 
 // Extract document ID from room name (format: "type:uuid")
 // All document types (doc, issue, program, sprint) map to the unified documents table
@@ -125,11 +139,12 @@ async function persistDocument(docName: string, doc: Y.Doc) {
 
     // Get existing properties, document_type, and content to check for changes
     const existingResult = await pool.query(
-      'SELECT properties, document_type, content, created_by FROM documents WHERE id = $1',
+      'SELECT workspace_id, properties, document_type, content, created_by FROM documents WHERE id = $1',
       [docId]
     );
     const existingProps = existingResult.rows[0]?.properties || {};
     const documentType = existingResult.rows[0]?.document_type;
+    const workspaceId = existingResult.rows[0]?.workspace_id;
     const existingContent = existingResult.rows[0]?.content;
     const createdBy = existingResult.rows[0]?.created_by;
 
@@ -173,6 +188,21 @@ async function persistDocument(docName: string, doc: Y.Doc) {
       `UPDATE documents SET yjs_state = $1, content = $2, properties = $3, updated_at = now() WHERE id = $4`,
       [Buffer.from(state), JSON.stringify(content), JSON.stringify(updatedProps), docId]
     );
+
+    if (typeof workspaceId === 'string') {
+      latestFleetGraphIdleEvents.set(docName, {
+        workspaceId,
+        documentId: docId,
+        userId: typeof createdBy === 'string' ? createdBy : null,
+        documentType: typeof documentType === 'string' ? documentType : null,
+        properties: updatedProps as Record<string, unknown>,
+        contentHash: computeFleetGraphContentHash({
+          content,
+          properties: updatedProps as Record<string, unknown>,
+        }),
+      });
+      scheduleFleetGraphIdleCheckpoint(docName);
+    }
   } catch (err) {
     console.error('Failed to persist document:', err);
   }
@@ -186,6 +216,56 @@ function schedulePersist(docName: string, doc: Y.Doc) {
     persistDocument(docName, doc);
     pendingSaves.delete(docName);
   }, 2000));
+}
+
+function scheduleFleetGraphIdleCheckpoint(
+  docName: string,
+  delayMs = FLEETGRAPH_COLLAB_IDLE_MS
+) {
+  const existing = pendingFleetGraphIdleRuns.get(docName);
+  if (existing) clearTimeout(existing);
+
+  pendingFleetGraphIdleRuns.set(docName, setTimeout(() => {
+    const activeConnections = countActiveConnectionsForDoc(docName);
+    if (activeConnections > 0) {
+      scheduleFleetGraphIdleCheckpoint(docName, FLEETGRAPH_COLLAB_IDLE_MS);
+      return;
+    }
+
+    const event = latestFleetGraphIdleEvents.get(docName);
+    if (!event) {
+      pendingFleetGraphIdleRuns.delete(docName);
+      return;
+    }
+
+    if (!isFleetGraphReportProperties(event.properties)) {
+      void enqueueFleetGraphRun({
+        workspaceId: event.workspaceId,
+        documentId: event.documentId,
+        source: 'collaboration_persist',
+        userId: event.userId,
+        documentType: event.documentType,
+        contentHash: event.contentHash,
+      }).catch((error) => {
+        console.error('[FleetGraph] Failed to enqueue collaboration idle run', {
+          documentId: event.documentId,
+          error,
+        });
+      });
+    }
+    pendingFleetGraphIdleRuns.delete(docName);
+    latestFleetGraphIdleEvents.delete(docName);
+  }, delayMs));
+}
+
+function countActiveConnectionsForDoc(docName: string): number {
+  let count = 0;
+  conns.forEach((conn, ws) => {
+    if (conn.docName === docName && ws.readyState === WebSocket.OPEN) {
+      count += 1;
+    }
+  });
+  return count;
 }
 
 // Track which docs were loaded fresh from JSON (not from yjs_state)
@@ -483,6 +563,13 @@ export function invalidateDocumentCache(docId: string): void {
       pendingSaves.delete(docName);
     }
 
+    const pendingFleetGraph = pendingFleetGraphIdleRuns.get(docName);
+    if (pendingFleetGraph) {
+      clearTimeout(pendingFleetGraph);
+      pendingFleetGraphIdleRuns.delete(docName);
+    }
+    latestFleetGraphIdleEvents.delete(docName);
+
     // Remove from cache - next connection will reload from database
     docs.delete(docName);
     awareness.delete(docName);
@@ -750,6 +837,13 @@ export function setupCollaboration(server: Server) {
       if (conn) {
         awarenessProtocol.removeAwarenessStates(aw, [conn.awarenessClientId], null);
         conns.delete(ws);
+
+        if (
+          countActiveConnectionsForDoc(conn.docName) === 0 &&
+          latestFleetGraphIdleEvents.has(conn.docName)
+        ) {
+          scheduleFleetGraphIdleCheckpoint(conn.docName, 5_000);
+        }
       }
       // Clean up rate limiting data for this connection
       messageTimestamps.delete(ws);
@@ -779,6 +873,12 @@ export function setupCollaboration(server: Server) {
           if (stillNoConnections) {
             docs.delete(docName);
             awareness.delete(docName);
+            latestFleetGraphIdleEvents.delete(docName);
+            const pendingFleetGraph = pendingFleetGraphIdleRuns.get(docName);
+            if (pendingFleetGraph) {
+              clearTimeout(pendingFleetGraph);
+              pendingFleetGraphIdleRuns.delete(docName);
+            }
           }
         }, 30000);
       }
@@ -831,4 +931,8 @@ export function setupCollaboration(server: Server) {
 
   console.log('Yjs collaboration server attached');
   console.log('Events WebSocket server attached');
+}
+
+function isFleetGraphReportProperties(properties: Record<string, unknown> | null | undefined): boolean {
+  return properties?.fleetgraph_report_type === 'quality_report';
 }

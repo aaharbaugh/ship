@@ -25,6 +25,12 @@ This repo can run on Railway as a single service:
 ## Optional Environment Variables
 
 - `ENVIRONMENT=railway`
+- `INTERNAL_API_URL=https://<your-service-domain>`
+- `OPENAI_API_KEY=<openai key>` for GPT-4o reasoning
+- `SHIP_API_TOKEN=<workspace api token>` for FleetGraph queued execution and cron scans
+- `LANGSMITH_API_KEY=<langsmith key>`
+- `LANGSMITH_TRACING=true`
+- `LANGSMITH_PROJECT=fleetgraph-dev`
 - `S3_UPLOADS_BUCKET=<bucket name>` if you want S3-backed uploads
 - `CDN_DOMAIN=<cdn domain>` if you want CDN-backed uploads
 - `AWS_REGION=<aws region>` if using S3
@@ -51,8 +57,28 @@ If `S3_UPLOADS_BUCKET` and `CDN_DOMAIN` are not set, uploads fall back to local 
 2. Sign in and confirm authenticated navigation works.
 3. Create/edit a document and verify autosave.
 4. Open the same document in two tabs and verify collaboration updates.
+5. Open `GET /api/fleetgraph/readiness` with an admin session and confirm all required FleetGraph env vars are present.
+6. Trigger a FleetGraph scan using:
+
+```bash
+pnpm fleetgraph:nightly-scan
+```
+
+7. Capture two LangSmith trace links and record them in `fleetgraph/TRACE_LINKS.md`.
 5. Run the smoke gate locally before promoting confidence:
 
 ```bash
 sg docker -c "cd /home/aaron/projects/gauntlet/ship/ship && pnpm run test:e2e:smoke"
 ```
+
+## Railway Scheduled Scan
+
+Use the same deployed service URL with the repo script:
+
+```bash
+APP_BASE_URL=https://<your-service-domain> \
+SHIP_API_TOKEN=<workspace api token> \
+pnpm fleetgraph:nightly-scan
+```
+
+This can be used from a Railway cron service or any other scheduler that can run a command with env vars.
